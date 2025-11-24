@@ -3,17 +3,16 @@
 import { Box, Center } from '@mantine/core';
 import { CanvasSettings, Screen } from './AppFrames';
 import { DeviceFrame } from './DeviceFrame';
-import { WelcomeState } from './WelcomeState';
 
 interface CanvasProps {
   settings: CanvasSettings;
   screens: Screen[];
-  onReplaceScreen?: (file: File) => void;
+  onReplaceScreen?: (files: File[]) => void;
   onPanChange?: (panX: number, panY: number) => void;
 }
 
 // Canvas dimensions based on canvas size (App Store requirements)
-const getCanvasDimensions = (canvasSize: string, orientation: string) => {
+const getCanvasDimensions = (canvasSize: string, _orientation: string) => {
   const dimensions: Record<string, { width: number; height: number }> = {
     // iPhone 6.5" Display
     'iphone-6.5-1': { width: 1242, height: 2688 },
@@ -59,12 +58,10 @@ export function Canvas({ settings, screens, onReplaceScreen, onPanChange }: Canv
   const aspectRatio = canvasDimensions.width / canvasDimensions.height;
 
   const handleDrop = (files: File[]) => {
-    if (!onReplaceScreen) return;
-    // Only process the first file
-    const file = files[0];
-    if (file) {
-      onReplaceScreen(file);
+    if (!onReplaceScreen || files.length === 0) {
+      return;
     }
+    onReplaceScreen(files);
   };
   
   const renderComposition = () => {
@@ -76,6 +73,7 @@ export function Canvas({ settings, screens, onReplaceScreen, onPanChange }: Canv
         return (
           <Center style={{ height: '100%' }}>
             <DeviceFrame
+              deviceType={settings.deviceFrame}
               image={selectedScreen?.image}
               mediaId={selectedScreen?.mediaId}
               scale={scale}
@@ -92,14 +90,18 @@ export function Canvas({ settings, screens, onReplaceScreen, onPanChange }: Canv
         return (
           <Center style={{ height: '100%', gap: 20 }}>
             <DeviceFrame
-              image={selectedScreen?.image}
+              deviceType={settings.deviceFrame}
+              image={screens[0]?.image}
+              mediaId={screens[0]?.mediaId}
               scale={scale * 0.9}
               screenScale={settings.screenScale}
               panX={settings.screenPanX}
               panY={settings.screenPanY}
             />
             <DeviceFrame
-              image={screens[1]?.image || selectedScreen?.image}
+              deviceType={settings.deviceFrame}
+              image={screens[1]?.image}
+              mediaId={screens[1]?.mediaId}
               scale={scale * 0.9}
               screenScale={settings.screenScale}
               panX={settings.screenPanX}
@@ -114,7 +116,9 @@ export function Canvas({ settings, screens, onReplaceScreen, onPanChange }: Canv
             <Box style={{ position: 'relative' }}>
               <Box style={{ position: 'absolute', top: -20, left: -20, zIndex: 1 }}>
                 <DeviceFrame
-                  image={selectedScreen?.image}
+                  deviceType={settings.deviceFrame}
+                  image={screens[0]?.image}
+                  mediaId={screens[0]?.mediaId}
                   scale={scale * 0.85}
                   screenScale={settings.screenScale}
                   panX={settings.screenPanX}
@@ -123,7 +127,9 @@ export function Canvas({ settings, screens, onReplaceScreen, onPanChange }: Canv
               </Box>
               <Box style={{ position: 'relative', zIndex: 2 }}>
                 <DeviceFrame
-                  image={screens[1]?.image || selectedScreen?.image}
+                  deviceType={settings.deviceFrame}
+                  image={screens[1]?.image}
+                  mediaId={screens[1]?.mediaId}
                   scale={scale * 0.85}
                   screenScale={settings.screenScale}
                   panX={settings.screenPanX}
@@ -138,21 +144,27 @@ export function Canvas({ settings, screens, onReplaceScreen, onPanChange }: Canv
         return (
           <Center style={{ height: '100%', gap: 15 }}>
             <DeviceFrame
-              image={selectedScreen?.image}
+              deviceType={settings.deviceFrame}
+              image={screens[0]?.image}
+              mediaId={screens[0]?.mediaId}
               scale={scale * 0.75}
               screenScale={settings.screenScale}
               panX={settings.screenPanX}
               panY={settings.screenPanY}
             />
             <DeviceFrame
-              image={screens[1]?.image || selectedScreen?.image}
+              deviceType={settings.deviceFrame}
+              image={screens[1]?.image}
+              mediaId={screens[1]?.mediaId}
               scale={scale * 0.75}
               screenScale={settings.screenScale}
               panX={settings.screenPanX}
               panY={settings.screenPanY}
             />
             <DeviceFrame
-              image={screens[2]?.image || selectedScreen?.image}
+              deviceType={settings.deviceFrame}
+              image={screens[2]?.image}
+              mediaId={screens[2]?.mediaId}
               scale={scale * 0.75}
               screenScale={settings.screenScale}
               panX={settings.screenPanX}
@@ -175,7 +187,9 @@ export function Canvas({ settings, screens, onReplaceScreen, onPanChange }: Canv
                 }}
               >
                 <DeviceFrame
-                  image={selectedScreen?.image}
+                  deviceType={settings.deviceFrame}
+                  image={screens[0]?.image}
+                  mediaId={screens[0]?.mediaId}
                   scale={scale * 0.7}
                   screenScale={settings.screenScale}
                   panX={settings.screenPanX}
@@ -192,7 +206,9 @@ export function Canvas({ settings, screens, onReplaceScreen, onPanChange }: Canv
                 }}
               >
                 <DeviceFrame
-                  image={screens[1]?.image || selectedScreen?.image}
+                  deviceType={settings.deviceFrame}
+                  image={screens[1]?.image}
+                  mediaId={screens[1]?.mediaId}
                   scale={scale * 0.7}
                   screenScale={settings.screenScale}
                   panX={settings.screenPanX}
@@ -209,7 +225,9 @@ export function Canvas({ settings, screens, onReplaceScreen, onPanChange }: Canv
                 }}
               >
                 <DeviceFrame
-                  image={screens[2]?.image || selectedScreen?.image}
+                  deviceType={settings.deviceFrame}
+                  image={screens[2]?.image}
+                  mediaId={screens[2]?.mediaId}
                   scale={scale * 0.7}
                   screenScale={settings.screenScale}
                   panX={settings.screenPanX}

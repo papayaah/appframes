@@ -2,9 +2,10 @@
 
 import { useState } from 'react';
 import { Box, Tabs } from '@mantine/core';
-import { IconLayout, IconDeviceMobile, IconPhoto } from '@tabler/icons-react';
+import { IconLayout, IconDeviceMobile, IconPhoto, IconTypography } from '@tabler/icons-react';
 import { Sidebar } from './Sidebar';
 import { DeviceTab } from './DeviceTab';
+import { TextTab } from './TextTab';
 import { MediaLibrary } from './MediaLibrary';
 import { CanvasSettings, Screen } from './AppFrames';
 
@@ -27,6 +28,9 @@ export function SidebarTabs({ settings, setSettings, screens, onMediaSelect }: S
         <Tabs.Tab value="device" leftSection={<IconDeviceMobile size={16} />}>
           Device
         </Tabs.Tab>
+        <Tabs.Tab value="text" leftSection={<IconTypography size={16} />}>
+          Text
+        </Tabs.Tab>
         <Tabs.Tab value="media" leftSection={<IconPhoto size={16} />}>
           Media
         </Tabs.Tab>
@@ -39,6 +43,10 @@ export function SidebarTabs({ settings, setSettings, screens, onMediaSelect }: S
 
         <Tabs.Panel value="device" style={{ height: '100%' }}>
           <DeviceTab settings={settings} setSettings={setSettings} />
+        </Tabs.Panel>
+
+        <Tabs.Panel value="text" style={{ height: '100%' }}>
+          <TextTab settings={settings} setSettings={setSettings} />
         </Tabs.Panel>
 
         <Tabs.Panel value="media" style={{ height: '100%' }}>

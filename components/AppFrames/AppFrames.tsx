@@ -38,7 +38,7 @@ export interface ScreensStudioActions {
 }
 
 // Canvas dimensions helper (App Store requirements)
-const getCanvasDimensions = (canvasSize: string, orientation: string) => {
+const getCanvasDimensions = (canvasSize: string, _orientation: string) => {
   const dimensions: Record<string, { width: number; height: number }> = {
     // iPhone 6.5" Display
     'iphone-6.5-1': { width: 1242, height: 2688 },
@@ -79,6 +79,50 @@ const getCanvasDimensions = (canvasSize: string, orientation: string) => {
   return dim;
 };
 
+// Helper function to determine how many device frames a composition uses
+const getCompositionFrameCount = (composition: string): number => {
+  switch (composition) {
+    case 'single': return 1;
+    case 'dual': return 2;
+    case 'stack': return 2;
+    case 'triple': return 3;
+    case 'fan': return 3;
+    default: return 1;
+  }
+};
+
+// Helper function to find the next empty screen index for smart frame filling
+// Returns -1 if a new screen needs to be created
+const findNextEmptyScreenIndex = (
+  screens: Screen[],
+  composition: string,
+  currentIndex: number
+): number => {
+  // Handle empty screens array
+  if (screens.length === 0) {
+    return -1; // Signal to create new screen
+  }
+  
+  // Determine how many frames the composition uses
+  const frameCount = getCompositionFrameCount(composition);
+  
+  // If we don't have enough screens for the composition, signal to create new
+  if (screens.length < frameCount) {
+    return -1; // Signal to create new screen
+  }
+  
+  // Find first empty frame within composition frame count
+  for (let i = 0; i < Math.min(frameCount, screens.length); i++) {
+    const screen = screens[i];
+    if (!screen.mediaId && !screen.image) {
+      return i;
+    }
+  }
+  
+  // All frames filled, use current selection
+  return currentIndex;
+};
+
 export function AppFrames() {
   const [screens, setScreens] = useState<Screen[]>([]);
   const [settings, setSettings] = useState<CanvasSettings>({
@@ -89,7 +133,7 @@ export function AppFrames() {
     captionVertical: 10,
     captionHorizontal: 50,
     selectedScreenIndex: 0,
-    screenScale: 50,
+    screenScale: 100, // Changed from 50 to 100 to fill device frame by default
     screenPanX: 50,
     screenPanY: 50,
     orientation: 'portrait',
@@ -100,29 +144,25 @@ export function AppFrames() {
 
   const addScreen = (imageOrMediaId: string | number) => {
     const newScreen: Screen = {
-      id: `screen-${Date.now()}`,
+      id: `screen-${Date.now()}-${Math.random()}`, // More unique ID
       ...(typeof imageOrMediaId === 'number' 
         ? { mediaId: imageOrMediaId } 
         : { image: imageOrMediaId }),
       name: `Screen ${screens.length + 1}`,
     };
-    setScreens([...screens, newScreen]);
+    setScreens((prevScreens) => [...prevScreens, newScreen]);
     // Select the newly added screen
-    setSettings({ ...settings, selectedScreenIndex: screens.length });
+    setSettings((prevSettings) => ({ 
+        ...prevSettings, 
+        selectedScreenIndex: screens.length // use current length as new index
+    }));
   };
 
-  const replaceScreen = (index: number, imageOrMediaId: string | number) => {
-    const updatedScreens = [...screens];
-    if (updatedScreens[index]) {
-      updatedScreens[index] = {
-        ...updatedScreens[index],
-        ...(typeof imageOrMediaId === 'number' 
-          ? { mediaId: imageOrMediaId, image: undefined } 
-          : { image: imageOrMediaId, mediaId: undefined }),
-      };
-      setScreens(updatedScreens);
-    }
-  };
+  // Separate helper that just returns the new array without setting state immediately if needed, 
+  // but since we need sequential updates for the loop, we might need to be careful with state updates.
+  // Actually, state updates are batched. 
+  // If we call setScreens multiple times in a loop, it might not work as expected if relying on previous state variable.
+  // We should accumulate changes.
 
   const handleMediaUpload = async (file: File): Promise<number | null> => {
     try {
@@ -155,6 +195,7 @@ export function AppFrames() {
 
       return id as number;
     } catch (error) {
+      // eslint-disable-next-line no-console
       console.error('Error uploading media:', error);
       return null;
     }
@@ -171,16 +212,12 @@ export function AppFrames() {
           let width = img.width;
           let height = img.height;
 
-          if (width > height) {
-            if (width > maxSize) {
-              height = (height * maxSize) / width;
-              width = maxSize;
-            }
-          } else {
-            if (height > maxSize) {
-              width = (width * maxSize) / height;
-              height = maxSize;
-            }
+          if (width > height && width > maxSize) {
+            height = (height * maxSize) / width;
+            width = maxSize;
+          } else if (height >= width && height > maxSize) {
+            width = (width * maxSize) / height;
+            height = maxSize;
           }
 
           canvas.width = width;
@@ -210,6 +247,7 @@ export function AppFrames() {
       const canvasElement = document.querySelector('[data-canvas="true"]') as HTMLElement;
       
       if (!canvasElement) {
+        // eslint-disable-next-line no-alert
         alert('Canvas not found');
         return;
       }
@@ -224,10 +262,28 @@ export function AppFrames() {
       link.href = dataUrl;
       link.click();
     } catch (error) {
+      // eslint-disable-next-line no-console
       console.error('Export failed:', error);
+      // eslint-disable-next-line no-alert
       alert('Export failed. Please try again.');
     }
   };
+
+  const replaceScreen = (index: number, imageOrMediaId: string | number) => {
+      setScreens(prevScreens => {
+          const updatedScreens = [...prevScreens];
+          if (updatedScreens[index]) {
+              updatedScreens[index] = {
+                  ...updatedScreens[index],
+                  ...(typeof imageOrMediaId === 'number'
+                      ? { mediaId: imageOrMediaId, image: undefined }
+                      : { image: imageOrMediaId, mediaId: undefined }),
+              };
+          }
+          return updatedScreens;
+      });
+  };
+
 
   return (
     <AppShell
@@ -251,6 +307,7 @@ export function AppFrames() {
           setSettings={setSettings} 
           screens={screens}
           onMediaSelect={(mediaId) => {
+            // If no screens exist, create one
             if (screens.length === 0) {
               addScreen(mediaId);
             } else {
@@ -265,15 +322,88 @@ export function AppFrames() {
           <Canvas 
             settings={settings} 
             screens={screens} 
-            onReplaceScreen={async (file) => {
-              // Upload to media library
-              const mediaId = await handleMediaUpload(file);
-              if (mediaId) {
-                if (screens.length === 0) {
-                  addScreen(mediaId);
-                } else {
-                  replaceScreen(settings.selectedScreenIndex, mediaId);
+            onReplaceScreen={async (files) => {
+              try {
+                const layoutFrameCount = getCompositionFrameCount(settings.composition);
+                
+                // Pre-process uploads
+                const uploadPromises = files.map(file => handleMediaUpload(file));
+                const mediaIds = await Promise.all(uploadPromises);
+                
+                // We need to work with a snapshot of screens to determine what happens
+                // Since setState is async, we can't rely on `screens` updating inside the loop
+                let currentScreens = [...screens];
+                let newSettings = { ...settings };
+
+                for (let i = 0; i < mediaIds.length; i++) {
+                    const mediaId = mediaIds[i];
+                    if (!mediaId) continue;
+
+                    let targetIndex = -1;
+
+                    if (files.length > 1) {
+                        // Multi-drop: fill 0, 1, 2... regardless of current selection?
+                        // Or fill sequential starting from selection?
+                        // "dropping 3 images should fill all 3 images" -> implies filling 0, 1, 2 if 3 slots
+                        if (i < layoutFrameCount) {
+                            targetIndex = i;
+                        }
+                    } else {
+                        // Single drop
+                        targetIndex = findNextEmptyScreenIndex(
+                            currentScreens, 
+                            newSettings.composition, 
+                            newSettings.selectedScreenIndex
+                        );
+                    }
+
+                    // If target is valid
+                    if (targetIndex !== -1 && targetIndex < layoutFrameCount) {
+                        if (targetIndex < currentScreens.length) {
+                            // Update existing screen in our local copy
+                            currentScreens[targetIndex] = {
+                                ...currentScreens[targetIndex],
+                                mediaId: mediaId,
+                                image: undefined
+                            };
+                        } else {
+                            // Create new screen
+                            const newScreen: Screen = {
+                                id: `screen-${Date.now()}-${i}`,
+                                mediaId: mediaId,
+                                name: `Screen ${currentScreens.length + 1}`,
+                            };
+                            currentScreens.push(newScreen);
+                        }
+                        
+                        // Update selection index for the last item
+                        if (i === mediaIds.length - 1) {
+                            newSettings.selectedScreenIndex = targetIndex;
+                        }
+                    } else if (targetIndex === -1) {
+                        // Fallback: add new screen
+                        const newScreen: Screen = {
+                            id: `screen-${Date.now()}-${i}`,
+                            mediaId: mediaId,
+                            name: `Screen ${currentScreens.length + 1}`,
+                        };
+                        currentScreens.push(newScreen);
+                        
+                        if (i === mediaIds.length - 1) {
+                            newSettings.selectedScreenIndex = currentScreens.length - 1;
+                        }
+                    }
                 }
+
+                // Batch update state
+                setScreens(currentScreens);
+                setSettings(newSettings);
+
+              } catch (error) {
+                // eslint-disable-next-line no-console
+                console.error('Error processing dropped files:', error);
+                // eslint-disable-next-line no-alert
+                alert('Failed to process images. Please try again.');
               }
             }}
             onPanChange={(panX, panY) => setSettings({ ...settings, screenPanX: panX, screenPanY: panY })}

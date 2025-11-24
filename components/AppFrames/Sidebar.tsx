@@ -279,53 +279,6 @@ export function Sidebar({ settings, setSettings, screens }: SidebarProps) {
         />
       </Box>
 
-      <Box>
-        <Group justify="space-between" mb="xs">
-          <Text size="sm" fw={700}>
-            Caption
-          </Text>
-          <Switch
-            size="xs"
-            checked={settings.showCaption}
-            onChange={(e) => setSettings({ ...settings, showCaption: e.currentTarget.checked })}
-          />
-        </Group>
-
-        {settings.showCaption && (
-          <>
-            <TextInput
-              size="xs"
-              placeholder="Enter caption text"
-              value={settings.captionText}
-              onChange={(e) => setSettings({ ...settings, captionText: e.currentTarget.value })}
-              mb="md"
-            />
-
-            <Text size="xs" c="dimmed" mb="xs">
-              VERTICAL (Y)
-            </Text>
-            <Slider
-              value={settings.captionVertical}
-              onChange={(value) => setSettings({ ...settings, captionVertical: value })}
-              min={0}
-              max={100}
-              label={(value) => `${value}%`}
-            />
-
-            <Text size="xs" c="dimmed" mb="xs" mt="md">
-              HORIZONTAL (X)
-            </Text>
-            <Slider
-              value={settings.captionHorizontal}
-              onChange={(value) => setSettings({ ...settings, captionHorizontal: value })}
-              min={0}
-              max={100}
-              label={(value) => `${value}%`}
-            />
-          </>
-        )}
-      </Box>
-
       {screens.length > 0 && (
         <Box>
           <Text size="sm" fw={700} mb="xs">
