@@ -45,6 +45,7 @@ const ScreenThumbnail = memo(function ScreenThumbnail({
         padding: 2,
         overflow: 'hidden',
         position: 'relative',
+        pointerEvents: 'none', // Disable pointer events for the content to allow the parent to be clickable
       }}
     >
       <Box
@@ -175,6 +176,7 @@ export function ScreensPanel({
                     right: 4,
                     opacity: 0,
                     transition: 'opacity 0.2s',
+                    pointerEvents: 'auto', // Re-enable pointer events for the delete button
                   }}
                   onClick={(e) => {
                     e.stopPropagation();

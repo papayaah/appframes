@@ -5,6 +5,7 @@ import './globals.css';
 import React from 'react';
 import { ColorSchemeScript, mantineHtmlProps, MantineProvider } from '@mantine/core';
 import { theme } from '../theme';
+import { FramesProvider } from '../components/AppFrames/FramesContext';
 
 export const metadata = {
   title: 'AppFrames - Create Beautiful App Screenshots',
@@ -23,7 +24,9 @@ export default function RootLayout({ children }: { children: any }) {
         />
       </head>
       <body>
-        <MantineProvider theme={theme}>{children}</MantineProvider>
+        <MantineProvider theme={theme}>
+          <FramesProvider>{children}</FramesProvider>
+        </MantineProvider>
       </body>
     </html>
   );

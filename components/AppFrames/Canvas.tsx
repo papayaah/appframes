@@ -9,6 +9,8 @@ interface CanvasProps {
   settings: CanvasSettings;
   screens: Screen[];
   selectedScreenIndices: number[];
+  selectedFrameIndex?: number;
+  onSelectFrame?: (index: number) => void;
   onReplaceScreen?: (files: File[], targetFrameIndex?: number, screenIndex?: number) => void;
   onPanChange?: (panX: number, panY: number, screenIndex: number) => void;
   zoom?: number;
@@ -56,7 +58,16 @@ const getCanvasDimensions = (canvasSize: string, _orientation: string) => {
   return dim;
 };
 
-export function Canvas({ settings, screens, selectedScreenIndices, onReplaceScreen, onPanChange, zoom = 100 }: CanvasProps) {
+export function Canvas({
+  settings,
+  screens,
+  selectedScreenIndices,
+  selectedFrameIndex,
+  onSelectFrame,
+  onReplaceScreen,
+  onPanChange,
+  zoom = 100
+}: CanvasProps) {
   const [hoveredFrameIndex, setHoveredFrameIndex] = useState<number | null>(null);
   const [hoveredScreenIndex, setHoveredScreenIndex] = useState<number | null>(null);
   const [dragFileCount, setDragFileCount] = useState<number>(0);
@@ -123,6 +134,9 @@ export function Canvas({ settings, screens, selectedScreenIndices, onReplaceScre
           const canvasDimensions = getCanvasDimensions(screenSettings.canvasSize, screenSettings.orientation);
           const aspectRatio = canvasDimensions.width / canvasDimensions.height;
 
+          // Only show selection for the primary selected screen (last one)
+          const isPrimaryScreen = screenIndex === selectedScreenIndices[selectedScreenIndices.length - 1];
+
           return (
             <Box
               key={screen.id}
@@ -168,6 +182,8 @@ export function Canvas({ settings, screens, selectedScreenIndices, onReplaceScre
                   hoveredFrameIndex={hoveredScreenIndex === screenIndex ? hoveredFrameIndex : null}
                   onFrameHover={setHoveredFrameIndex}
                   dragFileCount={dragFileCount}
+                  selectedFrameIndex={isPrimaryScreen ? selectedFrameIndex : undefined}
+                  onSelectFrame={isPrimaryScreen ? onSelectFrame : undefined}
                 />
                 {screenSettings.showCaption && screenSettings.captionText && screen.images && screen.images.some(img => img.image || img.mediaId) && (
                   <Box

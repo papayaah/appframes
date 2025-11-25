@@ -123,7 +123,7 @@ export function MediaLibrary({ onSelectMedia, selectedSlot }: MediaLibraryProps)
   }
 
   return (
-    <Box p="md">
+    <Box p="md" style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       <Box mb="xs">
         <Text size="sm" fw={700} mb={4}>
           Media
@@ -145,6 +145,7 @@ export function MediaLibrary({ onSelectMedia, selectedSlot }: MediaLibraryProps)
           padding: 0,
           minHeight: 'auto',
           marginBottom: 16,
+          flexShrink: 0,
         }}
       >
         <Center p="md">
@@ -164,90 +165,92 @@ export function MediaLibrary({ onSelectMedia, selectedSlot }: MediaLibraryProps)
         Library
       </Text>
 
-      <SimpleGrid cols={2} spacing="xs">
-        {mediaFiles.map((media) => (
-          <Box
-            key={media.id}
-            style={{
-              position: 'relative',
-              aspectRatio: '1',
-              borderRadius: 8,
-              overflow: 'hidden',
-              cursor: 'pointer',
-              border: '1px solid #dee2e6',
-              transition: 'all 0.2s',
-            }}
-            onClick={() => media.id && onSelectMedia(media.id)}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.borderColor = '#667eea';
-              e.currentTarget.style.transform = 'scale(1.02)';
-              const deleteBtn = e.currentTarget.querySelector('.delete-btn') as HTMLElement;
-              if (deleteBtn) deleteBtn.style.opacity = '1';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.borderColor = '#dee2e6';
-              e.currentTarget.style.transform = 'scale(1)';
-              const deleteBtn = e.currentTarget.querySelector('.delete-btn') as HTMLElement;
-              if (deleteBtn) deleteBtn.style.opacity = '0';
-            }}
-          >
-            <img
-              src={media.thumbnail}
-              alt={media.name}
-              style={{
-                width: '100%',
-                height: '100%',
-                objectFit: 'cover',
-              }}
-              draggable
-              onDragStart={(e) => {
-                e.dataTransfer.setData('mediaId', String(media.id));
-              }}
-            />
-            <ActionIcon
-              size="xs"
-              color="red"
-              variant="filled"
-              className="delete-btn"
-              style={{
-                position: 'absolute',
-                top: 4,
-                right: 4,
-                opacity: 0,
-                transition: 'opacity 0.2s',
-              }}
-              onClick={(e) => {
-                e.stopPropagation();
-                media.id && handleDelete(media.id, media.fileHandle);
-              }}
-            >
-              <IconX size={12} />
-            </ActionIcon>
+      <Box style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden' }}>
+        <SimpleGrid cols={2} spacing="xs">
+          {mediaFiles.map((media) => (
             <Box
+              key={media.id}
               style={{
-                position: 'absolute',
-                bottom: 0,
-                left: 0,
-                right: 0,
-                padding: 4,
-                background: 'linear-gradient(to top, rgba(0,0,0,0.7), transparent)',
+                position: 'relative',
+                aspectRatio: '1',
+                borderRadius: 8,
+                overflow: 'hidden',
+                cursor: 'pointer',
+                border: '1px solid #dee2e6',
+                transition: 'all 0.2s',
+              }}
+              onClick={() => media.id && onSelectMedia(media.id)}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.borderColor = '#667eea';
+                e.currentTarget.style.transform = 'scale(1.02)';
+                const deleteBtn = e.currentTarget.querySelector('.delete-btn') as HTMLElement;
+                if (deleteBtn) deleteBtn.style.opacity = '1';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.borderColor = '#dee2e6';
+                e.currentTarget.style.transform = 'scale(1)';
+                const deleteBtn = e.currentTarget.querySelector('.delete-btn') as HTMLElement;
+                if (deleteBtn) deleteBtn.style.opacity = '0';
               }}
             >
-              <Text
-                size="xs"
-                c="white"
+              <img
+                src={media.thumbnail}
+                alt={media.name}
                 style={{
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'cover',
+                }}
+                draggable
+                onDragStart={(e) => {
+                  e.dataTransfer.setData('mediaId', String(media.id));
+                }}
+              />
+              <ActionIcon
+                size="xs"
+                color="red"
+                variant="filled"
+                className="delete-btn"
+                style={{
+                  position: 'absolute',
+                  top: 4,
+                  right: 4,
+                  opacity: 0,
+                  transition: 'opacity 0.2s',
+                }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  media.id && handleDelete(media.id, media.fileHandle);
                 }}
               >
-                {media.name}
-              </Text>
+                <IconX size={12} />
+              </ActionIcon>
+              <Box
+                style={{
+                  position: 'absolute',
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  padding: 4,
+                  background: 'linear-gradient(to top, rgba(0,0,0,0.7), transparent)',
+                }}
+              >
+                <Text
+                  size="xs"
+                  c="white"
+                  style={{
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {media.name}
+                </Text>
+              </Box>
             </Box>
-          </Box>
-        ))}
-      </SimpleGrid>
+          ))}
+        </SimpleGrid>
+      </Box>
     </Box>
   );
 }

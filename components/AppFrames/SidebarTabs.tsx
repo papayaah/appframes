@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect } from 'react';
+import { useRouter, usePathname } from 'next/navigation';
 import { Box, Tabs } from '@mantine/core';
 import { IconLayout, IconDeviceMobile, IconPhoto, IconTypography } from '@tabler/icons-react';
 import { Sidebar } from './Sidebar';
@@ -17,10 +18,21 @@ interface SidebarTabsProps {
 }
 
 export function SidebarTabs({ settings, setSettings, screens, onMediaSelect }: SidebarTabsProps) {
-  const [activeTab, setActiveTab] = useState<string | null>('layout');
+  const router = useRouter();
+  const pathname = usePathname();
+
+  // Extract tab from pathname (e.g., "/layout" -> "layout", "/" -> "layout")
+  const currentTab = pathname === '/' ? 'layout' : pathname.replace('/', '');
+  const tab = ['layout', 'device', 'text', 'media'].includes(currentTab) ? currentTab : 'layout';
+
+  const handleTabChange = (value: string | null) => {
+    if (value) {
+      router.push(`/${value}`, { scroll: false });
+    }
+  };
 
   return (
-    <Tabs value={activeTab} onChange={setActiveTab} style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+    <Tabs value={tab} onChange={handleTabChange} style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       <Tabs.List>
         <Tabs.Tab value="layout" leftSection={<IconLayout size={16} />}>
           Layout
@@ -50,7 +62,7 @@ export function SidebarTabs({ settings, setSettings, screens, onMediaSelect }: S
         </Tabs.Panel>
 
         <Tabs.Panel value="media" style={{ height: '100%' }}>
-          <MediaLibrary 
+          <MediaLibrary
             onSelectMedia={(mediaId) => onMediaSelect && onMediaSelect(mediaId)}
             selectedSlot={settings.selectedScreenIndex}
           />

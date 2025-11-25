@@ -11,6 +11,8 @@ interface CompositionRendererProps {
   hoveredFrameIndex?: number | null;
   onFrameHover?: (index: number | null) => void;
   dragFileCount?: number;
+  selectedFrameIndex?: number;
+  onSelectFrame?: (index: number) => void;
 }
 
 const getCompositionFrameCount = (composition: string): number => {
@@ -24,15 +26,24 @@ const getCompositionFrameCount = (composition: string): number => {
   }
 };
 
-export function CompositionRenderer({ settings, screen, onPanChange, hoveredFrameIndex, onFrameHover, dragFileCount = 0 }: CompositionRendererProps) {
+export function CompositionRenderer({
+  settings,
+  screen,
+  onPanChange,
+  hoveredFrameIndex,
+  onFrameHover,
+  dragFileCount = 0,
+  selectedFrameIndex,
+  onSelectFrame
+}: CompositionRendererProps) {
   const scale = settings.compositionScale / 100;
   const images = screen.images || [];
-  
+
   // Determine which frames should be highlighted based on drag
   const getHighlightedFrames = (): number[] => {
     if (hoveredFrameIndex === null || hoveredFrameIndex === undefined) return [];
     const frameCount = getCompositionFrameCount(settings.composition);
-    
+
     if (dragFileCount > 1) {
       // Multi-file drag: highlight frames starting from hovered index
       const frames: number[] = [];
@@ -48,7 +59,7 @@ export function CompositionRenderer({ settings, screen, onPanChange, hoveredFram
       return [hoveredFrameIndex];
     }
   };
-  
+
   const highlightedFrames = getHighlightedFrames();
 
   switch (settings.composition) {
@@ -67,6 +78,8 @@ export function CompositionRenderer({ settings, screen, onPanChange, hoveredFram
             onPanChange={onPanChange}
             frameIndex={0}
             isHighlighted={highlightedFrames.includes(0)}
+            isSelected={selectedFrameIndex === 0}
+            onClick={() => onSelectFrame?.(0)}
             onDragOver={() => onFrameHover?.(0)}
             onDragLeave={() => onFrameHover?.(null)}
           />
@@ -86,6 +99,8 @@ export function CompositionRenderer({ settings, screen, onPanChange, hoveredFram
             panY={settings.screenPanY}
             frameIndex={0}
             isHighlighted={highlightedFrames.includes(0)}
+            isSelected={selectedFrameIndex === 0}
+            onClick={() => onSelectFrame?.(0)}
             onDragOver={() => onFrameHover?.(0)}
             onDragLeave={() => onFrameHover?.(null)}
           />
@@ -99,6 +114,8 @@ export function CompositionRenderer({ settings, screen, onPanChange, hoveredFram
             panY={settings.screenPanY}
             frameIndex={1}
             isHighlighted={highlightedFrames.includes(1)}
+            isSelected={selectedFrameIndex === 1}
+            onClick={() => onSelectFrame?.(1)}
             onDragOver={() => onFrameHover?.(1)}
             onDragLeave={() => onFrameHover?.(null)}
           />
@@ -120,6 +137,8 @@ export function CompositionRenderer({ settings, screen, onPanChange, hoveredFram
                 panY={settings.screenPanY}
                 frameIndex={0}
                 isHighlighted={highlightedFrames.includes(0)}
+                isSelected={selectedFrameIndex === 0}
+                onClick={() => onSelectFrame?.(0)}
                 onDragOver={() => onFrameHover?.(0)}
                 onDragLeave={() => onFrameHover?.(null)}
               />
@@ -135,6 +154,8 @@ export function CompositionRenderer({ settings, screen, onPanChange, hoveredFram
                 panY={settings.screenPanY}
                 frameIndex={1}
                 isHighlighted={highlightedFrames.includes(1)}
+                isSelected={selectedFrameIndex === 1}
+                onClick={() => onSelectFrame?.(1)}
                 onDragOver={() => onFrameHover?.(1)}
                 onDragLeave={() => onFrameHover?.(null)}
               />
@@ -156,6 +177,8 @@ export function CompositionRenderer({ settings, screen, onPanChange, hoveredFram
             panY={settings.screenPanY}
             frameIndex={0}
             isHighlighted={highlightedFrames.includes(0)}
+            isSelected={selectedFrameIndex === 0}
+            onClick={() => onSelectFrame?.(0)}
             onDragOver={() => onFrameHover?.(0)}
             onDragLeave={() => onFrameHover?.(null)}
           />
@@ -169,6 +192,8 @@ export function CompositionRenderer({ settings, screen, onPanChange, hoveredFram
             panY={settings.screenPanY}
             frameIndex={1}
             isHighlighted={highlightedFrames.includes(1)}
+            isSelected={selectedFrameIndex === 1}
+            onClick={() => onSelectFrame?.(1)}
             onDragOver={() => onFrameHover?.(1)}
             onDragLeave={() => onFrameHover?.(null)}
           />
@@ -182,6 +207,8 @@ export function CompositionRenderer({ settings, screen, onPanChange, hoveredFram
             panY={settings.screenPanY}
             frameIndex={2}
             isHighlighted={highlightedFrames.includes(2)}
+            isSelected={selectedFrameIndex === 2}
+            onClick={() => onSelectFrame?.(2)}
             onDragOver={() => onFrameHover?.(2)}
             onDragLeave={() => onFrameHover?.(null)}
           />
@@ -211,6 +238,8 @@ export function CompositionRenderer({ settings, screen, onPanChange, hoveredFram
                 panY={settings.screenPanY}
                 frameIndex={0}
                 isHighlighted={highlightedFrames.includes(0)}
+                isSelected={selectedFrameIndex === 0}
+                onClick={() => onSelectFrame?.(0)}
                 onDragOver={() => onFrameHover?.(0)}
                 onDragLeave={() => onFrameHover?.(null)}
               />
@@ -234,6 +263,8 @@ export function CompositionRenderer({ settings, screen, onPanChange, hoveredFram
                 panY={settings.screenPanY}
                 frameIndex={1}
                 isHighlighted={highlightedFrames.includes(1)}
+                isSelected={selectedFrameIndex === 1}
+                onClick={() => onSelectFrame?.(1)}
                 onDragOver={() => onFrameHover?.(1)}
                 onDragLeave={() => onFrameHover?.(null)}
               />
@@ -257,6 +288,8 @@ export function CompositionRenderer({ settings, screen, onPanChange, hoveredFram
                 panY={settings.screenPanY}
                 frameIndex={2}
                 isHighlighted={highlightedFrames.includes(2)}
+                isSelected={selectedFrameIndex === 2}
+                onClick={() => onSelectFrame?.(2)}
                 onDragOver={() => onFrameHover?.(2)}
                 onDragLeave={() => onFrameHover?.(null)}
               />
@@ -269,4 +302,3 @@ export function CompositionRenderer({ settings, screen, onPanChange, hoveredFram
       return null;
   }
 }
-

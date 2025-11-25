@@ -17,6 +17,8 @@ interface DeviceFrameProps {
   onPanChange?: (panX: number, panY: number) => void;
   frameIndex?: number;
   isHighlighted?: boolean;
+  isSelected?: boolean;
+  onClick?: () => void;
   onDragOver?: () => void;
   onDragLeave?: () => void;
 }
@@ -70,7 +72,7 @@ const getDeviceConfig = (deviceId: string = 'iphone-14-pro'): DeviceConfig => {
       bezelWidth: 15, // Thicker top/bottom bezel simulated in render
     };
   }
-  
+
   // Phones - Android
   if (deviceId.includes('pixel') || deviceId.includes('samsung') || deviceId.includes('galaxy')) {
     return {
@@ -88,7 +90,7 @@ const getDeviceConfig = (deviceId: string = 'iphone-14-pro'): DeviceConfig => {
   if (deviceId.includes('ipad') || deviceId.includes('tablet') || deviceId.includes('tab-s9')) {
     return {
       width: 440,
-      height: 580, 
+      height: 580,
       radius: 24,
       frameColor: '#2a2a2a',
       screenRadius: 16,
@@ -136,18 +138,20 @@ const getDeviceConfig = (deviceId: string = 'iphone-14-pro'): DeviceConfig => {
   };
 };
 
-export function DeviceFrame({ 
+export function DeviceFrame({
   deviceType,
-  image, 
+  image,
   mediaId,
-  scale, 
-  screenScale, 
-  panX, 
-  panY, 
+  scale,
+  screenScale,
+  panX,
+  panY,
   showInstructions = false,
   onPanChange,
   frameIndex,
   isHighlighted = false,
+  isSelected = false,
+  onClick,
   onDragOver,
   onDragLeave
 }: DeviceFrameProps) {
@@ -160,14 +164,19 @@ export function DeviceFrame({
   const config = getDeviceConfig(deviceType);
 
   const handleMouseDown = (e: React.MouseEvent) => {
-    if (!displayImage || !onPanChange) return;
-    setIsDragging(true);
-    setDragStart({
-      x: e.clientX,
-      y: e.clientY,
-      panX,
-      panY,
-    });
+    // If we have an image and pan handler, handle panning
+    if (displayImage && onPanChange) {
+      setIsDragging(true);
+      setDragStart({
+        x: e.clientX,
+        y: e.clientY,
+        panX,
+        panY,
+      });
+    }
+
+    // Also trigger selection
+    onClick?.();
   };
 
   const handleMouseMove = (e: React.MouseEvent) => {
@@ -195,7 +204,7 @@ export function DeviceFrame({
   const topPadding = config.type === 'home-button' ? 60 * scale : padding;
   const bottomPadding = config.type === 'home-button' ? 60 * scale : padding;
   const sidePadding = padding;
-  
+
   // Adjust padding for iMac (chin)
   const imacChin = config.type === 'monitor' && deviceType?.includes('imac') ? 40 * scale : 0;
 
@@ -269,7 +278,7 @@ export function DeviceFrame({
       case 'laptop':
         // Camera dot
         return (
-           <Box
+          <Box
             style={{
               position: 'absolute',
               top: padding / 2,
@@ -283,9 +292,9 @@ export function DeviceFrame({
             }}
           />
         );
-       case 'monitor':
-         // Nothing special on screen, but maybe base?
-         return null;
+      case 'monitor':
+        // Nothing special on screen, but maybe base?
+        return null;
       default:
         return null;
     }
@@ -310,7 +319,7 @@ export function DeviceFrame({
         >
           {/* Groove */}
           <Box
-             style={{
+            style={{
               position: 'absolute',
               top: 0,
               left: '50%',
@@ -326,7 +335,7 @@ export function DeviceFrame({
       );
     }
     if (config.type === 'monitor') {
-       return (
+      return (
         <Box
           style={{
             position: 'absolute',
@@ -340,170 +349,178 @@ export function DeviceFrame({
             justifyContent: 'center',
           }}
         >
-           <Box 
-             style={{
-               width: 40 * scale,
-               height: '100%',
-               background: '#d1d1d1',
-             }}
-           />
-           <Box 
-              style={{
-                position: 'absolute',
-                bottom: 0,
-                width: 140 * scale,
-                height: 10 * scale,
-                background: '#d1d1d1',
-                borderRadius: 4 * scale,
-              }}
-           />
+          <Box
+            style={{
+              width: 40 * scale,
+              height: '100%',
+              background: '#d1d1d1',
+            }}
+          />
+          <Box
+            style={{
+              position: 'absolute',
+              bottom: 0,
+              width: 140 * scale,
+              height: 10 * scale,
+              background: '#d1d1d1',
+              borderRadius: 4 * scale,
+            }}
+          />
         </Box>
-       )
-    }
+      )
+      }
     return null;
-  };
+    };
 
-  return (
-    <Box 
-      style={{ position: 'relative' }}
-      onDragOver={(e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        onDragOver?.();
-      }}
-      onDragLeave={(e) => {
-        // Only trigger if actually leaving the frame (not entering a child)
-        if (!e.currentTarget.contains(e.relatedTarget as Node)) {
-          onDragLeave?.();
-        }
-      }}
-    >
+    return (
       <Box
-        style={{
-          width,
-          height: height + imacChin, // Add chin height if iMac
-          borderRadius: config.radius * scale,
-          background: `linear-gradient(145deg, ${config.frameColor}, ${config.frameColor})`,
-          paddingTop: topPadding,
-          paddingBottom: bottomPadding + imacChin,
-          paddingLeft: sidePadding,
-          paddingRight: sidePadding,
-          boxShadow: isHighlighted
-            ? '0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 0 3px rgba(102, 126, 234, 0.8), 0 0 20px rgba(102, 126, 234, 0.5)'
-            : '0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.1) inset',
-          position: 'relative',
-          display: 'flex',
-          flexDirection: 'column',
-          transition: 'box-shadow 0.2s ease',
+        style={{ position: 'relative' }}
+        onDragOver={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          onDragOver?.();
+        }}
+        onDragLeave={(e) => {
+          // Only trigger if actually leaving the frame (not entering a child)
+          if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+            onDragLeave?.();
+          }
         }}
       >
-        {renderDecorations()}
-
-        {/* Screen */}
         <Box
-          ref={screenRef}
           style={{
-            flex: 1,
-            width: '100%',
-            borderRadius: config.screenRadius * scale,
-            backgroundColor: '#000',
-            overflow: 'hidden',
+            width,
+            height: height + imacChin, // Add chin height if iMac
+            borderRadius: config.radius * scale,
+            background: `linear-gradient(145deg, ${config.frameColor}, ${config.frameColor})`,
+            paddingTop: topPadding,
+            paddingBottom: bottomPadding + imacChin,
+            paddingLeft: sidePadding,
+            paddingRight: sidePadding,
+            boxShadow: isHighlighted
+              ? '0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 0 3px rgba(102, 126, 234, 0.8), 0 0 20px rgba(102, 126, 234, 0.5)'
+              : isSelected
+                ? '0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 0 3px #667eea'
+                : '0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.1) inset',
             position: 'relative',
-            boxShadow: '0 0 0 1px rgba(255, 255, 255, 0.05) inset',
-            cursor: displayImage && onPanChange ? (isDragging ? 'grabbing' : 'grab') : 'default',
+            display: 'flex',
+            flexDirection: 'column',
+            transition: 'box-shadow 0.2s ease',
+            cursor: onClick ? 'pointer' : undefined,
           }}
-          onMouseDown={handleMouseDown}
-          onMouseMove={handleMouseMove}
-          onMouseUp={handleMouseUp}
-          onMouseLeave={handleMouseUp}
+          onClick={onClick ? (e) => {
+            e.stopPropagation();
+            onClick();
+          } : undefined}
         >
-          {displayImage ? (
-            <Box
-              style={{
-                width: '100%',
-                height: '100%',
-                backgroundImage: `url(${displayImage})`,
-                backgroundSize: `${screenScale}%`,
-                backgroundPosition: `${panX}% ${panY}%`,
-                backgroundRepeat: 'no-repeat',
-                pointerEvents: 'none',
-              }}
-            />
-          ) : showInstructions ? (
-            <Box
-              style={{
-                width: '100%',
-                height: '100%',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                flexDirection: 'column',
-                gap: 12 * scale,
-                padding: 20 * scale,
-              }}
-            >
-              <IconUpload size={32 * scale} color="#667eea" />
-              <Text 
-                size="sm" 
-                c="dimmed" 
-                style={{ 
-                  fontSize: 12 * scale, 
-                  textAlign: 'center',
-                  lineHeight: 1.4 
+          {renderDecorations()}
+
+          {/* Screen */}
+          <Box
+            ref={screenRef}
+            style={{
+              flex: 1,
+              width: '100%',
+              borderRadius: config.screenRadius * scale,
+              backgroundColor: '#000',
+              overflow: 'hidden',
+              position: 'relative',
+              boxShadow: '0 0 0 1px rgba(255, 255, 255, 0.05) inset',
+              cursor: displayImage && onPanChange ? (isDragging ? 'grabbing' : 'grab') : 'pointer',
+            }}
+            onMouseDown={handleMouseDown}
+            onMouseMove={handleMouseMove}
+            onMouseUp={handleMouseUp}
+            onMouseLeave={handleMouseUp}
+          >
+            {displayImage ? (
+              <Box
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  backgroundImage: `url(${displayImage})`,
+                  backgroundSize: `${screenScale}%`,
+                  backgroundPosition: `${panX}% ${panY}%`,
+                  backgroundRepeat: 'no-repeat',
+                  pointerEvents: 'none',
+                }}
+              />
+            ) : showInstructions ? (
+              <Box
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexDirection: 'column',
+                  gap: 12 * scale,
+                  padding: 20 * scale,
                 }}
               >
-                Drop screenshot
-              </Text>
-            </Box>
-          ) : (
-            <Box
-              style={{
-                width: '100%',
-                height: '100%',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                flexDirection: 'column',
-                gap: 8 * scale,
-              }}
-            >
-               {/* Empty State Minimal */}
-            </Box>
-          )}
-        </Box>
-        
-        {/* Buttons (only for phones/tablets) */}
-        {['notch', 'punch-hole', 'tablet', 'home-button', 'dynamic-island'].includes(config.type) && (
-            <>
-                 <Box
-                    style={{
-                    position: 'absolute',
-                    right: -2 * scale,
-                    top: '25%',
-                    width: 3 * scale,
-                    height: 50 * scale,
-                    backgroundColor: config.frameColor,
-                    borderRadius: `0 ${2 * scale}px ${2 * scale}px 0`,
-                    opacity: 0.8,
-                    }}
-                />
-                <Box
-                    style={{
-                    position: 'absolute',
-                    left: -2 * scale,
-                    top: '20%',
-                    width: 3 * scale,
-                    height: 30 * scale,
-                    backgroundColor: config.frameColor,
-                    borderRadius: `${2 * scale}px 0 0 ${2 * scale}px`,
-                    opacity: 0.8,
-                    }}
-                />
-            </>
-        )}
+                <IconUpload size={32 * scale} color={isSelected ? "#667eea" : "#4a5568"} />
+                <Text
+                  size="sm"
+                  c="dimmed"
+                  style={{
+                    fontSize: 12 * scale,
+                    textAlign: 'center',
+                    lineHeight: 1.4,
+                    color: isSelected ? "#667eea" : undefined
+                  }}
+                >
+                  {isSelected ? "Selected" : "Drop screenshot"}
+                </Text>
+              </Box>
+            ) : (
+              <Box
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexDirection: 'column',
+                  gap: 8 * scale,
+                }}
+              >
+                {/* Empty State Minimal */}
+              </Box>
+            )}
+          </Box>
 
+          {/* Buttons (only for phones/tablets) */}
+          {['notch', 'punch-hole', 'tablet', 'home-button', 'dynamic-island'].includes(config.type) && (
+            <>
+              <Box
+                style={{
+                  position: 'absolute',
+                  right: -2 * scale,
+                  top: '25%',
+                  width: 3 * scale,
+                  height: 50 * scale,
+                  backgroundColor: config.frameColor,
+                  borderRadius: `0 ${2 * scale}px ${2 * scale}px 0`,
+                  opacity: 0.8,
+                }}
+              />
+              <Box
+                style={{
+                  position: 'absolute',
+                  left: -2 * scale,
+                  top: '20%',
+                  width: 3 * scale,
+                  height: 30 * scale,
+                  backgroundColor: config.frameColor,
+                  borderRadius: `${2 * scale}px 0 0 ${2 * scale}px`,
+                  opacity: 0.8,
+                }}
+              />
+            </>
+          )}
+
+        </Box>
+        {renderBase()}
       </Box>
-      {renderBase()}
-    </Box>
-  );
-}
+    );
+  }
