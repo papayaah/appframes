@@ -1,8 +1,7 @@
 'use client';
 
 import { memo } from 'react';
-import { Box, Group, Text, ActionIcon, Center } from '@mantine/core';
-import { Dropzone, IMAGE_MIME_TYPE } from '@mantine/dropzone';
+import { Box, Group, Text, ActionIcon } from '@mantine/core';
 import { IconPlus, IconX } from '@tabler/icons-react';
 import { Screen, CanvasSettings } from './AppFrames';
 import { CompositionRenderer } from './CompositionRenderer';
@@ -11,19 +10,19 @@ interface ScreensPanelProps {
   screens: Screen[];
   addScreen: (imageOrMediaId: string | number) => void;
   removeScreen: (id: string) => void;
-  selectedIndex: number;
-  onSelectScreen: (index: number) => void;
+  selectedIndices: number[];
+  onSelectScreen: (index: number, multi: boolean) => void;
   onMediaUpload?: (file: File) => Promise<number | null>;
 }
 
 // Component to render mini composition preview for a specific screen
 // Each thumbnail shows its OWN screen's composition using the shared renderer
 // Memoized to only re-render when THIS screen's data or settings change
-const ScreenThumbnail = memo(function ScreenThumbnail({ 
+const ScreenThumbnail = memo(function ScreenThumbnail({
   screen,
   allScreens,
   screenIndex
-}: { 
+}: {
   screen: Screen;
   allScreens: Screen[]; // All screens needed for multi-screen compositions
   screenIndex: number; // Index of this screen
@@ -33,7 +32,7 @@ const ScreenThumbnail = memo(function ScreenThumbnail({
     ...screen.settings,
     selectedScreenIndex: screenIndex, // Use this screen's index
   };
-  
+
   return (
     <Box
       style={{
@@ -61,8 +60,8 @@ const ScreenThumbnail = memo(function ScreenThumbnail({
       >
         {/* Use the same renderer as main canvas, showing this screen's composition */}
         {/* Each screen uses its own images array */}
-        <CompositionRenderer 
-          settings={settings} 
+        <CompositionRenderer
+          settings={settings}
           screen={screen}
         />
       </Box>
@@ -70,12 +69,12 @@ const ScreenThumbnail = memo(function ScreenThumbnail({
   );
 }, (prevProps, nextProps) => {
   // Only re-render if THIS screen's data or settings changed
-  const screenChanged = 
+  const screenChanged =
     prevProps.screen.id !== nextProps.screen.id ||
     JSON.stringify(prevProps.screen.images) !== JSON.stringify(nextProps.screen.images);
-  
+
   // Check if this screen's settings changed
-  const settingsChanged = 
+  const settingsChanged =
     prevProps.screen.settings.composition !== nextProps.screen.settings.composition ||
     prevProps.screen.settings.deviceFrame !== nextProps.screen.settings.deviceFrame ||
     prevProps.screen.settings.compositionScale !== nextProps.screen.settings.compositionScale ||
@@ -83,7 +82,7 @@ const ScreenThumbnail = memo(function ScreenThumbnail({
     prevProps.screen.settings.screenScale !== nextProps.screen.settings.screenScale ||
     prevProps.screen.settings.screenPanX !== nextProps.screen.settings.screenPanX ||
     prevProps.screen.settings.screenPanY !== nextProps.screen.settings.screenPanY;
-  
+
   // Return true if nothing changed (skip re-render), false if something changed (re-render)
   return !screenChanged && !settingsChanged;
 });
@@ -92,7 +91,7 @@ export function ScreensPanel({
   screens,
   addScreen,
   removeScreen,
-  selectedIndex,
+  selectedIndices,
   onSelectScreen,
   onMediaUpload,
 }: ScreensPanelProps) {
@@ -125,81 +124,86 @@ export function ScreensPanel({
         backgroundColor: 'white',
         height: 140,
         boxShadow: '0 -2px 8px rgba(0,0,0,0.05)',
+        overflowX: 'auto', // Allow horizontal scrolling if many screens
       }}
     >
-      <Group gap="md" align="flex-start">
-        {screens.map((screen, index) => (
-          <Box
-            key={screen.id}
-            style={{
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-            }}
-          >
+      <Group gap="md" align="flex-start" wrap="nowrap">
+        {screens.map((screen, index) => {
+          const isSelected = selectedIndices.includes(index);
+          return (
             <Box
+              key={screen.id}
               style={{
-                position: 'relative',
-                width: 60,
-                height: 80,
-                border: selectedIndex === index ? '2px solid #667eea' : '1px solid #dee2e6',
-                borderRadius: 8,
-                overflow: 'hidden',
-                cursor: 'pointer',
-                backgroundColor: '#f8f9fa',
-                transition: 'all 0.2s',
-                boxShadow: selectedIndex === index ? '0 4px 12px rgba(102, 126, 234, 0.3)' : 'none',
-              }}
-              onClick={() => onSelectScreen(index)}
-              onMouseEnter={(e) => {
-                const deleteBtn = e.currentTarget.querySelector('.delete-btn') as HTMLElement;
-                if (deleteBtn) deleteBtn.style.opacity = '1';
-              }}
-              onMouseLeave={(e) => {
-                const deleteBtn = e.currentTarget.querySelector('.delete-btn') as HTMLElement;
-                if (deleteBtn) deleteBtn.style.opacity = '0';
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                flexShrink: 0,
               }}
             >
-              <ScreenThumbnail screen={screen} allScreens={screens} screenIndex={index} />
-              <ActionIcon
-                className="delete-btn"
-                size="xs"
-                color="red"
-                variant="filled"
+              <Box
                 style={{
-                  position: 'absolute',
-                  top: 4,
-                  right: 4,
-                  opacity: 0,
-                  transition: 'opacity 0.2s',
+                  position: 'relative',
+                  width: 60,
+                  height: 80,
+                  border: isSelected ? '2px solid #667eea' : '1px solid #dee2e6',
+                  borderRadius: 8,
+                  overflow: 'hidden',
+                  cursor: 'pointer',
+                  backgroundColor: '#f8f9fa',
+                  transition: 'all 0.2s',
+                  boxShadow: isSelected ? '0 4px 12px rgba(102, 126, 234, 0.3)' : 'none',
                 }}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  removeScreen(screen.id);
+                onClick={(e) => onSelectScreen(index, e.metaKey || e.ctrlKey || e.shiftKey)}
+                onMouseEnter={(e) => {
+                  const deleteBtn = e.currentTarget.querySelector('.delete-btn') as HTMLElement;
+                  if (deleteBtn) deleteBtn.style.opacity = '1';
+                }}
+                onMouseLeave={(e) => {
+                  const deleteBtn = e.currentTarget.querySelector('.delete-btn') as HTMLElement;
+                  if (deleteBtn) deleteBtn.style.opacity = '0';
                 }}
               >
-                <IconX size={12} />
-              </ActionIcon>
+                <ScreenThumbnail screen={screen} allScreens={screens} screenIndex={index} />
+                <ActionIcon
+                  className="delete-btn"
+                  size="xs"
+                  color="red"
+                  variant="filled"
+                  style={{
+                    position: 'absolute',
+                    top: 4,
+                    right: 4,
+                    opacity: 0,
+                    transition: 'opacity 0.2s',
+                  }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    removeScreen(screen.id);
+                  }}
+                >
+                  <IconX size={12} />
+                </ActionIcon>
+              </Box>
+              <Text
+                size="xs"
+                style={{
+                  marginTop: 4,
+                  color: '#666',
+                  textAlign: 'center',
+                  fontSize: 10,
+                  maxWidth: 60,
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {screen.name}
+              </Text>
             </Box>
-            <Text
-              size="xs"
-              style={{
-                marginTop: 4,
-                color: '#666',
-                textAlign: 'center',
-                fontSize: 10,
-                maxWidth: 60,
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap',
-              }}
-            >
-              {screen.name}
-            </Text>
-          </Box>
-        ))}
+          );
+        })}
 
-        <Box style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+        <Box style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0 }}>
           <Box
             onClick={(e) => {
               e.preventDefault();
