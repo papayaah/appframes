@@ -1,7 +1,6 @@
 'use client';
 
 import { Box, Group, Text, ActionIcon, Center } from '@mantine/core';
-import { Dropzone, IMAGE_MIME_TYPE } from '@mantine/dropzone';
 import { IconPlus, IconX } from '@tabler/icons-react';
 import { Screen } from './AppFrames';
 
@@ -9,8 +8,8 @@ interface ScreensPanelProps {
   screens: Screen[];
   addScreen: (imageOrMediaId: string | number) => void;
   removeScreen: (id: string) => void;
-  selectedIndex: number;
-  onSelectScreen: (index: number) => void;
+  selectedIndices: number[];
+  onSelectScreen: (indices: number[]) => void;
   onMediaUpload?: (file: File) => Promise<number | null>;
 }
 
@@ -18,30 +17,9 @@ export function ScreensPanel({
   screens,
   addScreen,
   removeScreen,
-  selectedIndex,
+  selectedIndices,
   onSelectScreen,
-  onMediaUpload,
 }: ScreensPanelProps) {
-  const handleDrop = async (files: File[]) => {
-    for (const file of files) {
-      if (onMediaUpload) {
-        // Upload to media library
-        const mediaId = await onMediaUpload(file);
-        if (mediaId) {
-          addScreen(mediaId);
-        }
-      } else {
-        // Fallback to base64
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          if (e.target?.result) {
-            addScreen(e.target.result as string);
-          }
-        };
-        reader.readAsDataURL(file);
-      }
-    }
-  };
 
   return (
     <Box
@@ -80,25 +58,44 @@ export function ScreensPanel({
               position: 'relative',
               width: 60,
               height: 80,
-              border: selectedIndex === index ? '2px solid #667eea' : '1px solid #dee2e6',
+              border: selectedIndices.includes(index) ? '2px solid #667eea' : '1px solid #dee2e6',
               borderRadius: 8,
               overflow: 'hidden',
               cursor: 'pointer',
               backgroundColor: '#f8f9fa',
               transition: 'all 0.2s',
-              boxShadow: selectedIndex === index ? '0 4px 12px rgba(102, 126, 234, 0.3)' : 'none',
+              boxShadow: selectedIndices.includes(index)
+                ? '0 4px 12px rgba(102, 126, 234, 0.3)'
+                : 'none',
             }}
-            onClick={() => onSelectScreen(index)}
+            onClick={(e) => {
+              const isSelected = selectedIndices.includes(index);
+
+              // Cmd/Ctrl click toggles selection
+              if (e.metaKey || e.ctrlKey) {
+                if (isSelected) {
+                  const next = selectedIndices.filter((i) => i !== index);
+                  onSelectScreen(next.length ? next : [index]);
+                } else {
+                  onSelectScreen([...selectedIndices, index].sort((a, b) => a - b));
+                }
+              } else {
+                // Regular click: single select
+                onSelectScreen([index]);
+              }
+            }}
           >
-            <img
-              src={screen.image}
-              alt={screen.name}
-              style={{
-                width: '100%',
-                height: '100%',
-                objectFit: 'cover',
-              }}
-            />
+            {screen.image && (
+              <img
+                src={screen.image}
+                alt={screen.name}
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'cover',
+                }}
+              />
+            )}
             <ActionIcon
               size="xs"
               color="red"
@@ -133,26 +130,20 @@ export function ScreensPanel({
           </Box>
         ))}
 
-        <Dropzone
-          onDrop={handleDrop}
-          accept={IMAGE_MIME_TYPE}
+        {/* New Screen: create a blank screen (no image) without opening file dialog */}
+        <Box
+          onClick={() => addScreen('')}
           style={{
             width: 100,
             height: 80,
             border: '2px dashed #dee2e6',
             borderRadius: 8,
             padding: 0,
-            minHeight: 'auto',
             cursor: 'pointer',
             transition: 'all 0.2s',
-          }}
-          styles={{
-            root: {
-              '&:hover': {
-                borderColor: '#667eea',
-                backgroundColor: '#f8f9ff',
-              },
-            },
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
           }}
         >
           <Center style={{ height: '100%' }}>
@@ -176,7 +167,7 @@ export function ScreensPanel({
               </Text>
             </Box>
           </Center>
-        </Dropzone>
+        </Box>
       </Group>
     </Box>
   );

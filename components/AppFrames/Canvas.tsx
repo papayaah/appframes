@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { Box, Center } from '@mantine/core';
 import { CanvasSettings, Screen } from './AppFrames';
 import { DeviceFrame } from './DeviceFrame';
@@ -7,7 +8,8 @@ import { DeviceFrame } from './DeviceFrame';
 interface CanvasProps {
   settings: CanvasSettings;
   screens: Screen[];
-  onReplaceScreen?: (files: File[]) => void;
+  // Optional target screen index lets us drop directly into a specific screen
+  onReplaceScreen?: (files: File[], targetScreenIndex?: number) => void;
   onPanChange?: (panX: number, panY: number) => void;
 }
 
@@ -56,12 +58,24 @@ const getCanvasDimensions = (canvasSize: string, _orientation: string) => {
 export function Canvas({ settings, screens, onReplaceScreen, onPanChange }: CanvasProps) {
   const canvasDimensions = getCanvasDimensions(settings.canvasSize, settings.orientation);
   const aspectRatio = canvasDimensions.width / canvasDimensions.height;
+  const [hoveredScreenIndex, setHoveredScreenIndex] = useState<number | null>(null);
 
-  const handleDrop = (files: File[]) => {
+  const handleDrop = (files: File[], targetScreenIndex?: number) => {
     if (!onReplaceScreen || files.length === 0) {
       return;
     }
-    onReplaceScreen(files);
+    // When multiple canvases are visible (multi-select in Single composition),
+    // only allow drops on specific device frames to avoid ambiguity.
+    if (
+      typeof targetScreenIndex !== 'number' &&
+      settings.composition === 'single' &&
+      settings.selectedScreenIndices &&
+      settings.selectedScreenIndices.length > 1
+    ) {
+      return;
+    }
+
+    onReplaceScreen(files, targetScreenIndex);
   };
   
   const renderComposition = () => {
@@ -72,41 +86,84 @@ export function Canvas({ settings, screens, onReplaceScreen, onPanChange }: Canv
       case 'single':
         return (
           <Center style={{ height: '100%' }}>
-            <DeviceFrame
-              deviceType={settings.deviceFrame}
-              image={selectedScreen?.image}
-              mediaId={selectedScreen?.mediaId}
-              scale={scale}
-              screenScale={settings.screenScale}
-              panX={settings.screenPanX}
-              panY={settings.screenPanY}
-              showInstructions={screens.length === 0}
-              onPanChange={onPanChange}
-            />
+            <Box
+              onDragOver={(e) => {
+                e.preventDefault();
+                setHoveredScreenIndex(settings.selectedScreenIndex);
+              }}
+              onDragLeave={() => setHoveredScreenIndex(null)}
+              onDrop={(e) => {
+                e.preventDefault();
+                const files = Array.from(e.dataTransfer.files);
+                handleDrop(files, settings.selectedScreenIndex);
+                setHoveredScreenIndex(null);
+              }}
+              style={{
+                padding: 4,
+                borderRadius: 16,
+                border:
+                  hoveredScreenIndex === settings.selectedScreenIndex
+                    ? '2px solid #6366f1'
+                    : '2px solid transparent',
+                transition: 'border-color 120ms ease-out',
+              }}
+            >
+              <DeviceFrame
+                deviceType={settings.deviceFrame}
+                image={selectedScreen?.image}
+                mediaId={selectedScreen?.mediaId}
+                scale={scale}
+                screenScale={settings.screenScale}
+                panX={settings.screenPanX}
+                panY={settings.screenPanY}
+                showInstructions={screens.length === 0}
+                onPanChange={onPanChange}
+              />
+            </Box>
           </Center>
         );
 
       case 'dual':
         return (
           <Center style={{ height: '100%', gap: 20 }}>
-            <DeviceFrame
-              deviceType={settings.deviceFrame}
-              image={screens[0]?.image}
-              mediaId={screens[0]?.mediaId}
-              scale={scale * 0.9}
-              screenScale={settings.screenScale}
-              panX={settings.screenPanX}
-              panY={settings.screenPanY}
-            />
-            <DeviceFrame
-              deviceType={settings.deviceFrame}
-              image={screens[1]?.image}
-              mediaId={screens[1]?.mediaId}
-              scale={scale * 0.9}
-              screenScale={settings.screenScale}
-              panX={settings.screenPanX}
-              panY={settings.screenPanY}
-            />
+            {[0, 1].map((screenIndex) => {
+              const screen = screens[screenIndex];
+              return (
+                <Box
+                  key={screenIndex}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    setHoveredScreenIndex(screenIndex);
+                  }}
+                  onDragLeave={() => setHoveredScreenIndex(null)}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    const files = Array.from(e.dataTransfer.files);
+                    handleDrop(files, screenIndex);
+                    setHoveredScreenIndex(null);
+                  }}
+                  style={{
+                    padding: 4,
+                    borderRadius: 16,
+                    border:
+                      hoveredScreenIndex === screenIndex
+                        ? '2px solid #6366f1'
+                        : '2px solid transparent',
+                    transition: 'border-color 120ms ease-out',
+                  }}
+                >
+                  <DeviceFrame
+                    deviceType={settings.deviceFrame}
+                    image={screen?.image}
+                    mediaId={screen?.mediaId}
+                    scale={scale * 0.9}
+                    screenScale={settings.screenScale}
+                    panX={settings.screenPanX}
+                    panY={settings.screenPanY}
+                  />
+                </Box>
+              );
+            })}
           </Center>
         );
 
@@ -114,7 +171,20 @@ export function Canvas({ settings, screens, onReplaceScreen, onPanChange }: Canv
         return (
           <Center style={{ height: '100%', position: 'relative' }}>
             <Box style={{ position: 'relative' }}>
-              <Box style={{ position: 'absolute', top: -20, left: -20, zIndex: 1 }}>
+              <Box
+                style={{ position: 'absolute', top: -20, left: -20, zIndex: 1 }}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  setHoveredScreenIndex(0);
+                }}
+                onDragLeave={() => setHoveredScreenIndex(null)}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  const files = Array.from(e.dataTransfer.files);
+                  handleDrop(files, 0);
+                  setHoveredScreenIndex(null);
+                }}
+              >
                 <DeviceFrame
                   deviceType={settings.deviceFrame}
                   image={screens[0]?.image}
@@ -125,7 +195,20 @@ export function Canvas({ settings, screens, onReplaceScreen, onPanChange }: Canv
                   panY={settings.screenPanY}
                 />
               </Box>
-              <Box style={{ position: 'relative', zIndex: 2 }}>
+              <Box
+                style={{ position: 'relative', zIndex: 2 }}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  setHoveredScreenIndex(1);
+                }}
+                onDragLeave={() => setHoveredScreenIndex(null)}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  const files = Array.from(e.dataTransfer.files);
+                  handleDrop(files, 1);
+                  setHoveredScreenIndex(null);
+                }}
+              >
                 <DeviceFrame
                   deviceType={settings.deviceFrame}
                   image={screens[1]?.image}
@@ -143,33 +226,44 @@ export function Canvas({ settings, screens, onReplaceScreen, onPanChange }: Canv
       case 'triple':
         return (
           <Center style={{ height: '100%', gap: 15 }}>
-            <DeviceFrame
-              deviceType={settings.deviceFrame}
-              image={screens[0]?.image}
-              mediaId={screens[0]?.mediaId}
-              scale={scale * 0.75}
-              screenScale={settings.screenScale}
-              panX={settings.screenPanX}
-              panY={settings.screenPanY}
-            />
-            <DeviceFrame
-              deviceType={settings.deviceFrame}
-              image={screens[1]?.image}
-              mediaId={screens[1]?.mediaId}
-              scale={scale * 0.75}
-              screenScale={settings.screenScale}
-              panX={settings.screenPanX}
-              panY={settings.screenPanY}
-            />
-            <DeviceFrame
-              deviceType={settings.deviceFrame}
-              image={screens[2]?.image}
-              mediaId={screens[2]?.mediaId}
-              scale={scale * 0.75}
-              screenScale={settings.screenScale}
-              panX={settings.screenPanX}
-              panY={settings.screenPanY}
-            />
+            {[0, 1, 2].map((screenIndex) => {
+              const screen = screens[screenIndex];
+              return (
+                <Box
+                  key={screenIndex}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    setHoveredScreenIndex(screenIndex);
+                  }}
+                  onDragLeave={() => setHoveredScreenIndex(null)}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    const files = Array.from(e.dataTransfer.files);
+                    handleDrop(files, screenIndex);
+                    setHoveredScreenIndex(null);
+                  }}
+                  style={{
+                    padding: 4,
+                    borderRadius: 16,
+                    border:
+                      hoveredScreenIndex === screenIndex
+                        ? '2px solid #6366f1'
+                        : '2px solid transparent',
+                    transition: 'border-color 120ms ease-out',
+                  }}
+                >
+                  <DeviceFrame
+                    deviceType={settings.deviceFrame}
+                    image={screen?.image}
+                    mediaId={screen?.mediaId}
+                    scale={scale * 0.75}
+                    screenScale={settings.screenScale}
+                    panX={settings.screenPanX}
+                    panY={settings.screenPanY}
+                  />
+                </Box>
+              );
+            })}
           </Center>
         );
 
@@ -184,6 +278,17 @@ export function Canvas({ settings, screens, onReplaceScreen, onPanChange }: Canv
                   left: '20%',
                   transform: 'translate(-50%, -50%) rotate(-8deg)',
                   zIndex: 1,
+                }}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  setHoveredScreenIndex(0);
+                }}
+                onDragLeave={() => setHoveredScreenIndex(null)}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  const files = Array.from(e.dataTransfer.files);
+                  handleDrop(files, 0);
+                  setHoveredScreenIndex(null);
                 }}
               >
                 <DeviceFrame
@@ -204,6 +309,17 @@ export function Canvas({ settings, screens, onReplaceScreen, onPanChange }: Canv
                   transform: 'translate(-50%, -50%)',
                   zIndex: 3,
                 }}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  setHoveredScreenIndex(1);
+                }}
+                onDragLeave={() => setHoveredScreenIndex(null)}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  const files = Array.from(e.dataTransfer.files);
+                  handleDrop(files, 1);
+                  setHoveredScreenIndex(null);
+                }}
               >
                 <DeviceFrame
                   deviceType={settings.deviceFrame}
@@ -222,6 +338,17 @@ export function Canvas({ settings, screens, onReplaceScreen, onPanChange }: Canv
                   left: '80%',
                   transform: 'translate(-50%, -50%) rotate(8deg)',
                   zIndex: 2,
+                }}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  setHoveredScreenIndex(2);
+                }}
+                onDragLeave={() => setHoveredScreenIndex(null)}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  const files = Array.from(e.dataTransfer.files);
+                  handleDrop(files, 2);
+                  setHoveredScreenIndex(null);
                 }}
               >
                 <DeviceFrame
@@ -247,6 +374,7 @@ export function Canvas({ settings, screens, onReplaceScreen, onPanChange }: Canv
     <Box
       style={{
         flex: 1,
+        minHeight: 0,
         backgroundColor: '#F9FAFB',
         display: 'flex',
         alignItems: 'center',
@@ -266,6 +394,7 @@ export function Canvas({ settings, screens, onReplaceScreen, onPanChange }: Canv
         style={{
           width: '100%',
           maxWidth: aspectRatio > 1 ? '90%' : 600,
+          maxHeight: '100%',
           aspectRatio: `${aspectRatio}`,
           backgroundColor: settings.backgroundColor,
           position: 'relative',
