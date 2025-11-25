@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { AppShell, Box } from '@mantine/core';
 import { Header } from './Header';
 import { SidebarTabs } from './SidebarTabs';
@@ -28,6 +29,8 @@ export function AppFrames() {
     handleScreenSelect,
     replaceScreen,
   } = useFrames();
+
+  const [navWidth, setNavWidth] = useState(360); // Rail (80) + Panel (~280)
 
   const handleMediaUpload = async (file: File): Promise<number | null> => {
     try {
@@ -133,10 +136,11 @@ export function AppFrames() {
   return (
     <AppShell
       header={{ height: 60 }}
-      navbar={{ width: 240, breakpoint: 'sm' }}
+      navbar={{ width: navWidth, breakpoint: 'sm' }}
       padding={0}
       styles={{
         main: { backgroundColor: '#F9FAFB' },
+        navbar: { overflow: 'visible' }, // Allow notch to protrude
       }}
     >
       <AppShell.Header>
@@ -153,6 +157,7 @@ export function AppFrames() {
           settings={settings}
           setSettings={setSettings}
           screens={screens}
+          onPanelToggle={(isOpen) => setNavWidth(isOpen ? 360 : 80)}
           onMediaSelect={(mediaId) => {
             // If no screens exist, create one
             if (screens.length === 0) {
