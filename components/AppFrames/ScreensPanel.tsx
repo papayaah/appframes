@@ -1,25 +1,121 @@
 'use client';
 
+import { memo } from 'react';
 import { Box, Group, Text, ActionIcon, Center } from '@mantine/core';
+import { Dropzone, IMAGE_MIME_TYPE } from '@mantine/dropzone';
 import { IconPlus, IconX } from '@tabler/icons-react';
-import { Screen } from './AppFrames';
+import { Screen, CanvasSettings } from './AppFrames';
+import { CompositionRenderer } from './CompositionRenderer';
 
 interface ScreensPanelProps {
   screens: Screen[];
   addScreen: (imageOrMediaId: string | number) => void;
   removeScreen: (id: string) => void;
-  selectedIndices: number[];
-  onSelectScreen: (indices: number[]) => void;
+  selectedIndex: number;
+  onSelectScreen: (index: number) => void;
   onMediaUpload?: (file: File) => Promise<number | null>;
 }
+
+// Component to render mini composition preview for a specific screen
+// Each thumbnail shows its OWN screen's composition using the shared renderer
+// Memoized to only re-render when THIS screen's data or settings change
+const ScreenThumbnail = memo(function ScreenThumbnail({ 
+  screen,
+  allScreens,
+  screenIndex
+}: { 
+  screen: Screen;
+  allScreens: Screen[]; // All screens needed for multi-screen compositions
+  screenIndex: number; // Index of this screen
+}) {
+  // Create full settings object with selectedScreenIndex (not used in thumbnails but required by type)
+  const settings: CanvasSettings = {
+    ...screen.settings,
+    selectedScreenIndex: screenIndex, // Use this screen's index
+  };
+  
+  return (
+    <Box
+      style={{
+        width: '100%',
+        height: '100%',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: screen.settings.backgroundColor,
+        padding: 2,
+        overflow: 'hidden',
+        position: 'relative',
+      }}
+    >
+      <Box
+        style={{
+          transform: 'scale(0.12)',
+          transformOrigin: 'center center',
+          width: '100%',
+          height: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        {/* Use the same renderer as main canvas, showing this screen's composition */}
+        {/* Each screen uses its own images array */}
+        <CompositionRenderer 
+          settings={settings} 
+          screen={screen}
+        />
+      </Box>
+    </Box>
+  );
+}, (prevProps, nextProps) => {
+  // Only re-render if THIS screen's data or settings changed
+  const screenChanged = 
+    prevProps.screen.id !== nextProps.screen.id ||
+    JSON.stringify(prevProps.screen.images) !== JSON.stringify(nextProps.screen.images);
+  
+  // Check if this screen's settings changed
+  const settingsChanged = 
+    prevProps.screen.settings.composition !== nextProps.screen.settings.composition ||
+    prevProps.screen.settings.deviceFrame !== nextProps.screen.settings.deviceFrame ||
+    prevProps.screen.settings.compositionScale !== nextProps.screen.settings.compositionScale ||
+    prevProps.screen.settings.backgroundColor !== nextProps.screen.settings.backgroundColor ||
+    prevProps.screen.settings.screenScale !== nextProps.screen.settings.screenScale ||
+    prevProps.screen.settings.screenPanX !== nextProps.screen.settings.screenPanX ||
+    prevProps.screen.settings.screenPanY !== nextProps.screen.settings.screenPanY;
+  
+  // Return true if nothing changed (skip re-render), false if something changed (re-render)
+  return !screenChanged && !settingsChanged;
+});
 
 export function ScreensPanel({
   screens,
   addScreen,
   removeScreen,
-  selectedIndices,
+  selectedIndex,
   onSelectScreen,
+  onMediaUpload,
 }: ScreensPanelProps) {
+  const handleDrop = async (files: File[]) => {
+    for (const file of files) {
+      if (onMediaUpload) {
+        // Upload to media library
+        const mediaId = await onMediaUpload(file);
+        if (mediaId) {
+          addScreen(mediaId);
+        }
+      } else {
+        // Fallback to base64
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          if (e.target?.result) {
+            addScreen(e.target.result as string);
+          }
+        };
+        reader.readAsDataURL(file);
+      }
+    }
+  };
 
   return (
     <Box
@@ -31,98 +127,71 @@ export function ScreensPanel({
         boxShadow: '0 -2px 8px rgba(0,0,0,0.05)',
       }}
     >
-      <Group gap="xs" mb="xs">
-        <Box
-          style={{
-            width: 20,
-            height: 20,
-            borderRadius: 4,
-            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          <IconPlus size={14} color="white" />
-        </Box>
-        <Text size="sm" fw={600} c="dark">
-          SCREENS ({screens.length})
-        </Text>
-      </Group>
-
-      <Group gap="md" style={{ height: 80 }}>
+      <Group gap="md" align="flex-start">
         {screens.map((screen, index) => (
           <Box
             key={screen.id}
             style={{
-              position: 'relative',
-              width: 60,
-              height: 80,
-              border: selectedIndices.includes(index) ? '2px solid #667eea' : '1px solid #dee2e6',
-              borderRadius: 8,
-              overflow: 'hidden',
-              cursor: 'pointer',
-              backgroundColor: '#f8f9fa',
-              transition: 'all 0.2s',
-              boxShadow: selectedIndices.includes(index)
-                ? '0 4px 12px rgba(102, 126, 234, 0.3)'
-                : 'none',
-            }}
-            onClick={(e) => {
-              const isSelected = selectedIndices.includes(index);
-
-              // Cmd/Ctrl click toggles selection
-              if (e.metaKey || e.ctrlKey) {
-                if (isSelected) {
-                  const next = selectedIndices.filter((i) => i !== index);
-                  onSelectScreen(next.length ? next : [index]);
-                } else {
-                  onSelectScreen([...selectedIndices, index].sort((a, b) => a - b));
-                }
-              } else {
-                // Regular click: single select
-                onSelectScreen([index]);
-              }
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
             }}
           >
-            {screen.image && (
-              <img
-                src={screen.image}
-                alt={screen.name}
-                style={{
-                  width: '100%',
-                  height: '100%',
-                  objectFit: 'cover',
-                }}
-              />
-            )}
-            <ActionIcon
-              size="xs"
-              color="red"
-              variant="filled"
+            <Box
               style={{
-                position: 'absolute',
-                top: 4,
-                right: 4,
+                position: 'relative',
+                width: 60,
+                height: 80,
+                border: selectedIndex === index ? '2px solid #667eea' : '1px solid #dee2e6',
+                borderRadius: 8,
+                overflow: 'hidden',
+                cursor: 'pointer',
+                backgroundColor: '#f8f9fa',
+                transition: 'all 0.2s',
+                boxShadow: selectedIndex === index ? '0 4px 12px rgba(102, 126, 234, 0.3)' : 'none',
               }}
-              onClick={(e) => {
-                e.stopPropagation();
-                removeScreen(screen.id);
+              onClick={() => onSelectScreen(index)}
+              onMouseEnter={(e) => {
+                const deleteBtn = e.currentTarget.querySelector('.delete-btn') as HTMLElement;
+                if (deleteBtn) deleteBtn.style.opacity = '1';
+              }}
+              onMouseLeave={(e) => {
+                const deleteBtn = e.currentTarget.querySelector('.delete-btn') as HTMLElement;
+                if (deleteBtn) deleteBtn.style.opacity = '0';
               }}
             >
-              <IconX size={12} />
-            </ActionIcon>
+              <ScreenThumbnail screen={screen} allScreens={screens} screenIndex={index} />
+              <ActionIcon
+                className="delete-btn"
+                size="xs"
+                color="red"
+                variant="filled"
+                style={{
+                  position: 'absolute',
+                  top: 4,
+                  right: 4,
+                  opacity: 0,
+                  transition: 'opacity 0.2s',
+                }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  removeScreen(screen.id);
+                }}
+              >
+                <IconX size={12} />
+              </ActionIcon>
+            </Box>
             <Text
               size="xs"
               style={{
-                position: 'absolute',
-                bottom: 0,
-                left: 0,
-                right: 0,
-                backgroundColor: 'rgba(0,0,0,0.7)',
-                color: 'white',
-                padding: '2px 4px',
+                marginTop: 4,
+                color: '#666',
                 textAlign: 'center',
+                fontSize: 10,
+                maxWidth: 60,
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
               }}
             >
               {screen.name}
@@ -130,23 +199,37 @@ export function ScreensPanel({
           </Box>
         ))}
 
-        {/* New Screen: create a blank screen (no image) without opening file dialog */}
-        <Box
-          onClick={() => addScreen('')}
-          style={{
-            width: 100,
-            height: 80,
-            border: '2px dashed #dee2e6',
-            borderRadius: 8,
-            padding: 0,
-            cursor: 'pointer',
-            transition: 'all 0.2s',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          <Center style={{ height: '100%' }}>
+        <Box style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+          <Box
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              addScreen('');
+            }}
+            onMouseDown={(e) => {
+              e.preventDefault(); // Prevent any default file picker behavior
+            }}
+            style={{
+              width: 100,
+              height: 80,
+              border: '2px dashed #dee2e6',
+              borderRadius: 8,
+              padding: 0,
+              cursor: 'pointer',
+              transition: 'all 0.2s',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.borderColor = '#667eea';
+              e.currentTarget.style.backgroundColor = '#f8f9ff';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.borderColor = '#dee2e6';
+              e.currentTarget.style.backgroundColor = 'transparent';
+            }}
+          >
             <Box style={{ textAlign: 'center' }}>
               <Box
                 style={{
@@ -166,7 +249,7 @@ export function ScreensPanel({
                 NEW SCREEN
               </Text>
             </Box>
-          </Center>
+          </Box>
         </Box>
       </Group>
     </Box>

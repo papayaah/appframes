@@ -1,14 +1,16 @@
 'use client';
 
-import { Group, Text, ActionIcon, Button, Box } from '@mantine/core';
+import { Group, Text, ActionIcon, Button, Box, Slider } from '@mantine/core';
 import { IconDeviceDesktop, IconMoon, IconDownload } from '@tabler/icons-react';
 
 interface HeaderProps {
   onExport?: () => void;
   outputDimensions?: string;
+  zoom?: number;
+  onZoomChange?: (zoom: number) => void;
 }
 
-export function Header({ onExport, outputDimensions = '1242 × 2688px' }: HeaderProps) {
+export function Header({ onExport, outputDimensions = '1242 × 2688px', zoom = 100, onZoomChange }: HeaderProps) {
   return (
     <Box
       style={{
@@ -18,6 +20,7 @@ export function Header({ onExport, outputDimensions = '1242 × 2688px' }: Header
         justifyContent: 'space-between',
         padding: '0 20px',
         borderBottom: '1px solid #E5E7EB',
+        position: 'relative',
       }}
     >
       <Group gap="sm">
@@ -45,6 +48,24 @@ export function Header({ onExport, outputDimensions = '1242 × 2688px' }: Header
         </Text>
       </Group>
 
+      <Group gap="md" style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)' }}>
+        <Text size="xs" c="dimmed" style={{ minWidth: 40 }}>
+          Zoom
+        </Text>
+        <Slider
+          value={zoom}
+          onChange={(value) => onZoomChange?.(value)}
+          min={25}
+          max={200}
+          label={(value) => `${value}%`}
+          style={{ width: 200 }}
+          size="sm"
+        />
+        <Text size="xs" c="dimmed" style={{ minWidth: 45 }}>
+          {zoom}%
+        </Text>
+      </Group>
+
       <Group gap="xs">
         <Text size="sm" c="dimmed">
           OUTPUT: {outputDimensions}
@@ -55,9 +76,6 @@ export function Header({ onExport, outputDimensions = '1242 × 2688px' }: Header
         <ActionIcon variant="subtle" color="gray" size="lg">
           <IconMoon size={18} />
         </ActionIcon>
-        <Text size="sm" c="dimmed">
-          25%
-        </Text>
         <Button leftSection={<IconDownload size={16} />} size="sm" onClick={onExport}>
           Export
         </Button>

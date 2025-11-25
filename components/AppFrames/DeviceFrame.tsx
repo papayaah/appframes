@@ -15,6 +15,10 @@ interface DeviceFrameProps {
   panY: number;
   showInstructions?: boolean;
   onPanChange?: (panX: number, panY: number) => void;
+  frameIndex?: number;
+  isHighlighted?: boolean;
+  onDragOver?: () => void;
+  onDragLeave?: () => void;
 }
 
 interface DeviceConfig {
@@ -141,7 +145,11 @@ export function DeviceFrame({
   panX, 
   panY, 
   showInstructions = false,
-  onPanChange 
+  onPanChange,
+  frameIndex,
+  isHighlighted = false,
+  onDragOver,
+  onDragLeave
 }: DeviceFrameProps) {
   const { imageUrl } = useMediaImage(mediaId);
   const displayImage = imageUrl || image;
@@ -356,7 +364,20 @@ export function DeviceFrame({
   };
 
   return (
-    <Box style={{ position: 'relative' }}>
+    <Box 
+      style={{ position: 'relative' }}
+      onDragOver={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        onDragOver?.();
+      }}
+      onDragLeave={(e) => {
+        // Only trigger if actually leaving the frame (not entering a child)
+        if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+          onDragLeave?.();
+        }
+      }}
+    >
       <Box
         style={{
           width,
@@ -367,11 +388,13 @@ export function DeviceFrame({
           paddingBottom: bottomPadding + imacChin,
           paddingLeft: sidePadding,
           paddingRight: sidePadding,
-          boxShadow:
-            '0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.1) inset',
+          boxShadow: isHighlighted
+            ? '0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 0 3px rgba(102, 126, 234, 0.8), 0 0 20px rgba(102, 126, 234, 0.5)'
+            : '0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.1) inset',
           position: 'relative',
           display: 'flex',
           flexDirection: 'column',
+          transition: 'box-shadow 0.2s ease',
         }}
       >
         {renderDecorations()}

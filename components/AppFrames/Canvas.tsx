@@ -3,14 +3,14 @@
 import { useState } from 'react';
 import { Box, Center } from '@mantine/core';
 import { CanvasSettings, Screen } from './AppFrames';
-import { DeviceFrame } from './DeviceFrame';
+import { CompositionRenderer } from './CompositionRenderer';
 
 interface CanvasProps {
   settings: CanvasSettings;
   screens: Screen[];
-  // Optional target screen index lets us drop directly into a specific screen
-  onReplaceScreen?: (files: File[], targetScreenIndex?: number) => void;
+  onReplaceScreen?: (files: File[], targetFrameIndex?: number) => void;
   onPanChange?: (panX: number, panY: number) => void;
+  zoom?: number;
 }
 
 // Canvas dimensions based on canvas size (App Store requirements)
@@ -55,356 +55,88 @@ const getCanvasDimensions = (canvasSize: string, _orientation: string) => {
   return dim;
 };
 
-export function Canvas({ settings, screens, onReplaceScreen, onPanChange }: CanvasProps) {
+export function Canvas({ settings, screens, onReplaceScreen, onPanChange, zoom = 100 }: CanvasProps) {
   const canvasDimensions = getCanvasDimensions(settings.canvasSize, settings.orientation);
   const aspectRatio = canvasDimensions.width / canvasDimensions.height;
-  const [hoveredScreenIndex, setHoveredScreenIndex] = useState<number | null>(null);
+  const currentScreen = screens[settings.selectedScreenIndex] || screens[0];
+  const [hoveredFrameIndex, setHoveredFrameIndex] = useState<number | null>(null);
+  const [dragFileCount, setDragFileCount] = useState<number>(0);
 
-  const handleDrop = (files: File[], targetScreenIndex?: number) => {
+  const handleDrop = (files: File[], targetFrameIndex?: number) => {
     if (!onReplaceScreen || files.length === 0) {
       return;
     }
-    // When multiple canvases are visible (multi-select in Single composition),
-    // only allow drops on specific device frames to avoid ambiguity.
-    if (
-      typeof targetScreenIndex !== 'number' &&
-      settings.composition === 'single' &&
-      settings.selectedScreenIndices &&
-      settings.selectedScreenIndices.length > 1
-    ) {
-      return;
-    }
-
-    onReplaceScreen(files, targetScreenIndex);
-  };
-  
-  const renderComposition = () => {
-    const scale = settings.compositionScale / 100;
-    const selectedScreen = screens[settings.selectedScreenIndex] || screens[0];
-
-    switch (settings.composition) {
-      case 'single':
-        return (
-          <Center style={{ height: '100%' }}>
-            <Box
-              onDragOver={(e) => {
-                e.preventDefault();
-                setHoveredScreenIndex(settings.selectedScreenIndex);
-              }}
-              onDragLeave={() => setHoveredScreenIndex(null)}
-              onDrop={(e) => {
-                e.preventDefault();
-                const files = Array.from(e.dataTransfer.files);
-                handleDrop(files, settings.selectedScreenIndex);
-                setHoveredScreenIndex(null);
-              }}
-              style={{
-                padding: 4,
-                borderRadius: 16,
-                border:
-                  hoveredScreenIndex === settings.selectedScreenIndex
-                    ? '2px solid #6366f1'
-                    : '2px solid transparent',
-                transition: 'border-color 120ms ease-out',
-              }}
-            >
-              <DeviceFrame
-                deviceType={settings.deviceFrame}
-                image={selectedScreen?.image}
-                mediaId={selectedScreen?.mediaId}
-                scale={scale}
-                screenScale={settings.screenScale}
-                panX={settings.screenPanX}
-                panY={settings.screenPanY}
-                showInstructions={screens.length === 0}
-                onPanChange={onPanChange}
-              />
-            </Box>
-          </Center>
-        );
-
-      case 'dual':
-        return (
-          <Center style={{ height: '100%', gap: 20 }}>
-            {[0, 1].map((screenIndex) => {
-              const screen = screens[screenIndex];
-              return (
-                <Box
-                  key={screenIndex}
-                  onDragOver={(e) => {
-                    e.preventDefault();
-                    setHoveredScreenIndex(screenIndex);
-                  }}
-                  onDragLeave={() => setHoveredScreenIndex(null)}
-                  onDrop={(e) => {
-                    e.preventDefault();
-                    const files = Array.from(e.dataTransfer.files);
-                    handleDrop(files, screenIndex);
-                    setHoveredScreenIndex(null);
-                  }}
-                  style={{
-                    padding: 4,
-                    borderRadius: 16,
-                    border:
-                      hoveredScreenIndex === screenIndex
-                        ? '2px solid #6366f1'
-                        : '2px solid transparent',
-                    transition: 'border-color 120ms ease-out',
-                  }}
-                >
-                  <DeviceFrame
-                    deviceType={settings.deviceFrame}
-                    image={screen?.image}
-                    mediaId={screen?.mediaId}
-                    scale={scale * 0.9}
-                    screenScale={settings.screenScale}
-                    panX={settings.screenPanX}
-                    panY={settings.screenPanY}
-                  />
-                </Box>
-              );
-            })}
-          </Center>
-        );
-
-      case 'stack':
-        return (
-          <Center style={{ height: '100%', position: 'relative' }}>
-            <Box style={{ position: 'relative' }}>
-              <Box
-                style={{ position: 'absolute', top: -20, left: -20, zIndex: 1 }}
-                onDragOver={(e) => {
-                  e.preventDefault();
-                  setHoveredScreenIndex(0);
-                }}
-                onDragLeave={() => setHoveredScreenIndex(null)}
-                onDrop={(e) => {
-                  e.preventDefault();
-                  const files = Array.from(e.dataTransfer.files);
-                  handleDrop(files, 0);
-                  setHoveredScreenIndex(null);
-                }}
-              >
-                <DeviceFrame
-                  deviceType={settings.deviceFrame}
-                  image={screens[0]?.image}
-                  mediaId={screens[0]?.mediaId}
-                  scale={scale * 0.85}
-                  screenScale={settings.screenScale}
-                  panX={settings.screenPanX}
-                  panY={settings.screenPanY}
-                />
-              </Box>
-              <Box
-                style={{ position: 'relative', zIndex: 2 }}
-                onDragOver={(e) => {
-                  e.preventDefault();
-                  setHoveredScreenIndex(1);
-                }}
-                onDragLeave={() => setHoveredScreenIndex(null)}
-                onDrop={(e) => {
-                  e.preventDefault();
-                  const files = Array.from(e.dataTransfer.files);
-                  handleDrop(files, 1);
-                  setHoveredScreenIndex(null);
-                }}
-              >
-                <DeviceFrame
-                  deviceType={settings.deviceFrame}
-                  image={screens[1]?.image}
-                  mediaId={screens[1]?.mediaId}
-                  scale={scale * 0.85}
-                  screenScale={settings.screenScale}
-                  panX={settings.screenPanX}
-                  panY={settings.screenPanY}
-                />
-              </Box>
-            </Box>
-          </Center>
-        );
-
-      case 'triple':
-        return (
-          <Center style={{ height: '100%', gap: 15 }}>
-            {[0, 1, 2].map((screenIndex) => {
-              const screen = screens[screenIndex];
-              return (
-                <Box
-                  key={screenIndex}
-                  onDragOver={(e) => {
-                    e.preventDefault();
-                    setHoveredScreenIndex(screenIndex);
-                  }}
-                  onDragLeave={() => setHoveredScreenIndex(null)}
-                  onDrop={(e) => {
-                    e.preventDefault();
-                    const files = Array.from(e.dataTransfer.files);
-                    handleDrop(files, screenIndex);
-                    setHoveredScreenIndex(null);
-                  }}
-                  style={{
-                    padding: 4,
-                    borderRadius: 16,
-                    border:
-                      hoveredScreenIndex === screenIndex
-                        ? '2px solid #6366f1'
-                        : '2px solid transparent',
-                    transition: 'border-color 120ms ease-out',
-                  }}
-                >
-                  <DeviceFrame
-                    deviceType={settings.deviceFrame}
-                    image={screen?.image}
-                    mediaId={screen?.mediaId}
-                    scale={scale * 0.75}
-                    screenScale={settings.screenScale}
-                    panX={settings.screenPanX}
-                    panY={settings.screenPanY}
-                  />
-                </Box>
-              );
-            })}
-          </Center>
-        );
-
-      case 'fan':
-        return (
-          <Center style={{ height: '100%', position: 'relative' }}>
-            <Box style={{ position: 'relative', width: 600, height: 500 }}>
-              <Box
-                style={{
-                  position: 'absolute',
-                  top: '50%',
-                  left: '20%',
-                  transform: 'translate(-50%, -50%) rotate(-8deg)',
-                  zIndex: 1,
-                }}
-                onDragOver={(e) => {
-                  e.preventDefault();
-                  setHoveredScreenIndex(0);
-                }}
-                onDragLeave={() => setHoveredScreenIndex(null)}
-                onDrop={(e) => {
-                  e.preventDefault();
-                  const files = Array.from(e.dataTransfer.files);
-                  handleDrop(files, 0);
-                  setHoveredScreenIndex(null);
-                }}
-              >
-                <DeviceFrame
-                  deviceType={settings.deviceFrame}
-                  image={screens[0]?.image}
-                  mediaId={screens[0]?.mediaId}
-                  scale={scale * 0.7}
-                  screenScale={settings.screenScale}
-                  panX={settings.screenPanX}
-                  panY={settings.screenPanY}
-                />
-              </Box>
-              <Box
-                style={{
-                  position: 'absolute',
-                  top: '50%',
-                  left: '50%',
-                  transform: 'translate(-50%, -50%)',
-                  zIndex: 3,
-                }}
-                onDragOver={(e) => {
-                  e.preventDefault();
-                  setHoveredScreenIndex(1);
-                }}
-                onDragLeave={() => setHoveredScreenIndex(null)}
-                onDrop={(e) => {
-                  e.preventDefault();
-                  const files = Array.from(e.dataTransfer.files);
-                  handleDrop(files, 1);
-                  setHoveredScreenIndex(null);
-                }}
-              >
-                <DeviceFrame
-                  deviceType={settings.deviceFrame}
-                  image={screens[1]?.image}
-                  mediaId={screens[1]?.mediaId}
-                  scale={scale * 0.7}
-                  screenScale={settings.screenScale}
-                  panX={settings.screenPanX}
-                  panY={settings.screenPanY}
-                />
-              </Box>
-              <Box
-                style={{
-                  position: 'absolute',
-                  top: '50%',
-                  left: '80%',
-                  transform: 'translate(-50%, -50%) rotate(8deg)',
-                  zIndex: 2,
-                }}
-                onDragOver={(e) => {
-                  e.preventDefault();
-                  setHoveredScreenIndex(2);
-                }}
-                onDragLeave={() => setHoveredScreenIndex(null)}
-                onDrop={(e) => {
-                  e.preventDefault();
-                  const files = Array.from(e.dataTransfer.files);
-                  handleDrop(files, 2);
-                  setHoveredScreenIndex(null);
-                }}
-              >
-                <DeviceFrame
-                  deviceType={settings.deviceFrame}
-                  image={screens[2]?.image}
-                  mediaId={screens[2]?.mediaId}
-                  scale={scale * 0.7}
-                  screenScale={settings.screenScale}
-                  panX={settings.screenPanX}
-                  panY={settings.screenPanY}
-                />
-              </Box>
-            </Box>
-          </Center>
-        );
-
-      default:
-        return null;
-    }
+    setHoveredFrameIndex(null);
+    setDragFileCount(0);
+    onReplaceScreen(files, targetFrameIndex);
   };
 
   return (
     <Box
       style={{
         flex: 1,
-        minHeight: 0,
         backgroundColor: '#F9FAFB',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
         padding: 40,
-        overflow: 'auto',
+        overflow: 'hidden',
+        position: 'relative',
       }}
-      onDragOver={(e) => e.preventDefault()}
+      onDragOver={(e) => {
+        e.preventDefault();
+        // Count files being dragged
+        if (e.dataTransfer.types.includes('Files')) {
+          const fileCount = e.dataTransfer.items.length;
+          setDragFileCount(fileCount);
+        }
+      }}
+      onDragLeave={(e) => {
+        // Only clear if leaving the entire canvas area
+        if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+          setHoveredFrameIndex(null);
+          setDragFileCount(0);
+        }
+      }}
       onDrop={(e) => {
         e.preventDefault();
         const files = Array.from(e.dataTransfer.files);
-        handleDrop(files);
+        handleDrop(files, hoveredFrameIndex ?? undefined);
       }}
     >
       <Box
-        data-canvas="true"
         style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          transform: `scale(${zoom / 100})`,
+          transformOrigin: 'center center',
           width: '100%',
-          maxWidth: aspectRatio > 1 ? '90%' : 600,
-          maxHeight: '100%',
-          aspectRatio: `${aspectRatio}`,
-          backgroundColor: settings.backgroundColor,
-          position: 'relative',
-          boxShadow: '0 10px 40px rgba(0,0,0,0.15)',
-          borderRadius: 8,
-          overflow: 'hidden',
+          height: '100%',
         }}
       >
-        {renderComposition()}
-        {settings.showCaption && settings.captionText && screens.length > 0 && (
+        <Box
+          data-canvas="true"
+          style={{
+            width: '100%',
+            maxWidth: aspectRatio > 1 ? '90%' : 600,
+            aspectRatio: `${aspectRatio}`,
+            backgroundColor: settings.backgroundColor,
+            position: 'relative',
+            boxShadow: '0 10px 40px rgba(0,0,0,0.15)',
+            borderRadius: 8,
+            overflow: 'hidden',
+          }}
+        >
+        <CompositionRenderer 
+          settings={settings} 
+          screen={currentScreen} 
+          onPanChange={onPanChange}
+          hoveredFrameIndex={hoveredFrameIndex}
+          onFrameHover={setHoveredFrameIndex}
+          dragFileCount={dragFileCount}
+        />
+        {settings.showCaption && settings.captionText && currentScreen && currentScreen.images && currentScreen.images.some(img => img.image || img.mediaId) && (
           <Box
             style={{
               position: 'absolute',
@@ -423,6 +155,7 @@ export function Canvas({ settings, screens, onReplaceScreen, onPanChange }: Canv
             {settings.captionText}
           </Box>
         )}
+        </Box>
       </Box>
     </Box>
   );

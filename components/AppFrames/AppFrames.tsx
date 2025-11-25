@@ -7,11 +7,16 @@ import { SidebarTabs } from './SidebarTabs';
 import { Canvas } from './Canvas';
 import { ScreensPanel } from './ScreensPanel';
 
+export interface ScreenImage {
+  image?: string; // Base64 image (legacy support)
+  mediaId?: number; // Reference to media library
+}
+
 export interface Screen {
   id: string;
-  mediaId?: number; // Optional: Reference to media library
-  image?: string; // Optional: Base64 image (legacy support)
+  images: ScreenImage[]; // Array of images for this screen's composition (1 for single, 2 for dual/stack, 3 for triple/fan)
   name: string;
+  settings: Omit<CanvasSettings, 'selectedScreenIndex'>; // Each screen has its own settings
 }
 
 export interface CanvasSettings {
@@ -21,10 +26,7 @@ export interface CanvasSettings {
   compositionScale: number;
   captionVertical: number;
   captionHorizontal: number;
-  // Primary selected screen (for controls, drag/drop, etc.)
   selectedScreenIndex: number;
-  // Optional multi-select of screens to show in the editor (used for multi-canvas view)
-  selectedScreenIndices?: number[];
   screenScale: number;
   screenPanX: number;
   screenPanY: number;
@@ -94,73 +96,142 @@ const getCompositionFrameCount = (composition: string): number => {
   }
 };
 
-// Helper function to find the next empty screen index for smart frame filling
-// Returns -1 if a new screen needs to be created
-const findNextEmptyScreenIndex = (
-  screens: Screen[],
-  composition: string,
-  currentIndex: number
-): number => {
-  // Handle empty screens array
-  if (screens.length === 0) {
-    return -1; // Signal to create new screen
-  }
-  
-  // Determine how many frames the composition uses
-  const frameCount = getCompositionFrameCount(composition);
-  
-  // If we don't have enough screens for the composition, signal to create new
-  if (screens.length < frameCount) {
-    return -1; // Signal to create new screen
-  }
-  
-  // Find first empty frame within composition frame count
-  for (let i = 0; i < Math.min(frameCount, screens.length); i++) {
-    const screen = screens[i];
-    if (!screen.mediaId && !screen.image) {
-      return i;
-    }
-  }
-  
-  // All frames filled, use current selection
-  return currentIndex;
-};
-
-export function AppFrames() {
-  const [screens, setScreens] = useState<Screen[]>([]);
-  const [settings, setSettings] = useState<CanvasSettings>({
+// Helper function to get default settings for a new screen
+const getDefaultScreenSettings = (): Omit<CanvasSettings, 'selectedScreenIndex'> => {
+  return {
     canvasSize: 'iphone-6.5-1',
     deviceFrame: 'iphone-14-pro',
     composition: 'single',
     compositionScale: 85,
     captionVertical: 10,
     captionHorizontal: 50,
-    selectedScreenIndex: 0,
-    selectedScreenIndices: [0],
-    screenScale: 100, // Changed from 50 to 100 to fill device frame by default
+    screenScale: 100,
     screenPanX: 50,
     screenPanY: 50,
     orientation: 'portrait',
     backgroundColor: '#E5E7EB',
     captionText: 'Powerful tools for your workflow',
     showCaption: true,
-  });
+  };
+};
 
-  const addScreen = (imageOrMediaId: string | number) => {
+// Helper function to find the next empty image slot in the current screen's images array
+// Returns the index of the first empty image slot, or 0 if all slots are filled
+const findNextEmptyImageSlot = (screen: Screen): number => {
+  if (!screen || !screen.images) return 0;
+  
+  const frameCount = getCompositionFrameCount(screen.settings.composition);
+  
+  // Find first empty image slot
+  for (let i = 0; i < frameCount; i++) {
+    const img = screen.images[i];
+    if (!img || (!img.image && !img.mediaId)) {
+      return i;
+    }
+  }
+  
+  // All slots filled, return 0 to replace first image
+  return 0;
+};
+
+export function AppFrames() {
+  // Initialize with one empty screen with default settings
+  const [screens, setScreens] = useState<Screen[]>([
+    {
+      id: `screen-${Date.now()}`,
+      name: 'Screen 1',
+      images: [], // Empty images array - will be populated based on composition
+      settings: getDefaultScreenSettings(),
+    },
+  ]);
+  const [zoom, setZoom] = useState<number>(100);
+  const [selectedScreenIndex, setSelectedScreenIndex] = useState<number>(0);
+  
+  // Get current screen's settings (computed from selected screen)
+  const currentScreen = screens[selectedScreenIndex];
+  const settings: CanvasSettings = currentScreen 
+    ? { ...currentScreen.settings, selectedScreenIndex }
+    : { ...getDefaultScreenSettings(), selectedScreenIndex: 0 };
+
+  const addScreen = (imageOrMediaId?: string | number) => {
+    const defaultSettings = getDefaultScreenSettings();
+    const frameCount = getCompositionFrameCount(defaultSettings.composition);
+    
+    // Initialize images array based on composition type
+    const images: ScreenImage[] = Array(frameCount).fill(null).map(() => ({}));
+    
+    // If an image was provided, add it to the first slot
+    if (imageOrMediaId) {
+      if (typeof imageOrMediaId === 'number') {
+        images[0] = { mediaId: imageOrMediaId };
+      } else {
+        images[0] = { image: imageOrMediaId };
+      }
+    }
+    
     const newScreen: Screen = {
       id: `screen-${Date.now()}-${Math.random()}`, // More unique ID
-      ...(typeof imageOrMediaId === 'number' 
-        ? { mediaId: imageOrMediaId } 
-        : { image: imageOrMediaId }),
+      images,
       name: `Screen ${screens.length + 1}`,
+      settings: defaultSettings, // Each screen gets its own default settings
     };
     setScreens((prevScreens) => [...prevScreens, newScreen]);
     // Select the newly added screen
-    setSettings((prevSettings) => ({ 
-        ...prevSettings, 
-        selectedScreenIndex: screens.length, // use current length as new index
-        selectedScreenIndices: [screens.length],
-    }));
+    setSelectedScreenIndex(screens.length); // use current length as new index
+  };
+  
+  // Update settings for the currently selected screen
+  const updateSelectedScreenSettings = (updates: Partial<Omit<CanvasSettings, 'selectedScreenIndex'>>) => {
+    setScreens((prevScreens) => {
+      const updated = [...prevScreens];
+      if (updated[selectedScreenIndex]) {
+        const screen = updated[selectedScreenIndex];
+        const newSettings = {
+          ...screen.settings,
+          ...updates,
+        };
+        
+        // If composition changed, resize images array to match new composition
+        let newImages = [...(screen.images || [])];
+        if (updates.composition && updates.composition !== screen.settings.composition) {
+          const oldFrameCount = getCompositionFrameCount(screen.settings.composition);
+          const newFrameCount = getCompositionFrameCount(updates.composition);
+          
+          if (newFrameCount > oldFrameCount) {
+            // Add empty slots
+            while (newImages.length < newFrameCount) {
+              newImages.push({});
+            }
+          } else if (newFrameCount < oldFrameCount) {
+            // Remove extra slots (keep first N)
+            newImages = newImages.slice(0, newFrameCount);
+          }
+        }
+        
+        updated[selectedScreenIndex] = {
+          ...screen,
+          settings: newSettings,
+          images: newImages,
+        };
+      }
+      return updated;
+    });
+  };
+  
+  // Set settings (for backward compatibility, updates selected screen)
+  const setSettings = (newSettings: CanvasSettings | ((prev: CanvasSettings) => CanvasSettings)) => {
+    const settingsToApply = typeof newSettings === 'function' 
+      ? newSettings(settings)
+      : newSettings;
+    
+    // Update selected screen index if it changed
+    if (settingsToApply.selectedScreenIndex !== selectedScreenIndex) {
+      setSelectedScreenIndex(settingsToApply.selectedScreenIndex);
+    }
+    
+    // Update the selected screen's settings (excluding selectedScreenIndex)
+    const { selectedScreenIndex: _, ...screenSettings } = settingsToApply;
+    updateSelectedScreenSettings(screenSettings);
   };
 
   // Separate helper that just returns the new array without setting state immediately if needed, 
@@ -241,25 +312,11 @@ export function AppFrames() {
     const newScreens = screens.filter((s) => s.id !== id);
     setScreens(newScreens);
     // Adjust selected index if needed
-    if (newScreens.length === 0) {
-      setSettings({
-        ...settings,
-        selectedScreenIndex: 0,
-        selectedScreenIndices: [],
-      });
-      return;
+    if (selectedScreenIndex >= newScreens.length && newScreens.length > 0) {
+      setSelectedScreenIndex(newScreens.length - 1);
+    } else if (newScreens.length === 0) {
+      setSelectedScreenIndex(0);
     }
-
-    let nextIndex = settings.selectedScreenIndex;
-    if (nextIndex >= newScreens.length) {
-      nextIndex = newScreens.length - 1;
-    }
-
-    setSettings({
-      ...settings,
-      selectedScreenIndex: nextIndex,
-      selectedScreenIndices: [nextIndex],
-    });
   };
 
   const handleExport = async () => {
@@ -290,15 +347,29 @@ export function AppFrames() {
     }
   };
 
-  const replaceScreen = (index: number, imageOrMediaId: string | number) => {
+  const replaceScreen = (index: number, imageOrMediaId: string | number, imageSlotIndex: number = 0) => {
       setScreens(prevScreens => {
           const updatedScreens = [...prevScreens];
           if (updatedScreens[index]) {
+              const screen = updatedScreens[index];
+              const newImages = [...(screen.images || [])];
+              
+              // Ensure the images array has enough slots
+              const frameCount = getCompositionFrameCount(screen.settings.composition);
+              while (newImages.length < frameCount) {
+                newImages.push({});
+              }
+              
+              // Update the specified image slot (default to first slot)
+              if (imageSlotIndex < newImages.length) {
+                newImages[imageSlotIndex] = typeof imageOrMediaId === 'number'
+                  ? { mediaId: imageOrMediaId, image: undefined }
+                  : { image: imageOrMediaId, mediaId: undefined };
+              }
+              
               updatedScreens[index] = {
-                  ...updatedScreens[index],
-                  ...(typeof imageOrMediaId === 'number'
-                      ? { mediaId: imageOrMediaId, image: undefined }
-                      : { image: imageOrMediaId, mediaId: undefined }),
+                  ...screen,
+                  images: newImages,
               };
           }
           return updatedScreens;
@@ -319,6 +390,8 @@ export function AppFrames() {
         <Header 
           onExport={handleExport}
           outputDimensions={`${getCanvasDimensions(settings.canvasSize, settings.orientation).width} × ${getCanvasDimensions(settings.canvasSize, settings.orientation).height}px`}
+          zoom={zoom}
+          onZoomChange={setZoom}
         />
       </AppShell.Header>
 
@@ -332,7 +405,7 @@ export function AppFrames() {
             if (screens.length === 0) {
               addScreen(mediaId);
             } else {
-              replaceScreen(settings.selectedScreenIndex, mediaId);
+              replaceScreen(selectedScreenIndex, mediaId);
             }
           }}
         />
@@ -340,146 +413,93 @@ export function AppFrames() {
 
       <AppShell.Main>
         <Box style={{ height: 'calc(100vh - 60px)', display: 'flex', flexDirection: 'column' }}>
-          {/* Canvas area – supports multi-canvas in Single composition when multiple screens are selected */}
-          <Box
-            style={{
-              flex: 1,
-              display: 'flex',
-              gap: 24,
-              alignItems: 'stretch',
-              justifyContent: 'center',
-              paddingInline: 24,
-            }}
-          >
-            {(() => {
-              const selectedIndices =
-                settings.selectedScreenIndices && settings.selectedScreenIndices.length > 0
-                  ? settings.selectedScreenIndices
-                  : [settings.selectedScreenIndex];
-
-              const shouldShowMulti =
-                settings.composition === 'single' && selectedIndices.length > 1;
-
-              const renderCanvas = (screenIndex: number) => (
-                <Box key={screenIndex} style={{ flex: 1, minWidth: 0 }}>
-                  <Canvas
-                    settings={{ ...settings, selectedScreenIndex: screenIndex }}
-                    screens={screens}
-                    onReplaceScreen={async (files, targetScreenIndex) => {
-                      try {
-                        const layoutFrameCount = getCompositionFrameCount(settings.composition);
-
-                        // Pre-process uploads
-                        const uploadPromises = files.map((file) => handleMediaUpload(file));
-                        const mediaIds = await Promise.all(uploadPromises);
-
-                        let currentScreens = [...screens];
-                        let newSettings = { ...settings };
-
-                        for (let i = 0; i < mediaIds.length; i += 1) {
-                          const mediaId = mediaIds[i];
-                          if (!mediaId) continue;
-
-                          let targetIndex = -1;
-
-                          // If a specific target screen is provided, treat that as the base slot
-                          // and fill sequentially from there for multi-file drops.
-                          if (typeof targetScreenIndex === 'number') {
-                            targetIndex = targetScreenIndex + i;
-                          } else if (shouldShowMulti) {
-                            // In multi-view mode, dropping on "empty space" of a canvas
-                            // should target THAT canvas's screen, not search globally.
-                            // screenIndex comes from renderCanvas scope.
-                            targetIndex = screenIndex + i;
-                          } else if (files.length > 1) {
-                            if (i < layoutFrameCount) {
-                              targetIndex = i;
-                            }
-                          } else {
-                            targetIndex = findNextEmptyScreenIndex(
-                              currentScreens,
-                              newSettings.composition,
-                              screenIndex,
-                            );
-                          }
-
-                          if (targetIndex !== -1 && targetIndex < layoutFrameCount) {
-                            if (targetIndex < currentScreens.length) {
-                              currentScreens[targetIndex] = {
-                                ...currentScreens[targetIndex],
-                                mediaId,
-                                image: undefined,
-                              };
-                            } else {
-                              const newScreen: Screen = {
-                                id: `screen-${Date.now()}-${i}`,
-                                mediaId,
-                                name: `Screen ${currentScreens.length + 1}`,
-                              };
-                              currentScreens.push(newScreen);
-                            }
-
-                            if (i === mediaIds.length - 1) {
-                              newSettings.selectedScreenIndex = targetIndex;
-                              newSettings.selectedScreenIndices = [targetIndex];
-                            }
-                          } else if (targetIndex === -1) {
-                            const newScreen: Screen = {
-                              id: `screen-${Date.now()}-${i}`,
-                              mediaId,
-                              name: `Screen ${currentScreens.length + 1}`,
-                            };
-                            currentScreens.push(newScreen);
-
-                            if (i === mediaIds.length - 1) {
-                              const lastIndex = currentScreens.length - 1;
-                              newSettings.selectedScreenIndex = lastIndex;
-                              newSettings.selectedScreenIndices = [lastIndex];
-                            }
-                          }
+          <Canvas 
+            settings={settings} 
+            screens={screens}
+            zoom={zoom}
+            onReplaceScreen={async (files, targetFrameIndex) => {
+              try {
+                if (!currentScreen) return;
+                
+                const layoutFrameCount = getCompositionFrameCount(currentScreen.settings.composition);
+                
+                // Pre-process uploads
+                const uploadPromises = files.map(file => handleMediaUpload(file));
+                const mediaIds = await Promise.all(uploadPromises);
+                
+                // Limit to number of frames in composition
+                const filesToProcess = Math.min(mediaIds.length, layoutFrameCount);
+                
+                // Update the current screen's images array
+                setScreens(prevScreens => {
+                  const updated = [...prevScreens];
+                  const screenIndex = selectedScreenIndex;
+                  
+                  if (!updated[screenIndex]) return prevScreens;
+                  
+                  const screen = updated[screenIndex];
+                  const newImages = [...screen.images];
+                  
+                  // Ensure images array has enough slots for the composition
+                  while (newImages.length < layoutFrameCount) {
+                    newImages.push({});
+                  }
+                  
+                  // Add images to the current screen's images array
+                  for (let i = 0; i < filesToProcess; i++) {
+                    const mediaId = mediaIds[i];
+                    if (!mediaId) continue;
+                    
+                    let targetImageIndex = -1;
+                    
+                    if (files.length > 1) {
+                      // Multi-drop: fill image slots starting from targetFrameIndex (or 0 if not specified)
+                      const startIndex = targetFrameIndex !== undefined ? targetFrameIndex : 0;
+                      targetImageIndex = (startIndex + i) % layoutFrameCount;
+                    } else {
+                      // Single drop: use targetFrameIndex if specified, otherwise find first empty or use 0
+                      if (targetFrameIndex !== undefined) {
+                        targetImageIndex = targetFrameIndex;
+                      } else {
+                        targetImageIndex = newImages.findIndex(img => !img.image && !img.mediaId);
+                        if (targetImageIndex === -1) {
+                          targetImageIndex = 0; // Replace first image if all slots filled
                         }
-
-                        setScreens(currentScreens);
-                        setSettings(newSettings);
-                      } catch (error) {
-                        // eslint-disable-next-line no-console
-                        console.error('Error processing dropped files:', error);
-                        // eslint-disable-next-line no-alert
-                        alert('Failed to process images. Please try again.');
                       }
-                    }}
-                    onPanChange={(panX, panY) =>
-                      setSettings({ ...settings, screenPanX: panX, screenPanY: panY })
                     }
-                  />
-                </Box>
-              );
+                    
+                    if (targetImageIndex >= 0 && targetImageIndex < layoutFrameCount) {
+                      newImages[targetImageIndex] = {
+                        mediaId: mediaId,
+                        image: undefined
+                      };
+                    }
+                  }
+                  
+                  updated[screenIndex] = {
+                    ...screen,
+                    images: newImages,
+                  };
+                  
+                  return updated;
+                });
 
-              if (shouldShowMulti) {
-                return selectedIndices.map((idx) => renderCanvas(idx));
+              } catch (error) {
+                // eslint-disable-next-line no-console
+                console.error('Error processing dropped files:', error);
+                // eslint-disable-next-line no-alert
+                alert('Failed to process images. Please try again.');
               }
-
-              return renderCanvas(settings.selectedScreenIndex);
-            })()}
-          </Box>
-
+            }}
+            onPanChange={(panX, panY) => updateSelectedScreenSettings({ screenPanX: panX, screenPanY: panY })}
+          />
           <ScreensPanel
             screens={screens}
             addScreen={addScreen}
             removeScreen={removeScreen}
-            selectedIndices={
-              settings.selectedScreenIndices && settings.selectedScreenIndices.length > 0
-                ? settings.selectedScreenIndices
-                : [settings.selectedScreenIndex]
-            }
-            onSelectScreen={(indices) => {
-              const primary = indices[0] ?? 0;
-              setSettings({
-                ...settings,
-                selectedScreenIndex: primary,
-                selectedScreenIndices: indices,
-              });
-            }}
+            selectedIndex={selectedScreenIndex}
+            onSelectScreen={setSelectedScreenIndex}
+            onMediaUpload={handleMediaUpload}
           />
         </Box>
       </AppShell.Main>
