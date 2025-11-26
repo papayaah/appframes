@@ -6,7 +6,7 @@ export interface ScreenImage {
 export interface CanvasSettings {
   canvasSize: string; // Export dimensions (App Store requirements)
   deviceFrame: string; // Visual frame type
-  composition: 'single' | 'dual' | 'stack' | 'triple' | 'fan';
+  composition: 'single' | 'dual' | 'stack' | 'triple' | 'fan' | 'tilt-left' | 'split';
   compositionScale: number;
   captionVertical: number;
   captionHorizontal: number;
@@ -25,6 +25,7 @@ export interface Screen {
   images: ScreenImage[]; // Array of images for this screen's composition (1 for single, 2 for dual/stack, 3 for triple/fan)
   name: string;
   settings: Omit<CanvasSettings, 'selectedScreenIndex'>; // Each screen has its own settings
+  splitPairId?: string;
 }
 
 export interface ScreensStudioActions {

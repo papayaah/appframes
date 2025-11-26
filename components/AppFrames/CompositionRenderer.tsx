@@ -22,6 +22,8 @@ const getCompositionFrameCount = (composition: string): number => {
     case 'stack': return 2;
     case 'triple': return 3;
     case 'fan': return 3;
+    case 'tilt-left': return 1;
+    case 'split': return 2;
     default: return 1;
   }
 };
@@ -294,6 +296,80 @@ export function CompositionRenderer({
                 onDragLeave={() => onFrameHover?.(null)}
               />
             </Box>
+          </Box>
+        </Center>
+      );
+
+    case 'tilt-left':
+      return (
+        <Center style={{ height: '100%', perspective: '1000px' }}>
+          <Box
+            style={{
+              transform: 'rotateY(-40deg)',
+              transformStyle: 'preserve-3d',
+            }}
+          >
+            <DeviceFrame
+              deviceType={settings.deviceFrame}
+              image={images[0]?.image}
+              mediaId={images[0]?.mediaId}
+              scale={scale}
+              screenScale={settings.screenScale}
+              panX={settings.screenPanX}
+              panY={settings.screenPanY}
+              showInstructions={images.length === 0 || (!images[0]?.image && !images[0]?.mediaId)}
+              onPanChange={onPanChange}
+              frameIndex={0}
+              isHighlighted={highlightedFrames.includes(0)}
+              onDragOver={() => onFrameHover?.(0)}
+              onDragLeave={() => onFrameHover?.(null)}
+            />
+          </Box>
+        </Center>
+      );
+
+    case 'split':
+      return (
+        <Center style={{ height: '100%', gap: 30, perspective: '1000px' }}>
+          <Box
+            style={{
+              transformStyle: 'preserve-3d',
+            }}
+          >
+            <DeviceFrame
+              deviceType={settings.deviceFrame}
+              image={images[0]?.image}
+              mediaId={images[0]?.mediaId}
+              scale={scale * 0.8}
+              screenScale={settings.screenScale}
+              panX={settings.screenPanX}
+              panY={settings.screenPanY}
+              showInstructions={images.length === 0 || (!images[0]?.image && !images[0]?.mediaId)}
+              frameIndex={0}
+              isHighlighted={highlightedFrames.includes(0)}
+              onDragOver={() => onFrameHover?.(0)}
+              onDragLeave={() => onFrameHover?.(null)}
+            />
+          </Box>
+          <Box
+            style={{
+              transformStyle: 'preserve-3d',
+            }}
+          >
+            <DeviceFrame
+              deviceType={settings.deviceFrame}
+              image={images[1]?.image}
+              mediaId={images[1]?.mediaId}
+              scale={scale * 0.8}
+              screenScale={settings.screenScale}
+              panX={settings.screenPanX}
+              panY={settings.screenPanY}
+              showInstructions={images.length < 2 || (!images[1]?.image && !images[1]?.mediaId)}
+              frameIndex={1}
+              isHighlighted={highlightedFrames.includes(1)}
+              onDragOver={() => onFrameHover?.(1)}
+              onDragLeave={() => onFrameHover?.(null)}
+            />
           </Box>
         </Center>
       );

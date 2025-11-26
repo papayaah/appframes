@@ -49,6 +49,8 @@ export const getCanvasDimensions = (canvasSize: string, _orientation: string) =>
 export const getCompositionFrameCount = (composition: string): number => {
   switch (composition) {
     case 'single': return 1;
+    case 'tilt-left': return 1;
+    case 'split': return 2;
     case 'dual': return 2;
     case 'stack': return 2;
     case 'triple': return 3;
@@ -193,10 +195,39 @@ export function FramesProvider({ children }: { children: ReactNode }) {
       // Only update the primary selected screen for now
       if (updated[primarySelectedIndex]) {
         const screen = updated[primarySelectedIndex];
+        const oldComposition = screen.settings.composition;
         const newSettings = {
           ...screen.settings,
           ...updates,
         };
+
+        if (updates.composition === 'split' && oldComposition !== 'split') {
+          const splitPairId = `split-${Date.now()}`;
+          const newScreen: Screen = {
+            id: `screen-${Date.now()}-${Math.random()}`,
+            images: [{}],
+            name: `Screen ${prevScreens.length + 1}`,
+            settings: {
+              ...newSettings,
+              composition: 'single', 
+            },
+            splitPairId,
+          };
+
+          updated[primarySelectedIndex] = {
+            ...screen,
+            settings: {
+              ...newSettings,
+              composition: 'single',
+            },
+            images: [{}],
+            splitPairId,
+          };
+
+          updated.splice(primarySelectedIndex + 1, 0, newScreen);
+          
+          return updated;
+        }
 
         // If composition changed, resize images array to match new composition
         let newImages = [...(screen.images || [])];
@@ -243,6 +274,7 @@ export function FramesProvider({ children }: { children: ReactNode }) {
     const { selectedScreenIndex: _, ...screenSettings } = settingsToApply;
     updateSelectedScreenSettings(screenSettings);
   };
+
 
   const removeScreen = (id: string) => {
     // Find index of screen to remove

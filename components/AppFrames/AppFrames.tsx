@@ -32,6 +32,55 @@ export function AppFrames() {
 
   const [navWidth, setNavWidth] = useState(360); // Rail (80) + Panel (~280)
 
+  const splitImageInHalf = async (file: File): Promise<[File, File]> => {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const img = new Image();
+          img.onload = () => {
+            const canvas = document.createElement('canvas');
+            const halfWidth = Math.floor(img.width / 2);
+            
+            // first half
+            canvas.width = halfWidth;
+            canvas.height = img.height;
+            const ctx = canvas.getContext('2d');
+            if (!ctx) {
+              reject(new Error('Failed to get canvas context'));
+              return;
+            }
+            
+            ctx.drawImage(img, 0, 0, halfWidth, img.height, 0, 0, halfWidth, img.height);
+            canvas.toBlob((leftBlob) => {
+              if (!leftBlob) {
+                reject(new Error('Failed to create left blob'));
+                return;
+              }
+              
+              const leftFile = new File([leftBlob], `${file.name}-left.png`, { type: 'image/png' });
+              
+              // 2nd half
+              ctx.clearRect(0, 0, canvas.width, canvas.height);
+              ctx.drawImage(img, halfWidth, 0, halfWidth, img.height, 0, 0, halfWidth, img.height);
+              canvas.toBlob((rightBlob) => {
+                if (!rightBlob) {
+                  reject(new Error('Failed to create right blob'));
+                  return;
+                }
+                
+                const rightFile = new File([rightBlob], `${file.name}-right.png`, { type: 'image/png' });
+                resolve([leftFile, rightFile]);
+              }, 'image/png');
+            }, 'image/png');
+          };
+          img.onerror = () => reject(new Error('Failed to load image'));
+          img.src = e.target?.result as string;
+        };
+        reader.onerror = () => reject(new Error('Failed to read file'));
+        reader.readAsDataURL(file);
+      });
+    };
+
   const handleMediaUpload = async (file: File): Promise<number | null> => {
     try {
       const { db } = await import('../../lib/db');
@@ -188,6 +237,67 @@ export function AppFrames() {
                 if (!targetScreen) return;
 
                 const layoutFrameCount = getCompositionFrameCount(targetScreen.settings.composition);
+
+                const isSplitPair = targetScreen.splitPairId && files.length === 1;
+
+                if (isSplitPair) {
+                  const [leftFile, rightFile] = await splitImageInHalf(files[0]);
+                  const leftMediaId = await handleMediaUpload(leftFile);
+                  const rightMediaId = await handleMediaUpload(rightFile);
+
+                  if (leftMediaId && rightMediaId) {
+                    setScreens(prevScreens => {
+                      const updated = [...prevScreens];
+                      
+                      const pairScreens = updated
+                        .map((s, idx) => ({ screen: s, index: idx }))
+                        .filter(({ screen }) => screen.splitPairId === targetScreen.splitPairId)
+                        .sort((a, b) => a.index - b.index);
+
+                      if (pairScreens.length === 2) {
+                        updated[pairScreens[0].index] = {
+                          ...updated[pairScreens[0].index],
+                          images: [{ mediaId: leftMediaId, image: undefined }],
+                        };
+
+                        updated[pairScreens[1].index] = {
+                          ...updated[pairScreens[1].index],
+                          images: [{ mediaId: rightMediaId, image: undefined }],
+                        };
+                      }
+
+                      return updated;
+                    });
+                  }
+                  return;
+                }
+
+                if (targetScreen.settings.composition === 'split' && files.length === 1) {
+                  const [leftFile, rightFile] = await splitImageInHalf(files[0]);
+                  const leftMediaId = await handleMediaUpload(leftFile);
+                  const rightMediaId = await handleMediaUpload(rightFile);
+
+                  if (leftMediaId && rightMediaId) {
+                    setScreens(prevScreens => {
+                      const updated = [...prevScreens];
+                      if (!updated[screenIndex]) return prevScreens;
+
+                      const screen = updated[screenIndex];
+                      const newImages = [
+                        { mediaId: leftMediaId, image: undefined },
+                        { mediaId: rightMediaId, image: undefined },
+                      ];
+
+                      updated[screenIndex] = {
+                        ...screen,
+                        images: newImages,
+                      };
+
+                      return updated;
+                    });
+                  }
+                  return;
+                }
 
                 // Pre-process uploads
                 const uploadPromises = files.map(file => handleMediaUpload(file));
