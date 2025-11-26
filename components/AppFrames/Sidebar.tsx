@@ -126,15 +126,10 @@ const CompositionButton = ({
           />
         </Box>
       )}
-      {type === 'tilt-left' && (
-        <Box style={{ transform: 'rotateY(-40deg)' }}>
-          <Box style={{ width: 20, height: 35, border: '2px solid #495057', borderRadius: 4 }} />
-        </Box>
-      )}
       {type === 'split' && (
-        <Group gap={0}>
+        <Group gap={4}>
           <Box style={{ width: 16, height: 30, border: '2px solid #495057', borderRadius: 3 }} />
-          <Box style={{  width: 16, height: 30, border: '2px solid #495057', borderRadius: 3 }} />
+          <Box style={{ width: 16, height: 30, border: '2px solid #495057', borderRadius: 3 }} />
         </Group>
       )}
     </Box>
@@ -263,18 +258,12 @@ export function Sidebar({ settings, setSettings, screens }: SidebarProps) {
             onClick={() => setSettings({ ...settings, composition: 'triple' })}
           />
         </SimpleGrid>
-        <SimpleGrid cols={3} spacing="xs" mt="xs">
+        <SimpleGrid cols={2} spacing="xs" mt="xs">
           <CompositionButton
             type="fan"
             label="Fan"
             selected={settings.composition === 'fan'}
             onClick={() => setSettings({ ...settings, composition: 'fan' })}
-          />
-          <CompositionButton
-            type="tilt-left"
-            label="Tilt Left"
-            selected={settings.composition === 'tilt-left'}
-            onClick={() => setSettings({ ...settings, composition: 'tilt-left' })}
           />
           <CompositionButton
             type="split"

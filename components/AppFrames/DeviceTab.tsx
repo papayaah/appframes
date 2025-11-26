@@ -122,6 +122,59 @@ export function DeviceTab({ settings, setSettings }: DeviceTabProps) {
   return (
     <ScrollArea style={{ height: '100%' }}>
       <Stack gap="lg" p="md">
+        <Box>
+          <Text size="xs" fw={700} c="dimmed" mb="xs" tt="uppercase">
+            TILT
+          </Text>
+          <Stack gap="xs">
+            <Box
+              onClick={() => setSettings({ ...settings, tilt: 'none' })}
+              style={{
+                padding: '12px 16px',
+                border: settings.tilt === 'none' ? '2px solid #667eea' : '1px solid #dee2e6',
+                borderRadius: 8,
+                cursor: 'pointer',
+                backgroundColor: settings.tilt === 'none' ? '#f8f9ff' : 'white',
+                transition: 'all 0.2s',
+              }}
+            >
+              <Text size="sm" fw={500} c={settings.tilt === 'none' ? 'dark' : 'dimmed'}>
+                No Tilt
+              </Text>
+            </Box>
+            <Box
+              onClick={() => setSettings({ ...settings, tilt: 'left' })}
+              style={{
+                padding: '12px 16px',
+                border: settings.tilt === 'left' ? '2px solid #667eea' : '1px solid #dee2e6',
+                borderRadius: 8,
+                cursor: 'pointer',
+                backgroundColor: settings.tilt === 'left' ? '#f8f9ff' : 'white',
+                transition: 'all 0.2s',
+              }}
+            >
+              <Text size="sm" fw={500} c={settings.tilt === 'left' ? 'dark' : 'dimmed'}>
+                Tilt Left
+              </Text>
+            </Box>
+            <Box
+              onClick={() => setSettings({ ...settings, tilt: 'right' })}
+              style={{
+                padding: '12px 16px',
+                border: settings.tilt === 'right' ? '2px solid #667eea' : '1px solid #dee2e6',
+                borderRadius: 8,
+                cursor: 'pointer',
+                backgroundColor: settings.tilt === 'right' ? '#f8f9ff' : 'white',
+                transition: 'all 0.2s',
+              }}
+            >
+              <Text size="sm" fw={500} c={settings.tilt === 'right' ? 'dark' : 'dimmed'}>
+                Tilt Right
+              </Text>
+            </Box>
+          </Stack>
+        </Box>
+
         {categories.map((category) => {
           const categoryDevices = devices.filter((d) => d.category === category);
           if (categoryDevices.length === 0) return null;

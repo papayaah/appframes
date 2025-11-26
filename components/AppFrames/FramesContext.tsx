@@ -49,7 +49,6 @@ export const getCanvasDimensions = (canvasSize: string, _orientation: string) =>
 export const getCompositionFrameCount = (composition: string): number => {
   switch (composition) {
     case 'single': return 1;
-    case 'tilt-left': return 1;
     case 'split': return 2;
     case 'dual': return 2;
     case 'stack': return 2;
@@ -75,6 +74,7 @@ export const getDefaultScreenSettings = (): Omit<CanvasSettings, 'selectedScreen
     backgroundColor: '#E5E7EB',
     captionText: 'Powerful tools for your workflow',
     showCaption: true,
+    tilt: 'none',
   };
 };
 
@@ -201,6 +201,46 @@ export function FramesProvider({ children }: { children: ReactNode }) {
           ...updates,
         };
 
+        if (screen.splitPairId && updates.composition && updates.composition !== 'split' && oldComposition === 'single') {
+          const pairScreens = updated
+            .map((s, idx) => ({ screen: s, index: idx }))
+            .filter(({ screen: s }) => s.splitPairId === screen.splitPairId);
+
+          if (pairScreens.length === 2) {
+            const otherScreenData = pairScreens.find(({ index }) => index !== primarySelectedIndex);
+            
+            if (otherScreenData) {
+              updated[otherScreenData.index] = {
+                ...updated[otherScreenData.index],
+                splitPairId: undefined,
+                settings: {
+                  ...updated[otherScreenData.index].settings,
+                  composition: 'single',
+                },
+              };
+            }
+
+            let newImages = [...(screen.images || [])];
+            const newFrameCount = getCompositionFrameCount(updates.composition);
+            
+            while (newImages.length < newFrameCount) {
+              newImages.push({});
+            }
+            if (newImages.length > newFrameCount) {
+              newImages = newImages.slice(0, newFrameCount);
+            }
+
+            updated[primarySelectedIndex] = {
+              ...screen,
+              splitPairId: undefined,
+              settings: newSettings,
+              images: newImages,
+            };
+
+            return updated;
+          }
+        }
+
         if (updates.composition === 'split' && oldComposition !== 'split') {
           const splitPairId = `split-${Date.now()}`;
           const newScreen: Screen = {
@@ -209,7 +249,7 @@ export function FramesProvider({ children }: { children: ReactNode }) {
             name: `Screen ${prevScreens.length + 1}`,
             settings: {
               ...newSettings,
-              composition: 'single', 
+              composition: 'single',
             },
             splitPairId,
           };
@@ -225,7 +265,7 @@ export function FramesProvider({ children }: { children: ReactNode }) {
           };
 
           updated.splice(primarySelectedIndex + 1, 0, newScreen);
-          
+
           return updated;
         }
 
@@ -281,6 +321,53 @@ export function FramesProvider({ children }: { children: ReactNode }) {
     const indexToRemove = screens.findIndex(s => s.id === id);
     if (indexToRemove === -1) return;
 
+    const screenToRemove = screens[indexToRemove];
+    
+    if (screenToRemove.splitPairId) {
+      const pairScreens = screens.filter(s => s.splitPairId === screenToRemove.splitPairId);
+      
+      if (pairScreens.length === 2) {
+        const remainingScreen = pairScreens.find(s => s.id !== id);
+        
+        if (remainingScreen) {
+          setScreens(prevScreens => {
+            const updated = prevScreens.filter(s => s.id !== id);
+            const remainingIndex = updated.findIndex(s => s.id === remainingScreen.id);
+            
+            if (remainingIndex !== -1) {
+              updated[remainingIndex] = {
+                ...updated[remainingIndex],
+                splitPairId: undefined,
+                settings: {
+                  ...updated[remainingIndex].settings,
+                  composition: 'single',
+                },
+              };
+            }
+            
+            return updated;
+          });
+          
+          setSelectedScreenIndices(prev => {
+            let newIndices = prev.filter(i => i !== indexToRemove);
+            newIndices = newIndices.map(i => i > indexToRemove ? i - 1 : i);
+            
+            const newScreensLength = screens.length - 1;
+            if (newScreensLength === 0) return [0];
+            
+            if (newIndices.length === 0) {
+              return [Math.max(0, Math.min(indexToRemove, newScreensLength - 1))];
+            }
+            
+            return newIndices;
+          });
+          
+          return;
+        }
+      }
+    }
+
+    // Regular screen removal (non-split)
     const newScreens = screens.filter((s) => s.id !== id);
     setScreens(newScreens);
 

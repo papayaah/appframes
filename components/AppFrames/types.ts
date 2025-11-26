@@ -6,7 +6,7 @@ export interface ScreenImage {
 export interface CanvasSettings {
   canvasSize: string; // Export dimensions (App Store requirements)
   deviceFrame: string; // Visual frame type
-  composition: 'single' | 'dual' | 'stack' | 'triple' | 'fan' | 'tilt-left' | 'split';
+  composition: 'single' | 'dual' | 'stack' | 'triple' | 'fan' | 'split';
   compositionScale: number;
   captionVertical: number;
   captionHorizontal: number;
@@ -18,6 +18,7 @@ export interface CanvasSettings {
   backgroundColor: string;
   captionText: string;
   showCaption: boolean;
+  tilt: 'none' | 'left' | 'right';
 }
 
 export interface Screen {

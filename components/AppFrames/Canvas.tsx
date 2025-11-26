@@ -126,6 +126,119 @@ export function Canvas({
           const screen = screens[screenIndex];
           if (!screen) return null;
 
+          const isSplitPair = screen.splitPairId;
+          if (isSplitPair) {
+            const pairScreens = screens
+              .map((s, idx) => ({ screen: s, index: idx }))
+              .filter(({ screen: s }) => s.splitPairId === screen.splitPairId)
+              .sort((a, b) => a.index - b.index);
+
+            const pairIndices = pairScreens.map(p => p.index);
+            const isAnyPairSelected = pairIndices.some(idx => selectedScreenIndices.includes(idx));
+            
+            const firstPairIndex = pairScreens[0]?.index;
+            const secondPairIndex = pairScreens[1]?.index;
+            const shouldRender = screenIndex === firstPairIndex || 
+                                (screenIndex === secondPairIndex && !selectedScreenIndices.includes(firstPairIndex));
+            
+            if (!shouldRender) {
+              return null;
+            }
+
+            const leftScreen = pairScreens[0]?.screen || screen;
+            const rightScreen = pairScreens[1]?.screen || screen;
+            const leftIndex = pairScreens[0]?.index || screenIndex;
+            const rightIndex = pairScreens[1]?.index || screenIndex;
+
+            const screenSettings = {
+              ...leftScreen.settings,
+              selectedScreenIndex: leftIndex,
+            };
+
+            const canvasDimensions = getCanvasDimensions(screenSettings.canvasSize, screenSettings.orientation);
+            const aspectRatio = canvasDimensions.width / canvasDimensions.height;
+
+            const combinedScreen = {
+              ...leftScreen,
+              images: [leftScreen.images[0] || {}, rightScreen.images[0] || {}],
+            };
+
+            const primarySelectedIndex = selectedScreenIndices[selectedScreenIndices.length - 1];
+            const isPrimaryScreen = pairIndices.includes(primarySelectedIndex);
+            const selectedSplitFrame = primarySelectedIndex === rightIndex ? 1 : 0;
+
+            return (
+              <Box
+                key={screen.id}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transform: `scale(${zoom / 100})`,
+                  transformOrigin: 'center center',
+                  height: '100%',
+                  width: 'auto',
+                  flexShrink: 0,
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  const files = Array.from(e.dataTransfer.files);
+                  handleDrop(files, hoveredFrameIndex ?? undefined, leftIndex);
+                }}
+                onDragOver={(e) => {
+                  setHoveredScreenIndex(leftIndex);
+                }}
+              >
+                <Box
+                  id={`canvas-${screen.id}`}
+                  data-canvas="true"
+                  style={{
+                    width: 'auto',
+                    minWidth: aspectRatio > 1 ? 1000 : 800,
+                    aspectRatio: `${aspectRatio}`,
+                    backgroundColor: screenSettings.backgroundColor,
+                    position: 'relative',
+                    boxShadow: '0 10px 40px rgba(0,0,0,0.15)',
+                    borderRadius: 8,
+                    overflow: 'visible',
+                  }}
+                >
+                  <CompositionRenderer
+                    settings={{ ...screenSettings, composition: 'split' }}
+                    screen={combinedScreen}
+                    onPanChange={(x, y) => onPanChange?.(x, y, leftIndex)}
+                    hoveredFrameIndex={hoveredScreenIndex === leftIndex ? hoveredFrameIndex : null}
+                    onFrameHover={setHoveredFrameIndex}
+                    dragFileCount={dragFileCount}
+                    selectedFrameIndex={isPrimaryScreen ? selectedSplitFrame : undefined}
+                    onSelectFrame={isPrimaryScreen ? onSelectFrame : undefined}
+                  />
+                  {screenSettings.showCaption && screenSettings.captionText && combinedScreen.images && combinedScreen.images.some(img => img.image || img.mediaId) && (
+                    <Box
+                      style={{
+                        position: 'absolute',
+                        top: `${screenSettings.captionVertical}%`,
+                        left: `${screenSettings.captionHorizontal}%`,
+                        transform: 'translate(-50%, -50%)',
+                        color: '#1a1a1a',
+                        fontSize: 32,
+                        fontWeight: 700,
+                        textAlign: 'center',
+                        maxWidth: '80%',
+                        pointerEvents: 'none',
+                        textShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                      }}
+                    >
+                      {screenSettings.captionText}
+                    </Box>
+                  )}
+                </Box>
+              </Box>
+            );
+          }
+
+          // Regular screen rendering (non-split)
           const screenSettings = {
             ...screen.settings,
             selectedScreenIndex: screenIndex,

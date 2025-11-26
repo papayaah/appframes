@@ -22,7 +22,6 @@ const getCompositionFrameCount = (composition: string): number => {
     case 'stack': return 2;
     case 'triple': return 3;
     case 'fan': return 3;
-    case 'tilt-left': return 1;
     case 'split': return 2;
     default: return 1;
   }
@@ -64,27 +63,44 @@ export function CompositionRenderer({
 
   const highlightedFrames = getHighlightedFrames();
 
+  const getTiltTransform = () => {
+    if (settings.tilt === 'left') return 'rotateY(-40deg)';
+    if (settings.tilt === 'right') return 'rotateY(40deg)';
+    return 'none';
+  };
+
+  const tiltStyle = settings.tilt !== 'none' ? {
+    perspective: '1000px',
+  } : {};
+
+  const frameWrapperStyle = settings.tilt !== 'none' ? {
+    transform: getTiltTransform(),
+    transformStyle: 'preserve-3d' as const,
+  } : {};
+
   switch (settings.composition) {
     case 'single':
       return (
-        <Center style={{ height: '100%' }}>
-          <DeviceFrame
-            deviceType={settings.deviceFrame}
-            image={images[0]?.image}
-            mediaId={images[0]?.mediaId}
-            scale={scale}
-            screenScale={settings.screenScale}
-            panX={settings.screenPanX}
-            panY={settings.screenPanY}
-            showInstructions={images.length === 0 || (!images[0]?.image && !images[0]?.mediaId)}
-            onPanChange={onPanChange}
-            frameIndex={0}
-            isHighlighted={highlightedFrames.includes(0)}
-            isSelected={selectedFrameIndex === 0}
-            onClick={() => onSelectFrame?.(0)}
-            onDragOver={() => onFrameHover?.(0)}
-            onDragLeave={() => onFrameHover?.(null)}
-          />
+        <Center style={{ height: '100%', ...tiltStyle }}>
+          <Box style={frameWrapperStyle}>
+            <DeviceFrame
+              deviceType={settings.deviceFrame}
+              image={images[0]?.image}
+              mediaId={images[0]?.mediaId}
+              scale={scale}
+              screenScale={settings.screenScale}
+              panX={settings.screenPanX}
+              panY={settings.screenPanY}
+              showInstructions={images.length === 0 || (!images[0]?.image && !images[0]?.mediaId)}
+              onPanChange={onPanChange}
+              frameIndex={0}
+              isHighlighted={highlightedFrames.includes(0)}
+              isSelected={selectedFrameIndex === 0}
+              onClick={() => onSelectFrame?.(0)}
+              onDragOver={() => onFrameHover?.(0)}
+              onDragLeave={() => onFrameHover?.(null)}
+            />
+          </Box>
         </Center>
       );
 
@@ -300,73 +316,37 @@ export function CompositionRenderer({
         </Center>
       );
 
-    case 'tilt-left':
-      return (
-        <Center style={{ height: '100%', perspective: '1000px' }}>
-          <Box
-            style={{
-              transform: 'rotateY(-40deg)',
-              transformStyle: 'preserve-3d',
-            }}
-          >
-            <DeviceFrame
-              deviceType={settings.deviceFrame}
-              image={images[0]?.image}
-              mediaId={images[0]?.mediaId}
-              scale={scale}
-              screenScale={settings.screenScale}
-              panX={settings.screenPanX}
-              panY={settings.screenPanY}
-              showInstructions={images.length === 0 || (!images[0]?.image && !images[0]?.mediaId)}
-              onPanChange={onPanChange}
-              frameIndex={0}
-              isHighlighted={highlightedFrames.includes(0)}
-              onDragOver={() => onFrameHover?.(0)}
-              onDragLeave={() => onFrameHover?.(null)}
-            />
-          </Box>
-        </Center>
-      );
-
     case 'split':
       return (
-        <Center style={{ height: '100%', gap: 30, perspective: '1000px' }}>
-          <Box
-            style={{
-              transformStyle: 'preserve-3d',
-            }}
-          >
+        <Center style={{ height: '100%', width: '100%' }}>
+          <Box style={{ display: 'flex', gap: 5, alignItems: 'center', justifyContent: 'center' }}>
             <DeviceFrame
               deviceType={settings.deviceFrame}
               image={images[0]?.image}
               mediaId={images[0]?.mediaId}
-              scale={scale * 0.8}
+              scale={scale * 0.85}
               screenScale={settings.screenScale}
               panX={settings.screenPanX}
               panY={settings.screenPanY}
-              showInstructions={images.length === 0 || (!images[0]?.image && !images[0]?.mediaId)}
               frameIndex={0}
               isHighlighted={highlightedFrames.includes(0)}
+              isSelected={selectedFrameIndex === 0}
+              onClick={() => onSelectFrame?.(0)}
               onDragOver={() => onFrameHover?.(0)}
               onDragLeave={() => onFrameHover?.(null)}
             />
-          </Box>
-          <Box
-            style={{
-              transformStyle: 'preserve-3d',
-            }}
-          >
             <DeviceFrame
               deviceType={settings.deviceFrame}
               image={images[1]?.image}
               mediaId={images[1]?.mediaId}
-              scale={scale * 0.8}
+              scale={scale * 0.85}
               screenScale={settings.screenScale}
               panX={settings.screenPanX}
               panY={settings.screenPanY}
-              showInstructions={images.length < 2 || (!images[1]?.image && !images[1]?.mediaId)}
               frameIndex={1}
               isHighlighted={highlightedFrames.includes(1)}
+              isSelected={selectedFrameIndex === 1}
+              onClick={() => onSelectFrame?.(1)}
               onDragOver={() => onFrameHover?.(1)}
               onDragLeave={() => onFrameHover?.(null)}
             />
