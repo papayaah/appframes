@@ -4,15 +4,17 @@ import { Box, Center } from '@mantine/core';
 import { CanvasSettings, Screen } from './AppFrames';
 import { DeviceFrame } from './DeviceFrame';
 
-interface CompositionRendererProps {
+export interface CompositionRendererProps {
   settings: CanvasSettings;
-  screen: Screen; // Single screen with its own images array
+  screen: Screen;
   onPanChange?: (panX: number, panY: number) => void;
   hoveredFrameIndex?: number | null;
   onFrameHover?: (index: number | null) => void;
   dragFileCount?: number;
   selectedFrameIndex?: number;
   onSelectFrame?: (index: number) => void;
+  splitSide?: 'left' | 'right';
+  isScreenSelected?: boolean;
 }
 
 const getCompositionFrameCount = (composition: string): number => {
@@ -35,7 +37,9 @@ export function CompositionRenderer({
   onFrameHover,
   dragFileCount = 0,
   selectedFrameIndex,
-  onSelectFrame
+  onSelectFrame,
+  splitSide,
+  isScreenSelected
 }: CompositionRendererProps) {
   const scale = settings.compositionScale / 100;
   const images = screen.images || [];
@@ -95,10 +99,11 @@ export function CompositionRenderer({
               onPanChange={onPanChange}
               frameIndex={0}
               isHighlighted={highlightedFrames.includes(0)}
-              isSelected={selectedFrameIndex === 0}
+              isSelected={isScreenSelected || selectedFrameIndex === 0}
               onClick={() => onSelectFrame?.(0)}
               onDragOver={() => onFrameHover?.(0)}
               onDragLeave={() => onFrameHover?.(null)}
+              splitSide={splitSide}
             />
           </Box>
         </Center>

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { Box } from '@mantine/core';
 import { CanvasSettings, Screen } from './AppFrames';
 import { CompositionRenderer } from './CompositionRenderer';
@@ -115,7 +115,7 @@ export function Canvas({
       <Box
         style={{
           display: 'flex',
-          gap: 60, // Space between canvases
+          gap: 5, // Space between canvases (will be overridden by individual gaps)
           height: '100%',
           alignItems: 'center',
           margin: '0 auto', // Center if content is smaller than viewport
@@ -134,108 +134,227 @@ export function Canvas({
               .sort((a, b) => a.index - b.index);
 
             const pairIndices = pairScreens.map(p => p.index);
-            const isAnyPairSelected = pairIndices.some(idx => selectedScreenIndices.includes(idx));
             
             const firstPairIndex = pairScreens[0]?.index;
             const secondPairIndex = pairScreens[1]?.index;
-            const shouldRender = screenIndex === firstPairIndex || 
-                                (screenIndex === secondPairIndex && !selectedScreenIndices.includes(firstPairIndex));
             
-            if (!shouldRender) {
-              return null;
-            }
+            // Check if both screens in the pair are selected
+            const bothSelected = pairIndices.every(idx => selectedScreenIndices.includes(idx));
+            
+            if (bothSelected) {
+              // Only render once for the first screen in the pair when both are selected
+              if (screenIndex !== firstPairIndex) {
+                return null;
+              }
 
-            const leftScreen = pairScreens[0]?.screen || screen;
-            const rightScreen = pairScreens[1]?.screen || screen;
-            const leftIndex = pairScreens[0]?.index || screenIndex;
-            const rightIndex = pairScreens[1]?.index || screenIndex;
+              const leftScreen = pairScreens[0]?.screen || screen;
+              const rightScreen = pairScreens[1]?.screen || screen;
+              const leftIndex = pairScreens[0]?.index || screenIndex;
+              const rightIndex = pairScreens[1]?.index || screenIndex;
 
-            const screenSettings = {
-              ...leftScreen.settings,
-              selectedScreenIndex: leftIndex,
-            };
+              const leftSettings = {
+                ...leftScreen.settings,
+                selectedScreenIndex: leftIndex,
+              };
 
-            const canvasDimensions = getCanvasDimensions(screenSettings.canvasSize, screenSettings.orientation);
-            const aspectRatio = canvasDimensions.width / canvasDimensions.height;
+              const rightSettings = {
+                ...rightScreen.settings,
+                selectedScreenIndex: rightIndex,
+              };
 
-            const combinedScreen = {
-              ...leftScreen,
-              images: [leftScreen.images[0] || {}, rightScreen.images[0] || {}],
-            };
+              const canvasDimensions = getCanvasDimensions(leftSettings.canvasSize, leftSettings.orientation);
+              const aspectRatio = canvasDimensions.width / canvasDimensions.height;
 
-            const primarySelectedIndex = selectedScreenIndices[selectedScreenIndices.length - 1];
-            const isPrimaryScreen = pairIndices.includes(primarySelectedIndex);
-            const selectedSplitFrame = primarySelectedIndex === rightIndex ? 1 : 0;
+              const primarySelectedIndex = selectedScreenIndices[selectedScreenIndices.length - 1];
 
-            return (
-              <Box
-                key={screen.id}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  transform: `scale(${zoom / 100})`,
-                  transformOrigin: 'center center',
-                  height: '100%',
-                  width: 'auto',
-                  flexShrink: 0,
-                }}
-                onDrop={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  const files = Array.from(e.dataTransfer.files);
-                  handleDrop(files, hoveredFrameIndex ?? undefined, leftIndex);
-                }}
-                onDragOver={(e) => {
-                  setHoveredScreenIndex(leftIndex);
-                }}
-              >
-                <Box
-                  id={`canvas-${screen.id}`}
-                  data-canvas="true"
-                  style={{
-                    width: 'auto',
-                    minWidth: aspectRatio > 1 ? 1000 : 800,
-                    aspectRatio: `${aspectRatio}`,
-                    backgroundColor: screenSettings.backgroundColor,
-                    position: 'relative',
-                    boxShadow: '0 10px 40px rgba(0,0,0,0.15)',
-                    borderRadius: 8,
-                    overflow: 'visible',
-                  }}
-                >
-                  <CompositionRenderer
-                    settings={{ ...screenSettings, composition: 'split' }}
-                    screen={combinedScreen}
-                    onPanChange={(x, y) => onPanChange?.(x, y, leftIndex)}
-                    hoveredFrameIndex={hoveredScreenIndex === leftIndex ? hoveredFrameIndex : null}
-                    onFrameHover={setHoveredFrameIndex}
-                    dragFileCount={dragFileCount}
-                    selectedFrameIndex={isPrimaryScreen ? selectedSplitFrame : undefined}
-                    onSelectFrame={isPrimaryScreen ? onSelectFrame : undefined}
-                  />
-                  {screenSettings.showCaption && screenSettings.captionText && combinedScreen.images && combinedScreen.images.some(img => img.image || img.mediaId) && (
+              // Render split composition: each canvas shows half of a single device
+              const halfAspectRatio = aspectRatio / 2; // Half width for split view
+
+              return (
+                <React.Fragment key={`split-pair-${screen.splitPairId}`}>
+                  {/* Left Half Canvas */}
+                  <Box
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'flex-end',
+                      transform: `scale(${zoom / 100})`,
+                      transformOrigin: 'center center',
+                      height: '100%',
+                      width: aspectRatio > 1 ? '30vw' : '20vh',
+                      flexShrink: 0,
+                      marginRight: 2.5, // Half of 5px gap for split composition
+                    }}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      const files = Array.from(e.dataTransfer.files);
+                      handleDrop(files, 0, leftIndex);
+                    }}
+                    onDragOver={(e) => {
+                      setHoveredScreenIndex(leftIndex);
+                    }}
+                  >
                     <Box
+                      id={`canvas-${leftScreen.id}`}
+                      data-canvas="true"
                       style={{
-                        position: 'absolute',
-                        top: `${screenSettings.captionVertical}%`,
-                        left: `${screenSettings.captionHorizontal}%`,
-                        transform: 'translate(-50%, -50%)',
-                        color: '#1a1a1a',
-                        fontSize: 32,
-                        fontWeight: 700,
-                        textAlign: 'center',
-                        maxWidth: '80%',
-                        pointerEvents: 'none',
-                        textShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                        width: '100%',
+                        maxWidth: aspectRatio > 1 ? '90%' : 300,
+                        aspectRatio: `${halfAspectRatio}`,
+                        backgroundColor: leftSettings.backgroundColor,
+                        position: 'relative',
+                        boxShadow: '0 10px 40px rgba(0,0,0,0.15)',
+                        borderRadius: '8px 0 0 8px',
+                        overflow: 'hidden',
                       }}
                     >
-                      {screenSettings.captionText}
+                      <Box
+                        style={{
+                          position: 'absolute',
+                          top: 0,
+                          left: 0,
+                          width: '200%',
+                          height: '100%',
+                        }}
+                      >
+                        <Box
+                          style={{
+                            width: '100%',
+                            height: '100%',
+                            clipPath: 'inset(0 50% 0 0)',
+                          }}
+                        >
+                          <CompositionRenderer
+                            settings={{ ...leftSettings, composition: 'single' }}
+                            screen={leftScreen}
+                            onPanChange={(x, y) => onPanChange?.(x, y, leftIndex)}
+                            hoveredFrameIndex={hoveredScreenIndex === leftIndex ? hoveredFrameIndex : null}
+                            onFrameHover={setHoveredFrameIndex}
+                            dragFileCount={dragFileCount}
+                            selectedFrameIndex={primarySelectedIndex === leftIndex ? selectedFrameIndex : undefined}
+                            onSelectFrame={primarySelectedIndex === leftIndex ? onSelectFrame : undefined}
+                            splitSide="left"
+                            isScreenSelected={selectedScreenIndices.includes(leftIndex)}
+                          />
+                        </Box>
+                      </Box>
+                      {leftSettings.showCaption && leftSettings.captionText && leftScreen.images && leftScreen.images.some(img => img.image || img.mediaId) && (
+                        <Box
+                          style={{
+                            position: 'absolute',
+                            top: `${leftSettings.captionVertical}%`,
+                            left: `${leftSettings.captionHorizontal / 2}%`,
+                            transform: 'translate(-50%, -50%)',
+                            color: '#1a1a1a',
+                            fontSize: 32,
+                            fontWeight: 700,
+                            textAlign: 'center',
+                            maxWidth: '80%',
+                            pointerEvents: 'none',
+                            textShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                          }}
+                        >
+                          {leftSettings.captionText}
+                        </Box>
+                      )}
                     </Box>
-                  )}
-                </Box>
-              </Box>
-            );
+                  </Box>
+
+                  {/* Right Half Canvas */}
+                  <Box
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'flex-start',
+                      transform: `scale(${zoom / 100})`,
+                      transformOrigin: 'center center',
+                      height: '100%',
+                      width: aspectRatio > 1 ? '30vw' : '20vh',
+                      flexShrink: 0,
+                      marginLeft: 2.5, // Half of 5px gap for split composition
+                    }}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      const files = Array.from(e.dataTransfer.files);
+                      handleDrop(files, 0, rightIndex);
+                    }}
+                    onDragOver={(e) => {
+                      setHoveredScreenIndex(rightIndex);
+                    }}
+                  >
+                    <Box
+                      id={`canvas-${rightScreen.id}`}
+                      data-canvas="true"
+                      style={{
+                        width: '100%',
+                        maxWidth: aspectRatio > 1 ? '90%' : 300,
+                        aspectRatio: `${halfAspectRatio}`,
+                        backgroundColor: rightSettings.backgroundColor,
+                        position: 'relative',
+                        boxShadow: '0 10px 40px rgba(0,0,0,0.15)',
+                        borderRadius: '0 8px 8px 0',
+                        overflow: 'hidden',
+                      }}
+                    >
+                      <Box
+                        style={{
+                          position: 'absolute',
+                          top: 0,
+                          left: '-100%',
+                          width: '200%',
+                          height: '100%',
+                        }}
+                      >
+                        <Box
+                          style={{
+                            width: '100%',
+                            height: '100%',
+                            clipPath: 'inset(0 0 0 50%)',
+                          }}
+                        >
+                          <CompositionRenderer
+                            settings={{ ...rightSettings, composition: 'single' }}
+                            screen={rightScreen}
+                            onPanChange={(x, y) => onPanChange?.(x, y, rightIndex)}
+                            hoveredFrameIndex={hoveredScreenIndex === rightIndex ? hoveredFrameIndex : null}
+                            onFrameHover={setHoveredFrameIndex}
+                            dragFileCount={dragFileCount}
+                            selectedFrameIndex={primarySelectedIndex === rightIndex ? selectedFrameIndex : undefined}
+                            onSelectFrame={primarySelectedIndex === rightIndex ? onSelectFrame : undefined}
+                            splitSide="right"
+                            isScreenSelected={selectedScreenIndices.includes(rightIndex)}
+                          />
+                        </Box>
+                      </Box>
+                      {rightSettings.showCaption && rightSettings.captionText && rightScreen.images && rightScreen.images.some(img => img.image || img.mediaId) && (
+                        <Box
+                          style={{
+                            position: 'absolute',
+                            top: `${rightSettings.captionVertical}%`,
+                            left: `${50 + rightSettings.captionHorizontal / 2}%`,
+                            transform: 'translate(-50%, -50%)',
+                            color: '#1a1a1a',
+                            fontSize: 32,
+                            fontWeight: 700,
+                            textAlign: 'center',
+                            maxWidth: '80%',
+                            pointerEvents: 'none',
+                            textShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                          }}
+                        >
+                          {rightSettings.captionText}
+                        </Box>
+                      )}
+                    </Box>
+                  </Box>
+                </React.Fragment>
+              );
+            }
+            
+            // If only one screen from the pair is selected, render it as a single composition
+            // Fall through to regular rendering below
           }
 
           // Regular screen rendering (non-split)
@@ -260,9 +379,10 @@ export function Canvas({
                 transform: `scale(${zoom / 100})`,
                 transformOrigin: 'center center',
                 height: '100%',
-                // We need to ensure the container has width so scaling works properly
-                width: aspectRatio > 1 ? '60vw' : '40vh', // Approximate sizing
+                width: aspectRatio > 1 ? '60vw' : '40vh',
                 flexShrink: 0,
+                marginLeft: 30, // Half of 60px gap for regular screens
+                marginRight: 30, // Half of 60px gap for regular screens
               }}
               onDrop={(e) => {
                 e.preventDefault();

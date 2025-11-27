@@ -207,18 +207,17 @@ export function FramesProvider({ children }: { children: ReactNode }) {
             .filter(({ screen: s }) => s.splitPairId === screen.splitPairId);
 
           if (pairScreens.length === 2) {
-            const otherScreenData = pairScreens.find(({ index }) => index !== primarySelectedIndex);
+            const otherScreenIndex = pairScreens.find(({ index }) => index !== primarySelectedIndex)?.index;
             
-            if (otherScreenData) {
-              updated[otherScreenData.index] = {
-                ...updated[otherScreenData.index],
-                splitPairId: undefined,
-                settings: {
-                  ...updated[otherScreenData.index].settings,
-                  composition: 'single',
-                },
-              };
+            // Remove the other screen from the split pair
+            if (otherScreenIndex !== undefined) {
+              updated.splice(otherScreenIndex, 1);
             }
+
+            // Adjust primarySelectedIndex if needed (if we removed a screen before it)
+            const adjustedIndex = otherScreenIndex !== undefined && otherScreenIndex < primarySelectedIndex 
+              ? primarySelectedIndex - 1 
+              : primarySelectedIndex;
 
             let newImages = [...(screen.images || [])];
             const newFrameCount = getCompositionFrameCount(updates.composition);
@@ -230,12 +229,15 @@ export function FramesProvider({ children }: { children: ReactNode }) {
               newImages = newImages.slice(0, newFrameCount);
             }
 
-            updated[primarySelectedIndex] = {
+            updated[adjustedIndex] = {
               ...screen,
               splitPairId: undefined,
               settings: newSettings,
               images: newImages,
             };
+
+            // Update selection to only the remaining screen
+            setSelectedScreenIndices([adjustedIndex]);
 
             return updated;
           }
@@ -265,6 +267,9 @@ export function FramesProvider({ children }: { children: ReactNode }) {
           };
 
           updated.splice(primarySelectedIndex + 1, 0, newScreen);
+
+          // Auto-select both screens in the split pair
+          setSelectedScreenIndices([primarySelectedIndex, primarySelectedIndex + 1]);
 
           return updated;
         }

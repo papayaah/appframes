@@ -140,6 +140,11 @@ const CompositionButton = ({
 );
 
 export function Sidebar({ settings, setSettings, screens }: SidebarProps) {
+  // Check if the selected screen is part of a split pair
+  const selectedScreen = screens[settings.selectedScreenIndex];
+  const isSplitPairScreen = selectedScreen?.splitPairId !== undefined;
+  const effectiveComposition = isSplitPairScreen ? 'split' : settings.composition;
+
   return (
     <Stack gap="lg" style={{ overflow: 'auto', height: '100%', padding: '16px' }}>
       <Box>
@@ -236,25 +241,25 @@ export function Sidebar({ settings, setSettings, screens }: SidebarProps) {
           <CompositionButton
             type="single"
             label="Single"
-            selected={settings.composition === 'single'}
+            selected={effectiveComposition === 'single'}
             onClick={() => setSettings({ ...settings, composition: 'single' })}
           />
           <CompositionButton
             type="dual"
             label="Dual"
-            selected={settings.composition === 'dual'}
+            selected={effectiveComposition === 'dual'}
             onClick={() => setSettings({ ...settings, composition: 'dual' })}
           />
           <CompositionButton
             type="stack"
             label="Stack"
-            selected={settings.composition === 'stack'}
+            selected={effectiveComposition === 'stack'}
             onClick={() => setSettings({ ...settings, composition: 'stack' })}
           />
           <CompositionButton
             type="triple"
             label="Triple"
-            selected={settings.composition === 'triple'}
+            selected={effectiveComposition === 'triple'}
             onClick={() => setSettings({ ...settings, composition: 'triple' })}
           />
         </SimpleGrid>
@@ -262,13 +267,13 @@ export function Sidebar({ settings, setSettings, screens }: SidebarProps) {
           <CompositionButton
             type="fan"
             label="Fan"
-            selected={settings.composition === 'fan'}
+            selected={effectiveComposition === 'fan'}
             onClick={() => setSettings({ ...settings, composition: 'fan' })}
           />
           <CompositionButton
             type="split"
             label="Split"
-            selected={settings.composition === 'split'}
+            selected={effectiveComposition === 'split'}
             onClick={() => setSettings({ ...settings, composition: 'split' })}
           />
         </SimpleGrid>

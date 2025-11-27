@@ -32,55 +32,6 @@ export function AppFrames() {
 
   const [navWidth, setNavWidth] = useState(360); // Rail (80) + Panel (~280)
 
-  const splitImageInHalf = async (file: File): Promise<[File, File]> => {
-      return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          const img = new Image();
-          img.onload = () => {
-            const canvas = document.createElement('canvas');
-            const halfWidth = Math.floor(img.width / 2);
-            
-            // first half
-            canvas.width = halfWidth;
-            canvas.height = img.height;
-            const ctx = canvas.getContext('2d');
-            if (!ctx) {
-              reject(new Error('Failed to get canvas context'));
-              return;
-            }
-            
-            ctx.drawImage(img, 0, 0, halfWidth, img.height, 0, 0, halfWidth, img.height);
-            canvas.toBlob((leftBlob) => {
-              if (!leftBlob) {
-                reject(new Error('Failed to create left blob'));
-                return;
-              }
-              
-              const leftFile = new File([leftBlob], `${file.name}-left.png`, { type: 'image/png' });
-              
-              // 2nd half
-              ctx.clearRect(0, 0, canvas.width, canvas.height);
-              ctx.drawImage(img, halfWidth, 0, halfWidth, img.height, 0, 0, halfWidth, img.height);
-              canvas.toBlob((rightBlob) => {
-                if (!rightBlob) {
-                  reject(new Error('Failed to create right blob'));
-                  return;
-                }
-                
-                const rightFile = new File([rightBlob], `${file.name}-right.png`, { type: 'image/png' });
-                resolve([leftFile, rightFile]);
-              }, 'image/png');
-            }, 'image/png');
-          };
-          img.onerror = () => reject(new Error('Failed to load image'));
-          img.src = e.target?.result as string;
-        };
-        reader.onerror = () => reject(new Error('Failed to read file'));
-        reader.readAsDataURL(file);
-      });
-    };
-
   const handleMediaUpload = async (file: File): Promise<number | null> => {
     try {
       const { db } = await import('../../lib/db');
@@ -152,28 +103,38 @@ export function AppFrames() {
   const handleExport = async () => {
     try {
       const { toPng } = await import('html-to-image');
-      // Export all visible canvases
-      const canvasElements = document.querySelectorAll('[data-canvas="true"]');
-
-      if (canvasElements.length === 0) {
-        // eslint-disable-next-line no-alert
-        alert('Canvas not found');
+      
+      // Get all selected screens to export
+      const screensToExport = selectedScreenIndices.map(idx => screens[idx]).filter(Boolean);
+      
+      if (screensToExport.length === 0) {
+        alert('No screens selected');
         return;
       }
 
-      // For now, let's just export the primary selected screen's canvas.
-      const primaryCanvas = document.getElementById(`canvas-${screens[primarySelectedIndex].id}`);
-      const elementToExport = primaryCanvas || canvasElements[0] as HTMLElement;
+      for (let i = 0; i < screensToExport.length; i++) {
+        const screen = screensToExport[i];
+        const canvasElement = document.getElementById(`canvas-${screen.id}`);
+        
+        if (!canvasElement) {
+          console.warn(`Canvas not found for screen ${screen.id}`);
+          continue;
+        }
 
-      const dataUrl = await toPng(elementToExport, {
-        quality: 1.0,
-        pixelRatio: 2,
-      });
+        const dataUrl = await toPng(canvasElement, {
+          quality: 1.0,
+          pixelRatio: 2,
+        });
 
-      const link = document.createElement('a');
-      link.download = `screenshot-${Date.now()}.png`;
-      link.href = dataUrl;
-      link.click();
+        const link = document.createElement('a');
+        link.download = `screenshot-${screen.name.replace(/\s+/g, '-')}-${Date.now()}.png`;
+        link.href = dataUrl;
+        link.click();
+        
+        if (i < screensToExport.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 300));
+        }
+      }
     } catch (error) {
       // eslint-disable-next-line no-console
       console.error('Export failed:', error);
@@ -241,9 +202,8 @@ export function AppFrames() {
                 const isSplitPair = targetScreen.splitPairId && files.length === 1;
 
                 if (isSplitPair) {
-                  const [leftFile, rightFile] = await splitImageInHalf(files[0]);
-                  const leftMediaId = await handleMediaUpload(leftFile);
-                  const rightMediaId = await handleMediaUpload(rightFile);
+                  const leftMediaId = await handleMediaUpload(files[0]);
+                  const rightMediaId = await handleMediaUpload(files[0]);
 
                   if (leftMediaId && rightMediaId) {
                     setScreens(prevScreens => {
@@ -265,33 +225,6 @@ export function AppFrames() {
                           images: [{ mediaId: rightMediaId, image: undefined }],
                         };
                       }
-
-                      return updated;
-                    });
-                  }
-                  return;
-                }
-
-                if (targetScreen.settings.composition === 'split' && files.length === 1) {
-                  const [leftFile, rightFile] = await splitImageInHalf(files[0]);
-                  const leftMediaId = await handleMediaUpload(leftFile);
-                  const rightMediaId = await handleMediaUpload(rightFile);
-
-                  if (leftMediaId && rightMediaId) {
-                    setScreens(prevScreens => {
-                      const updated = [...prevScreens];
-                      if (!updated[screenIndex]) return prevScreens;
-
-                      const screen = updated[screenIndex];
-                      const newImages = [
-                        { mediaId: leftMediaId, image: undefined },
-                        { mediaId: rightMediaId, image: undefined },
-                      ];
-
-                      updated[screenIndex] = {
-                        ...screen,
-                        images: newImages,
-                      };
 
                       return updated;
                     });
