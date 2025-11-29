@@ -25,6 +25,7 @@ interface DeviceFrameProps {
   onMediaSelect?: (mediaId: number) => void;
   onPexelsSelect?: (url: string) => void;
   onFramePositionChange?: (frameX: number, frameY: number) => void;
+  frameY?: number; // The frame's Y position percentage (0-100)
 }
 
 interface DeviceConfig {
@@ -160,7 +161,8 @@ export function DeviceFrame({
   onDragLeave,
   onMediaSelect,
   onPexelsSelect,
-  onFramePositionChange
+  onFramePositionChange,
+  frameY = 50
 }: DeviceFrameProps) {
   const { imageUrl } = useMediaImage(mediaId);
   const displayImage = imageUrl || image;
@@ -567,12 +569,15 @@ export function DeviceFrame({
           )}
 
           {/* Frame Drag Handle - hide during any drag operation */}
+          {/* When frame is near the top (frameY < 20%), show handle at bottom instead */}
           {onFramePositionChange && (isHovered || isFrameDragging) && !isDragging && (
             <Box
               onMouseDown={handleFrameDragStart}
               style={{
                 position: 'absolute',
-                top: topPadding + 8 * scale,
+                ...(frameY < 20
+                  ? { bottom: bottomPadding + 8 * scale }
+                  : { top: topPadding + 8 * scale }),
                 left: '50%',
                 transform: 'translateX(-50%)',
                 zIndex: 20,

@@ -81,6 +81,11 @@ export function CompositionRenderer({
   // Common props builder for DeviceFrame
   const getFrameProps = (index: number, scaleMultiplier: number = 1) => {
     const { panX, panY } = getFramePan(index);
+    const { frameY } = getFrameOffset(index);
+    // Convert pixel offset to a percentage-like value for handle positioning
+    // Negative frameY means frame moved up, so handle should go to bottom
+    // We use a threshold of -100 pixels to trigger bottom handle
+    const handlePosition = frameY < -100 ? 0 : 50;
     return {
       deviceType: settings.deviceFrame,
       image: images[index]?.image,
@@ -99,6 +104,7 @@ export function CompositionRenderer({
       onPexelsSelect: (url: string) => onPexelsSelect?.(index, url),
       onPanChange: (x: number, y: number) => onPanChange?.(index, x, y),
       onFramePositionChange: (x: number, y: number) => onFramePositionChange?.(index, x, y),
+      frameY: handlePosition,
     };
   };
 
