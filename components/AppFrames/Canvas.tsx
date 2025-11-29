@@ -179,7 +179,7 @@ export function Canvas({
                       alignItems: 'center',
                       justifyContent: 'flex-end',
                       transform: `scale(${zoom / 100})`,
-                      transformOrigin: 'center center',
+                      transformOrigin: 'right center', // Scale from right edge to keep gap constant
                       height: '100%',
                       width: aspectRatio > 1 ? '45vw' : '35vh',
                       flexShrink: 0,
@@ -268,7 +268,7 @@ export function Canvas({
                       alignItems: 'center',
                       justifyContent: 'flex-start',
                       transform: `scale(${zoom / 100})`,
-                      transformOrigin: 'center center',
+                      transformOrigin: 'left center', // Scale from left edge to keep gap constant
                       height: '100%',
                       width: aspectRatio > 1 ? '45vw' : '35vh',
                       flexShrink: 0,
@@ -378,7 +378,7 @@ export function Canvas({
                   alignItems: 'center',
                   justifyContent: 'center',
                   transform: `scale(${zoom / 100})`,
-                  transformOrigin: 'center center',
+                  transformOrigin: splitSide === 'left' ? 'right center' : 'left center', // Scale from edge to maintain position
                   height: '100%',
                   width: aspectRatio > 1 ? '45vw' : '35vh',
                   flexShrink: 0,
