@@ -16,6 +16,8 @@ export interface CompositionRendererProps {
   onSelectFrame?: (index: number) => void;
   onMediaSelect?: (frameIndex: number, mediaId: number) => void;
   onPexelsSelect?: (frameIndex: number, url: string) => void;
+  splitSide?: 'left' | 'right';
+  isScreenSelected?: boolean;
 }
 
 const getCompositionFrameCount = (composition: string): number => {
@@ -41,7 +43,9 @@ export function CompositionRenderer({
   selectedFrameIndex,
   onSelectFrame,
   onMediaSelect,
-  onPexelsSelect
+  onPexelsSelect,
+  splitSide,
+  isScreenSelected = false
 }: CompositionRendererProps) {
   const scale = settings.compositionScale / 100;
   const images = screen.images || [];
@@ -92,7 +96,7 @@ export function CompositionRenderer({
       panY,
       frameIndex: index,
       isHighlighted: highlightedFrames.includes(index),
-      isSelected: selectedFrameIndex === index,
+      isSelected: isScreenSelected || selectedFrameIndex === index, // Show selected if screen is selected OR specific frame is selected
       onClick: () => onSelectFrame?.(index),
       onDragOver: () => onFrameHover?.(index),
       onDragLeave: () => onFrameHover?.(null),
@@ -100,6 +104,7 @@ export function CompositionRenderer({
       onPexelsSelect: (url: string) => onPexelsSelect?.(index, url),
       onPanChange: (x: number, y: number) => onPanChange?.(index, x, y),
       onFramePositionChange: (x: number, y: number) => onFramePositionChange?.(index, x, y),
+      splitSide, // Pass splitSide to DeviceFrame for proper cropping
     };
   };
 

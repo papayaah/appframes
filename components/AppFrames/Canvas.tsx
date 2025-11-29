@@ -234,7 +234,7 @@ export function Canvas({
                           <CompositionRenderer
                             settings={{ ...leftSettings, composition: 'single' }}
                             screen={leftScreen}
-                            onPanChange={(x, y) => onPanChange?.(x, y, leftIndex)}
+                            onPanChange={(frameIndex, x, y) => onPanChange?.(leftIndex, frameIndex, x, y)}
                             hoveredFrameIndex={hoveredScreenIndex === leftIndex ? hoveredFrameIndex : null}
                             onFrameHover={setHoveredFrameIndex}
                             dragFileCount={dragFileCount}
@@ -323,7 +323,7 @@ export function Canvas({
                           <CompositionRenderer
                             settings={{ ...rightSettings, composition: 'single' }}
                             screen={rightScreen}
-                            onPanChange={(x, y) => onPanChange?.(x, y, rightIndex)}
+                            onPanChange={(frameIndex, x, y) => onPanChange?.(rightIndex, frameIndex, x, y)}
                             hoveredFrameIndex={hoveredScreenIndex === rightIndex ? hoveredFrameIndex : null}
                             onFrameHover={setHoveredFrameIndex}
                             dragFileCount={dragFileCount}
@@ -434,7 +434,7 @@ export function Canvas({
                       <CompositionRenderer
                         settings={{ ...screenSettings, composition: 'single' }}
                         screen={screen}
-                        onPanChange={(x, y) => onPanChange?.(x, y, screenIndex)}
+                        onPanChange={(frameIndex, x, y) => onPanChange?.(screenIndex, frameIndex, x, y)}
                         hoveredFrameIndex={hoveredScreenIndex === screenIndex ? hoveredFrameIndex : null}
                         onFrameHover={setHoveredFrameIndex}
                         dragFileCount={dragFileCount}
