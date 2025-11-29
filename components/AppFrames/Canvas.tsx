@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Box } from '@mantine/core';
 import { CanvasSettings, Screen } from './AppFrames';
 import { CompositionRenderer } from './CompositionRenderer';
+import { DraggableText } from './DraggableText';
 
 interface CanvasProps {
   settings: CanvasSettings;
@@ -16,6 +17,8 @@ interface CanvasProps {
   onFramePositionChange?: (screenIndex: number, frameIndex: number, frameX: number, frameY: number) => void;
   onMediaSelect?: (screenIndex: number, frameIndex: number, mediaId: number) => void;
   onPexelsSelect?: (screenIndex: number, frameIndex: number, url: string) => void;
+  onCaptionPositionChange?: (screenIndex: number, x: number, y: number) => void;
+  onCaptionTextChange?: (screenIndex: number, text: string) => void;
   zoom?: number;
 }
 
@@ -62,7 +65,7 @@ const getCanvasDimensions = (canvasSize: string, _orientation: string) => {
 };
 
 export function Canvas({
-  settings,
+  settings: _settings,
   screens,
   selectedScreenIndices,
   selectedFrameIndex,
@@ -72,6 +75,8 @@ export function Canvas({
   onFramePositionChange,
   onMediaSelect,
   onPexelsSelect,
+  onCaptionPositionChange,
+  onCaptionTextChange,
   zoom = 100
 }: CanvasProps) {
   const [hoveredFrameIndex, setHoveredFrameIndex] = useState<number | null>(null);
@@ -130,7 +135,9 @@ export function Canvas({
       >
         {selectedScreenIndices.map((screenIndex) => {
           const screen = screens[screenIndex];
-          if (!screen) return null;
+          if (!screen) {
+            return null;
+          }
 
           const screenSettings = {
             ...screen.settings,
@@ -163,7 +170,7 @@ export function Canvas({
                 const files = Array.from(e.dataTransfer.files);
                 handleDrop(files, hoveredFrameIndex ?? undefined, screenIndex);
               }}
-              onDragOver={(e) => {
+              onDragOver={() => {
                 setHoveredScreenIndex(screenIndex);
               }}
             >
@@ -194,24 +201,14 @@ export function Canvas({
                   onMediaSelect={(frameIndex, mediaId) => onMediaSelect?.(screenIndex, frameIndex, mediaId)}
                   onPexelsSelect={(frameIndex, url) => onPexelsSelect?.(screenIndex, frameIndex, url)}
                 />
-                {screenSettings.showCaption && screenSettings.captionText && screen.images && screen.images.some(img => img.image || img.mediaId) && (
-                  <Box
-                    style={{
-                      position: 'absolute',
-                      top: `${screenSettings.captionVertical}%`,
-                      left: `${screenSettings.captionHorizontal}%`,
-                      transform: 'translate(-50%, -50%)',
-                      color: '#1a1a1a',
-                      fontSize: 32,
-                      fontWeight: 700,
-                      textAlign: 'center',
-                      maxWidth: '80%',
-                      pointerEvents: 'none',
-                      textShadow: '0 2px 4px rgba(0,0,0,0.1)',
-                    }}
-                  >
-                    {screenSettings.captionText}
-                  </Box>
+                {screenSettings.showCaption && screenSettings.captionText && (
+                  <DraggableText
+                    text={screenSettings.captionText}
+                    positionX={screenSettings.captionHorizontal}
+                    positionY={screenSettings.captionVertical}
+                    onPositionChange={(x, y) => onCaptionPositionChange?.(screenIndex, x, y)}
+                    onTextChange={(text) => onCaptionTextChange?.(screenIndex, text)}
+                  />
                 )}
               </Box>
             </Box>

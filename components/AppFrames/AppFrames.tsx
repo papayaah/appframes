@@ -323,6 +323,37 @@ export function AppFrames() {
                 console.error('Error importing pexels image:', error);
               }
             }}
+            onCaptionPositionChange={(screenIndex, x, y) => {
+              setScreens(prevScreens => {
+                const updated = [...prevScreens];
+                if (updated[screenIndex]) {
+                  updated[screenIndex] = {
+                    ...updated[screenIndex],
+                    settings: {
+                      ...updated[screenIndex].settings,
+                      captionHorizontal: x,
+                      captionVertical: y,
+                    },
+                  };
+                }
+                return updated;
+              });
+            }}
+            onCaptionTextChange={(screenIndex, text) => {
+              setScreens(prevScreens => {
+                const updated = [...prevScreens];
+                if (updated[screenIndex]) {
+                  updated[screenIndex] = {
+                    ...updated[screenIndex],
+                    settings: {
+                      ...updated[screenIndex].settings,
+                      captionText: text,
+                    },
+                  };
+                }
+                return updated;
+              });
+            }}
           />
           <ScreensPanel
             screens={screens}
