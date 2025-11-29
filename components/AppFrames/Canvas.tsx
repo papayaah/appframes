@@ -353,8 +353,114 @@ export function Canvas({
               );
             }
             
-            // If only one screen from the pair is selected, render it as a single composition
-            // Fall through to regular rendering below
+            // If only one screen from the pair is selected, render it with the correct crop
+            // Determine which side this screen is (left or right)
+            const isLeftScreen = pairScreens[0]?.index === screenIndex;
+            const splitSide = isLeftScreen ? 'left' : 'right';
+            
+            const screenSettings = {
+              ...screen.settings,
+              selectedScreenIndex: screenIndex,
+            };
+
+            const canvasDimensions = getCanvasDimensions(screenSettings.canvasSize, screenSettings.orientation);
+            const aspectRatio = canvasDimensions.width / canvasDimensions.height;
+            const halfAspectRatio = aspectRatio / 2;
+
+            const isPrimaryScreen = screenIndex === selectedScreenIndices[selectedScreenIndices.length - 1];
+
+            // Render single screen from split pair with cropping
+            return (
+              <Box
+                key={screen.id}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transform: `scale(${zoom / 100})`,
+                  transformOrigin: 'center center',
+                  height: '100%',
+                  width: aspectRatio > 1 ? '45vw' : '35vh',
+                  flexShrink: 0,
+                  marginLeft: 30,
+                  marginRight: 30,
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  const files = Array.from(e.dataTransfer.files);
+                  handleDrop(files, 0, screenIndex);
+                }}
+                onDragOver={(e) => {
+                  setHoveredScreenIndex(screenIndex);
+                }}
+              >
+                <Box
+                  id={`canvas-${screen.id}`}
+                  data-canvas="true"
+                  style={{
+                    width: '100%',
+                    maxWidth: aspectRatio > 1 ? '90%' : 300,
+                    aspectRatio: `${halfAspectRatio}`,
+                    backgroundColor: screenSettings.backgroundColor,
+                    position: 'relative',
+                    boxShadow: '0 10px 40px rgba(0,0,0,0.15)',
+                    borderRadius: splitSide === 'left' ? '8px 0 0 8px' : '0 8px 8px 0',
+                    overflow: 'hidden',
+                  }}
+                >
+                  <Box
+                    style={{
+                      position: 'absolute',
+                      top: 0,
+                      left: splitSide === 'left' ? 0 : '-100%',
+                      width: '200%',
+                      height: '100%',
+                    }}
+                  >
+                    <Box
+                      style={{
+                        width: '100%',
+                        height: '100%',
+                        clipPath: splitSide === 'left' ? 'inset(0 50% 0 0)' : 'inset(0 0 0 50%)',
+                      }}
+                    >
+                      <CompositionRenderer
+                        settings={{ ...screenSettings, composition: 'single' }}
+                        screen={screen}
+                        onPanChange={(x, y) => onPanChange?.(x, y, screenIndex)}
+                        hoveredFrameIndex={hoveredScreenIndex === screenIndex ? hoveredFrameIndex : null}
+                        onFrameHover={setHoveredFrameIndex}
+                        dragFileCount={dragFileCount}
+                        selectedFrameIndex={isPrimaryScreen ? selectedFrameIndex : undefined}
+                        onSelectFrame={isPrimaryScreen ? onSelectFrame : undefined}
+                        splitSide={splitSide}
+                        isScreenSelected={selectedScreenIndices.includes(screenIndex)}
+                      />
+                    </Box>
+                  </Box>
+                  {screenSettings.showCaption && screenSettings.captionText && screen.images && screen.images.some(img => img.image || img.mediaId) && (
+                    <Box
+                      style={{
+                        position: 'absolute',
+                        top: `${screenSettings.captionVertical}%`,
+                        left: `${screenSettings.captionHorizontal}%`,
+                        transform: 'translate(-50%, -50%)',
+                        color: '#1a1a1a',
+                        fontSize: 32,
+                        fontWeight: 700,
+                        textAlign: 'center',
+                        maxWidth: '80%',
+                        pointerEvents: 'none',
+                        textShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                      }}
+                    >
+                      {screenSettings.captionText}
+                    </Box>
+                  )}
+                </Box>
+              </Box>
+            );
           }
 
           // Regular screen rendering (non-split)
