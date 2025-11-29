@@ -1,16 +1,27 @@
 'use client';
 
 import { Group, Text, ActionIcon, Button, Box, Slider } from '@mantine/core';
-import { IconDeviceDesktop, IconMoon, IconDownload } from '@tabler/icons-react';
+import { IconDeviceDesktop, IconMoon, IconDownload, IconFileZip } from '@tabler/icons-react';
 
 interface HeaderProps {
-  onExport?: () => void;
+  onDownload?: () => void; // Download currently visible screens individually
+  onExport?: () => void; // Export all screens (zip if multiple)
   outputDimensions?: string;
   zoom?: number;
   onZoomChange?: (zoom: number) => void;
+  selectedCount?: number; // Number of currently visible/selected screens
+  totalCount?: number; // Total number of screens in panel
 }
 
-export function Header({ onExport, outputDimensions = '1242 × 2688px', zoom = 100, onZoomChange }: HeaderProps) {
+export function Header({
+  onDownload,
+  onExport,
+  outputDimensions = '1242 × 2688px',
+  zoom = 100,
+  onZoomChange,
+  selectedCount = 1,
+  totalCount = 1,
+}: HeaderProps) {
   return (
     <Box
       style={{
@@ -76,8 +87,20 @@ export function Header({ onExport, outputDimensions = '1242 × 2688px', zoom = 1
         <ActionIcon variant="subtle" color="gray" size="lg">
           <IconMoon size={18} />
         </ActionIcon>
-        <Button leftSection={<IconDownload size={16} />} size="sm" onClick={onExport}>
-          Export
+        <Button
+          leftSection={<IconDownload size={16} />}
+          size="sm"
+          variant="light"
+          onClick={onDownload}
+        >
+          Download{selectedCount > 1 ? ` (${selectedCount})` : ''}
+        </Button>
+        <Button
+          leftSection={<IconFileZip size={16} />}
+          size="sm"
+          onClick={onExport}
+        >
+          Export{totalCount > 1 ? ` All (${totalCount})` : ''}
         </Button>
       </Group>
     </Box>

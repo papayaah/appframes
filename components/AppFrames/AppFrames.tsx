@@ -100,31 +100,132 @@ export function AppFrames() {
     });
   };
 
-  const handleExport = async () => {
+  // Helper to convert canvas element to PNG blob
+  const canvasToBlob = async (element: HTMLElement): Promise<Blob> => {
+    const { toPng } = await import('html-to-image');
+    const dataUrl = await toPng(element, {
+      quality: 1.0,
+      pixelRatio: 2,
+    });
+    const response = await fetch(dataUrl);
+    return response.blob();
+  };
+
+  // Download currently visible/selected screens individually
+  const handleDownload = async () => {
     try {
       const { toPng } = await import('html-to-image');
-      // Export all visible canvases
-      const canvasElements = document.querySelectorAll('[data-canvas="true"]');
 
-      if (canvasElements.length === 0) {
+      // Download each currently visible screen
+      for (const screenIndex of selectedScreenIndices) {
+        const screen = screens[screenIndex];
+        if (!screen) {
+          continue;
+        }
+
+        const canvasElement = document.getElementById(`canvas-${screen.id}`);
+        if (!canvasElement) {
+          continue;
+        }
+
+        const dataUrl = await toPng(canvasElement, {
+          quality: 1.0,
+          pixelRatio: 2,
+        });
+
+        const link = document.createElement('a');
+        link.download = `${screen.name || `screen-${screenIndex + 1}`}-${Date.now()}.png`;
+        link.href = dataUrl;
+        link.click();
+
+        // Small delay between downloads to prevent browser blocking
+        if (selectedScreenIndices.length > 1) {
+          await new Promise(resolve => setTimeout(resolve, 300));
+        }
+      }
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.error('Download failed:', error);
+      // eslint-disable-next-line no-alert
+      alert('Download failed. Please try again.');
+    }
+  };
+
+  // Export all screens from the panel (zip if multiple, single file if one)
+  const handleExport = async () => {
+    try {
+      if (screens.length === 0) {
         // eslint-disable-next-line no-alert
-        alert('Canvas not found');
+        alert('No screens to export');
         return;
       }
 
-      // For now, let's just export the primary selected screen's canvas.
-      const primaryCanvas = document.getElementById(`canvas-${screens[primarySelectedIndex].id}`);
-      const elementToExport = primaryCanvas || canvasElements[0] as HTMLElement;
+      if (screens.length === 1) {
+        // Single screen - just download directly
+        const screen = screens[0];
+        const canvasElement = document.getElementById(`canvas-${screen.id}`);
+        if (!canvasElement) {
+          // eslint-disable-next-line no-alert
+          alert('Canvas not found');
+          return;
+        }
 
-      const dataUrl = await toPng(elementToExport, {
-        quality: 1.0,
-        pixelRatio: 2,
-      });
+        const { toPng } = await import('html-to-image');
+        const dataUrl = await toPng(canvasElement, {
+          quality: 1.0,
+          pixelRatio: 2,
+        });
 
-      const link = document.createElement('a');
-      link.download = `screenshot-${Date.now()}.png`;
-      link.href = dataUrl;
-      link.click();
+        const link = document.createElement('a');
+        link.download = `${screen.name || 'screen'}-${Date.now()}.png`;
+        link.href = dataUrl;
+        link.click();
+      } else {
+        // Multiple screens - create a zip file
+        const JSZip = (await import('jszip')).default;
+        const zip = new JSZip();
+
+        // We need to render each screen to capture it
+        // For screens not currently visible, we'll need to temporarily select them
+        for (let i = 0; i < screens.length; i++) {
+          const screen = screens[i];
+
+          // Check if canvas is already rendered
+          const canvasElement = document.getElementById(`canvas-${screen.id}`);
+
+          if (!canvasElement) {
+            // Screen not currently rendered - we need to skip it or handle differently
+            // For now, we'll only export screens that are currently visible
+            // In a future enhancement, we could temporarily render each screen
+            continue;
+          }
+
+          try {
+            const blob = await canvasToBlob(canvasElement);
+            const fileName = `${String(i + 1).padStart(2, '0')}-${screen.name || `screen-${i + 1}`}.png`;
+            zip.file(fileName, blob);
+          } catch (err) {
+            // eslint-disable-next-line no-console
+            console.error(`Failed to capture screen ${i}:`, err);
+          }
+        }
+
+        // Check if we captured any screens
+        const fileCount = Object.keys(zip.files).length;
+        if (fileCount === 0) {
+          // eslint-disable-next-line no-alert
+          alert('No screens could be captured. Make sure at least one screen is visible.');
+          return;
+        }
+
+        // Generate and download the zip file
+        const zipBlob = await zip.generateAsync({ type: 'blob' });
+        const link = document.createElement('a');
+        link.download = `appframes-export-${Date.now()}.zip`;
+        link.href = URL.createObjectURL(zipBlob);
+        link.click();
+        URL.revokeObjectURL(link.href);
+      }
     } catch (error) {
       // eslint-disable-next-line no-console
       console.error('Export failed:', error);
@@ -145,10 +246,13 @@ export function AppFrames() {
     >
       <AppShell.Header>
         <Header
+          onDownload={handleDownload}
           onExport={handleExport}
           outputDimensions={`${getCanvasDimensions(settings.canvasSize, settings.orientation).width} × ${getCanvasDimensions(settings.canvasSize, settings.orientation).height}px`}
           zoom={zoom}
           onZoomChange={setZoom}
+          selectedCount={selectedScreenIndices.length}
+          totalCount={screens.length}
         />
       </AppShell.Header>
 
