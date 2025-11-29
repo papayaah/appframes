@@ -275,17 +275,24 @@ export function FramesProvider({ children }: { children: ReactNode }) {
         }
 
         // If composition changed, resize images array to match new composition
+        // and reset frame positions to default
         let newImages = [...(screen.images || [])];
         if (updates.composition && updates.composition !== screen.settings.composition) {
-          const oldFrameCount = getCompositionFrameCount(screen.settings.composition);
           const newFrameCount = getCompositionFrameCount(updates.composition);
 
-          if (newFrameCount > oldFrameCount) {
+          // Reset frame positions and resize array
+          newImages = newImages.map(img => ({
+            ...img,
+            frameX: 0, // Reset frame position
+            frameY: 0,
+          }));
+
+          if (newFrameCount > newImages.length) {
             // Add empty slots
             while (newImages.length < newFrameCount) {
               newImages.push({});
             }
-          } else if (newFrameCount < oldFrameCount) {
+          } else if (newFrameCount < newImages.length) {
             // Remove extra slots (keep first N)
             newImages = newImages.slice(0, newFrameCount);
           }

@@ -299,21 +299,72 @@ export function AppFrames() {
                 alert('Failed to process images. Please try again.');
               }
             }}
-            onPanChange={(panX, panY, screenIndex) => {
+            onPanChange={(screenIndex, frameIndex, panX, panY) => {
               setScreens(prevScreens => {
                 const updated = [...prevScreens];
                 if (updated[screenIndex]) {
+                  const screen = updated[screenIndex];
+                  const newImages = [...screen.images];
+                  // Ensure the frame slot exists
+                  while (newImages.length <= frameIndex) {
+                    newImages.push({});
+                  }
+                  newImages[frameIndex] = {
+                    ...newImages[frameIndex],
+                    panX,
+                    panY,
+                  };
                   updated[screenIndex] = {
-                    ...updated[screenIndex],
-                    settings: {
-                      ...updated[screenIndex].settings,
-                      screenPanX: panX,
-                      screenPanY: panY,
-                    }
+                    ...screen,
+                    images: newImages,
                   };
                 }
                 return updated;
               });
+            }}
+            onFramePositionChange={(screenIndex, frameIndex, frameX, frameY) => {
+              setScreens(prevScreens => {
+                const updated = [...prevScreens];
+                if (updated[screenIndex]) {
+                  const screen = updated[screenIndex];
+                  const newImages = [...screen.images];
+                  // Ensure the frame slot exists
+                  while (newImages.length <= frameIndex) {
+                    newImages.push({});
+                  }
+                  // Get current position and add delta
+                  const currentFrameX = newImages[frameIndex]?.frameX ?? 0;
+                  const currentFrameY = newImages[frameIndex]?.frameY ?? 0;
+                  newImages[frameIndex] = {
+                    ...newImages[frameIndex],
+                    frameX: currentFrameX + frameX,
+                    frameY: currentFrameY + frameY,
+                  };
+                  updated[screenIndex] = {
+                    ...screen,
+                    images: newImages,
+                  };
+                }
+                return updated;
+              });
+            }}
+            onMediaSelect={(screenIndex, frameIndex, mediaId) => {
+              replaceScreen(screenIndex, mediaId, frameIndex);
+            }}
+            onPexelsSelect={async (screenIndex, frameIndex, url) => {
+              try {
+                // Fetch the pexels image and upload to media library
+                const res = await fetch(url);
+                const blob = await res.blob();
+                const fileName = url.split('/').pop() || 'pexels-image.jpg';
+                const file = new File([blob], fileName, { type: blob.type });
+                const mediaId = await handleMediaUpload(file);
+                if (mediaId) {
+                  replaceScreen(screenIndex, mediaId, frameIndex);
+                }
+              } catch (error) {
+                console.error('Error importing pexels image:', error);
+              }
             }}
           />
           <ScreensPanel
