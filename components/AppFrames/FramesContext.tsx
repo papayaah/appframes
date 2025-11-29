@@ -1,7 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useRef, ReactNode, useCallback } from 'react';
-import { Screen, ScreenImage, CanvasSettings } from './types';
+import { Screen, ScreenImage, CanvasSettings, DEFAULT_TEXT_STYLE } from './types';
 
 // Canvas dimensions helper (App Store requirements)
 export const getCanvasDimensions = (canvasSize: string, _orientation: string) => {
@@ -73,6 +73,7 @@ export const getDefaultScreenSettings = (): Omit<CanvasSettings, 'selectedScreen
     backgroundColor: '#E5E7EB',
     captionText: 'Powerful tools for your workflow',
     showCaption: true,
+    captionStyle: { ...DEFAULT_TEXT_STYLE },
   };
 };
 

@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { Box, Textarea } from '@mantine/core';
+import { TextStyle, DEFAULT_TEXT_STYLE } from './types';
 
 interface DraggableTextProps {
   text: string;
@@ -9,10 +10,23 @@ interface DraggableTextProps {
   positionY: number; // 0-100 percentage
   onPositionChange: (x: number, y: number) => void;
   onTextChange: (text: string) => void;
-  fontSize?: number;
-  fontWeight?: number;
-  color?: string;
+  style?: Partial<TextStyle>;
 }
+
+// Helper to convert hex color + opacity to rgba
+const hexToRgba = (hex: string, opacity: number): string => {
+  if (hex === 'transparent') {
+    return 'transparent';
+  }
+  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+  if (result) {
+    const r = parseInt(result[1], 16);
+    const g = parseInt(result[2], 16);
+    const b = parseInt(result[3], 16);
+    return `rgba(${r}, ${g}, ${b}, ${opacity / 100})`;
+  }
+  return hex;
+};
 
 export function DraggableText({
   text,
@@ -20,10 +34,11 @@ export function DraggableText({
   positionY,
   onPositionChange,
   onTextChange,
-  fontSize = 32,
-  fontWeight = 700,
-  color = '#1a1a1a',
+  style: styleProp,
 }: DraggableTextProps) {
+  // Merge provided style with defaults
+  const style: TextStyle = { ...DEFAULT_TEXT_STYLE, ...styleProp };
+
   const [isEditing, setIsEditing] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
@@ -112,6 +127,19 @@ export function DraggableText({
     }
   };
 
+  // Build text shadow CSS
+  const textShadowCss = style.textShadow
+    ? `${style.textShadowOffsetX}px ${style.textShadowOffsetY}px ${style.textShadowBlur}px ${style.textShadowColor}`
+    : 'none';
+
+  // Build background color with opacity
+  const bgColor = style.backgroundColor !== 'transparent'
+    ? hexToRgba(style.backgroundColor, style.backgroundOpacity)
+    : 'transparent';
+
+  // Display text (apply uppercase if needed)
+  const displayText = style.uppercase ? text.toUpperCase() : text;
+
   return (
     <Box
       ref={containerRef}
@@ -123,6 +151,7 @@ export function DraggableText({
         cursor: isEditing ? 'text' : isDragging ? 'grabbing' : 'grab',
         userSelect: isEditing ? 'text' : 'none',
         zIndex: isEditing ? 100 : 10,
+        maxWidth: `${style.maxWidth}%`,
       }}
       onMouseDown={handleMouseDown}
       onDoubleClick={handleDoubleClick}
@@ -150,10 +179,15 @@ export function DraggableText({
             maxRows={5}
             styles={{
               input: {
-                fontSize,
-                fontWeight,
-                color,
-                textAlign: 'center',
+                fontFamily: style.fontFamily,
+                fontSize: style.fontSize,
+                fontWeight: style.fontWeight,
+                fontStyle: style.italic ? 'italic' : 'normal',
+                color: style.color,
+                textAlign: style.textAlign,
+                letterSpacing: style.letterSpacing,
+                lineHeight: style.lineHeight,
+                textTransform: style.uppercase ? 'uppercase' : 'none',
                 border: 'none',
                 background: 'transparent',
                 padding: 0,
@@ -181,31 +215,51 @@ export function DraggableText({
         <Box
           style={{
             position: 'relative',
-            padding: '8px 16px',
-            borderRadius: 8,
-            backgroundColor: isHovered || isDragging ? 'rgba(102, 126, 234, 0.1)' : 'transparent',
-            border: isHovered || isDragging ? '2px dashed #667eea' : '2px dashed transparent',
-            transition: 'all 0.15s ease',
           }}
         >
+          {/* Highlight border when hovered/dragging */}
           <Box
             style={{
-              color,
-              fontSize,
-              fontWeight,
-              textAlign: 'center',
-              maxWidth: '80vw',
-              textShadow: '0 2px 4px rgba(0,0,0,0.1)',
-              whiteSpace: 'pre-wrap',
+              position: 'absolute',
+              inset: -4,
+              borderRadius: style.backgroundRadius + 4,
+              border: isHovered || isDragging ? '2px dashed #667eea' : '2px dashed transparent',
+              backgroundColor: isHovered || isDragging ? 'rgba(102, 126, 234, 0.05)' : 'transparent',
+              transition: 'all 0.15s ease',
+              pointerEvents: 'none',
+            }}
+          />
+          {/* Actual text with background */}
+          <Box
+            style={{
+              padding: style.backgroundPadding,
+              borderRadius: style.backgroundRadius,
+              backgroundColor: bgColor,
             }}
           >
-            {text}
+            <Box
+              style={{
+                fontFamily: style.fontFamily,
+                fontSize: style.fontSize,
+                fontWeight: style.fontWeight,
+                fontStyle: style.italic ? 'italic' : 'normal',
+                color: style.color,
+                textAlign: style.textAlign,
+                letterSpacing: style.letterSpacing,
+                lineHeight: style.lineHeight,
+                textShadow: textShadowCss,
+                whiteSpace: 'pre-wrap',
+                wordBreak: 'break-word',
+              }}
+            >
+              {displayText}
+            </Box>
           </Box>
           {isHovered && !isDragging && (
             <Box
               style={{
                 position: 'absolute',
-                bottom: -20,
+                bottom: -24,
                 left: '50%',
                 transform: 'translateX(-50%)',
                 fontSize: 10,

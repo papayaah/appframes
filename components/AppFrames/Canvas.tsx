@@ -208,6 +208,7 @@ export function Canvas({
                     positionY={screenSettings.captionVertical}
                     onPositionChange={(x, y) => onCaptionPositionChange?.(screenIndex, x, y)}
                     onTextChange={(text) => onCaptionTextChange?.(screenIndex, text)}
+                    style={screenSettings.captionStyle}
                   />
                 )}
               </Box>
