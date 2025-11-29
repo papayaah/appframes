@@ -12,7 +12,10 @@ interface CanvasProps {
   selectedFrameIndex?: number;
   onSelectFrame?: (index: number) => void;
   onReplaceScreen?: (files: File[], targetFrameIndex?: number, screenIndex?: number) => void;
-  onPanChange?: (panX: number, panY: number, screenIndex: number) => void;
+  onPanChange?: (screenIndex: number, frameIndex: number, panX: number, panY: number) => void;
+  onFramePositionChange?: (screenIndex: number, frameIndex: number, frameX: number, frameY: number) => void;
+  onMediaSelect?: (screenIndex: number, frameIndex: number, mediaId: number) => void;
+  onPexelsSelect?: (screenIndex: number, frameIndex: number, url: string) => void;
   zoom?: number;
 }
 
@@ -66,6 +69,9 @@ export function Canvas({
   onSelectFrame,
   onReplaceScreen,
   onPanChange,
+  onFramePositionChange,
+  onMediaSelect,
+  onPexelsSelect,
   zoom = 100
 }: CanvasProps) {
   const [hoveredFrameIndex, setHoveredFrameIndex] = useState<number | null>(null);
@@ -178,12 +184,15 @@ export function Canvas({
                 <CompositionRenderer
                   settings={screenSettings}
                   screen={screen}
-                  onPanChange={(x, y) => onPanChange?.(x, y, screenIndex)}
+                  onPanChange={(frameIndex, x, y) => onPanChange?.(screenIndex, frameIndex, x, y)}
+                  onFramePositionChange={(frameIndex, x, y) => onFramePositionChange?.(screenIndex, frameIndex, x, y)}
                   hoveredFrameIndex={hoveredScreenIndex === screenIndex ? hoveredFrameIndex : null}
                   onFrameHover={setHoveredFrameIndex}
                   dragFileCount={dragFileCount}
                   selectedFrameIndex={isPrimaryScreen ? selectedFrameIndex : undefined}
                   onSelectFrame={isPrimaryScreen ? onSelectFrame : undefined}
+                  onMediaSelect={(frameIndex, mediaId) => onMediaSelect?.(screenIndex, frameIndex, mediaId)}
+                  onPexelsSelect={(frameIndex, url) => onPexelsSelect?.(screenIndex, frameIndex, url)}
                 />
                 {screenSettings.showCaption && screenSettings.captionText && screen.images && screen.images.some(img => img.image || img.mediaId) && (
                   <Box

@@ -1,6 +1,12 @@
 export interface ScreenImage {
   image?: string; // Base64 image (legacy support)
   mediaId?: number; // Reference to media library
+  // Per-frame image pan (position of image inside the frame)
+  panX?: number; // 0-100, default 50 (centered)
+  panY?: number; // 0-100, default 50 (centered)
+  // Per-frame position on canvas (offset from default layout position)
+  frameX?: number; // Offset in pixels from default position
+  frameY?: number; // Offset in pixels from default position
 }
 
 export interface CanvasSettings {

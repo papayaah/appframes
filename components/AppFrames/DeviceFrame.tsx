@@ -1,9 +1,10 @@
 'use client';
 
 import { useState, useRef } from 'react';
-import { Box, Text } from '@mantine/core';
-import { IconUpload } from '@tabler/icons-react';
+import { Box, Text, ActionIcon, Popover } from '@mantine/core';
+import { IconUpload, IconPhoto, IconGripVertical } from '@tabler/icons-react';
 import { useMediaImage } from '../../hooks/useMediaImage';
+import { QuickMediaPicker } from './QuickMediaPicker';
 
 interface DeviceFrameProps {
   deviceType?: string;
@@ -21,6 +22,9 @@ interface DeviceFrameProps {
   onClick?: () => void;
   onDragOver?: () => void;
   onDragLeave?: () => void;
+  onMediaSelect?: (mediaId: number) => void;
+  onPexelsSelect?: (url: string) => void;
+  onFramePositionChange?: (frameX: number, frameY: number) => void;
 }
 
 interface DeviceConfig {
@@ -153,47 +157,91 @@ export function DeviceFrame({
   isSelected = false,
   onClick,
   onDragOver,
-  onDragLeave
+  onDragLeave,
+  onMediaSelect,
+  onPexelsSelect,
+  onFramePositionChange
 }: DeviceFrameProps) {
   const { imageUrl } = useMediaImage(mediaId);
   const displayImage = imageUrl || image;
   const [isDragging, setIsDragging] = useState(false);
-  const [dragStart, setDragStart] = useState({ x: 0, y: 0, panX, panY });
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
+  const [isFrameDragging, setIsFrameDragging] = useState(false);
   const screenRef = useRef<HTMLDivElement>(null);
 
   const config = getDeviceConfig(deviceType);
 
   const handleMouseDown = (e: React.MouseEvent) => {
     // If we have an image and pan handler, handle panning
-    if (displayImage && onPanChange) {
+    if (displayImage && onPanChange && screenRef.current) {
+      e.preventDefault();
+      e.stopPropagation();
       setIsDragging(true);
-      setDragStart({
-        x: e.clientX,
-        y: e.clientY,
-        panX,
-        panY,
-      });
+      setIsHovered(false); // Hide icons immediately when drag starts
+
+      const startX = e.clientX;
+      const startY = e.clientY;
+      const startPanX = panX;
+      const startPanY = panY;
+      const rect = screenRef.current.getBoundingClientRect();
+
+      const handleMove = (moveEvent: MouseEvent) => {
+        const deltaX = ((moveEvent.clientX - startX) / rect.width) * 100;
+        const deltaY = ((moveEvent.clientY - startY) / rect.height) * 100;
+
+        const newPanX = Math.max(0, Math.min(100, startPanX + deltaX));
+        const newPanY = Math.max(0, Math.min(100, startPanY + deltaY));
+
+        onPanChange(newPanX, newPanY);
+      };
+
+      const handleEnd = () => {
+        setIsDragging(false);
+        document.removeEventListener('mousemove', handleMove);
+        document.removeEventListener('mouseup', handleEnd);
+      };
+
+      document.addEventListener('mousemove', handleMove);
+      document.addEventListener('mouseup', handleEnd);
     }
 
     // Also trigger selection
     onClick?.();
   };
 
-  const handleMouseMove = (e: React.MouseEvent) => {
-    if (!isDragging || !onPanChange || !screenRef.current) return;
+  // Frame drag handle handlers
+  const handleFrameDragStart = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (onFramePositionChange) {
+      setIsFrameDragging(true);
+      setIsHovered(false); // Hide icons immediately when drag starts
+      const startX = e.clientX;
+      const startY = e.clientY;
+      let lastDeltaX = 0;
+      let lastDeltaY = 0;
 
-    const rect = screenRef.current.getBoundingClientRect();
-    const deltaX = ((e.clientX - dragStart.x) / rect.width) * 100;
-    const deltaY = ((e.clientY - dragStart.y) / rect.height) * 100;
+      const handleMove = (moveEvent: MouseEvent) => {
+        const totalDeltaX = moveEvent.clientX - startX;
+        const totalDeltaY = moveEvent.clientY - startY;
+        // Calculate incremental delta since last move
+        const incrementalDeltaX = totalDeltaX - lastDeltaX;
+        const incrementalDeltaY = totalDeltaY - lastDeltaY;
+        lastDeltaX = totalDeltaX;
+        lastDeltaY = totalDeltaY;
+        onFramePositionChange(incrementalDeltaX, incrementalDeltaY);
+      };
 
-    const newPanX = Math.max(0, Math.min(100, dragStart.panX + deltaX));
-    const newPanY = Math.max(0, Math.min(100, dragStart.panY + deltaY));
+      const handleEnd = () => {
+        setIsFrameDragging(false);
+        document.removeEventListener('mousemove', handleMove);
+        document.removeEventListener('mouseup', handleEnd);
+      };
 
-    onPanChange(newPanX, newPanY);
-  };
-
-  const handleMouseUp = () => {
-    setIsDragging(false);
+      document.addEventListener('mousemove', handleMove);
+      document.addEventListener('mouseup', handleEnd);
+    }
   };
 
   const width = config.width * scale;
@@ -375,6 +423,8 @@ export function DeviceFrame({
     return (
       <Box
         style={{ position: 'relative' }}
+        onMouseEnter={() => !isDragging && !isFrameDragging && setIsHovered(true)}
+        onMouseLeave={() => !isDragging && !isFrameDragging && setIsHovered(false)}
         onDragOver={(e) => {
           e.preventDefault();
           e.stopPropagation();
@@ -429,9 +479,6 @@ export function DeviceFrame({
               cursor: displayImage && onPanChange ? (isDragging ? 'grabbing' : 'grab') : 'pointer',
             }}
             onMouseDown={handleMouseDown}
-            onMouseMove={handleMouseMove}
-            onMouseUp={handleMouseUp}
-            onMouseLeave={handleMouseUp}
           >
             {displayImage ? (
               <Box
@@ -517,6 +564,72 @@ export function DeviceFrame({
                 }}
               />
             </>
+          )}
+
+          {/* Frame Drag Handle - hide during any drag operation */}
+          {onFramePositionChange && (isHovered || isFrameDragging) && !isDragging && (
+            <Box
+              onMouseDown={handleFrameDragStart}
+              style={{
+                position: 'absolute',
+                top: topPadding + 8 * scale,
+                left: '50%',
+                transform: 'translateX(-50%)',
+                zIndex: 20,
+                cursor: isFrameDragging ? 'grabbing' : 'grab',
+                padding: 4,
+                borderRadius: 4,
+                backgroundColor: 'rgba(102, 126, 234, 0.9)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                opacity: isFrameDragging ? 1 : 0.8,
+                transition: 'opacity 0.15s',
+              }}
+            >
+              <IconGripVertical size={14} color="white" />
+            </Box>
+          )}
+
+          {/* Quick Media Picker Button - hide during any drag operation */}
+          {(onMediaSelect || onPexelsSelect) && (isHovered || pickerOpen) && !isDragging && !isFrameDragging && (
+            <Popover
+              opened={pickerOpen}
+              onChange={setPickerOpen}
+              position="bottom"
+              withArrow
+              shadow="lg"
+              withinPortal
+            >
+              <Popover.Target>
+                <ActionIcon
+                  size="md"
+                  variant="filled"
+                  color="violet"
+                  style={{
+                    position: 'absolute',
+                    bottom: bottomPadding + 8 * scale,
+                    right: sidePadding + 8 * scale,
+                    zIndex: 20,
+                    opacity: pickerOpen ? 1 : 0.9,
+                    transition: 'opacity 0.15s',
+                  }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setPickerOpen(!pickerOpen);
+                  }}
+                >
+                  <IconPhoto size={16} />
+                </ActionIcon>
+              </Popover.Target>
+              <Popover.Dropdown p={0}>
+                <QuickMediaPicker
+                  onSelectMedia={(id) => onMediaSelect?.(id)}
+                  onSelectPexels={(url) => onPexelsSelect?.(url)}
+                  onClose={() => setPickerOpen(false)}
+                />
+              </Popover.Dropdown>
+            </Popover>
           )}
 
         </Box>

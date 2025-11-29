@@ -6,13 +6,16 @@ import { DeviceFrame } from './DeviceFrame';
 
 interface CompositionRendererProps {
   settings: CanvasSettings;
-  screen: Screen; // Single screen with its own images array
-  onPanChange?: (panX: number, panY: number) => void;
+  screen: Screen;
+  onPanChange?: (frameIndex: number, panX: number, panY: number) => void;
+  onFramePositionChange?: (frameIndex: number, frameX: number, frameY: number) => void;
   hoveredFrameIndex?: number | null;
   onFrameHover?: (index: number | null) => void;
   dragFileCount?: number;
   selectedFrameIndex?: number;
   onSelectFrame?: (index: number) => void;
+  onMediaSelect?: (frameIndex: number, mediaId: number) => void;
+  onPexelsSelect?: (frameIndex: number, url: string) => void;
 }
 
 const getCompositionFrameCount = (composition: string): number => {
@@ -30,14 +33,29 @@ export function CompositionRenderer({
   settings,
   screen,
   onPanChange,
+  onFramePositionChange,
   hoveredFrameIndex,
   onFrameHover,
   dragFileCount = 0,
   selectedFrameIndex,
-  onSelectFrame
+  onSelectFrame,
+  onMediaSelect,
+  onPexelsSelect
 }: CompositionRendererProps) {
   const scale = settings.compositionScale / 100;
   const images = screen.images || [];
+
+  // Helper to get per-frame pan values with defaults
+  const getFramePan = (index: number) => ({
+    panX: images[index]?.panX ?? 50,
+    panY: images[index]?.panY ?? 50,
+  });
+
+  // Helper to get per-frame position offset
+  const getFrameOffset = (index: number) => ({
+    frameX: images[index]?.frameX ?? 0,
+    frameY: images[index]?.frameY ?? 0,
+  });
 
   // Determine which frames should be highlighted based on drag
   const getHighlightedFrames = (): number[] => {
@@ -45,7 +63,6 @@ export function CompositionRenderer({
     const frameCount = getCompositionFrameCount(settings.composition);
 
     if (dragFileCount > 1) {
-      // Multi-file drag: highlight frames starting from hovered index
       const frames: number[] = [];
       for (let i = 0; i < Math.min(dragFileCount, frameCount); i++) {
         const frameIndex = (hoveredFrameIndex + i) % frameCount;
@@ -55,70 +72,77 @@ export function CompositionRenderer({
       }
       return frames;
     } else {
-      // Single file: highlight only the hovered frame
       return [hoveredFrameIndex];
     }
   };
 
   const highlightedFrames = getHighlightedFrames();
 
+  // Common props builder for DeviceFrame
+  const getFrameProps = (index: number, scaleMultiplier: number = 1) => {
+    const { panX, panY } = getFramePan(index);
+    return {
+      deviceType: settings.deviceFrame,
+      image: images[index]?.image,
+      mediaId: images[index]?.mediaId,
+      scale: scale * scaleMultiplier,
+      screenScale: settings.screenScale,
+      panX,
+      panY,
+      frameIndex: index,
+      isHighlighted: highlightedFrames.includes(index),
+      isSelected: selectedFrameIndex === index,
+      onClick: () => onSelectFrame?.(index),
+      onDragOver: () => onFrameHover?.(index),
+      onDragLeave: () => onFrameHover?.(null),
+      onMediaSelect: (mediaId: number) => onMediaSelect?.(index, mediaId),
+      onPexelsSelect: (url: string) => onPexelsSelect?.(index, url),
+      onPanChange: (x: number, y: number) => onPanChange?.(index, x, y),
+      onFramePositionChange: (x: number, y: number) => onFramePositionChange?.(index, x, y),
+    };
+  };
+
+  // Wrapper for draggable frame positioning
+  const DraggableFrame = ({ index, children, baseStyle }: {
+    index: number;
+    children: React.ReactNode;
+    baseStyle?: React.CSSProperties;
+  }) => {
+    const { frameX, frameY } = getFrameOffset(index);
+    return (
+      <Box
+        style={{
+          ...baseStyle,
+          transform: `${baseStyle?.transform || ''} translate(${frameX}px, ${frameY}px)`.trim(),
+        }}
+      >
+        {children}
+      </Box>
+    );
+  };
+
   switch (settings.composition) {
     case 'single':
       return (
         <Center style={{ height: '100%' }}>
-          <DeviceFrame
-            deviceType={settings.deviceFrame}
-            image={images[0]?.image}
-            mediaId={images[0]?.mediaId}
-            scale={scale}
-            screenScale={settings.screenScale}
-            panX={settings.screenPanX}
-            panY={settings.screenPanY}
-            showInstructions={images.length === 0 || (!images[0]?.image && !images[0]?.mediaId)}
-            onPanChange={onPanChange}
-            frameIndex={0}
-            isHighlighted={highlightedFrames.includes(0)}
-            isSelected={selectedFrameIndex === 0}
-            onClick={() => onSelectFrame?.(0)}
-            onDragOver={() => onFrameHover?.(0)}
-            onDragLeave={() => onFrameHover?.(null)}
-          />
+          <DraggableFrame index={0}>
+            <DeviceFrame
+              {...getFrameProps(0, 1)}
+              showInstructions={images.length === 0 || (!images[0]?.image && !images[0]?.mediaId)}
+            />
+          </DraggableFrame>
         </Center>
       );
 
     case 'dual':
       return (
         <Center style={{ height: '100%', gap: 20 }}>
-          <DeviceFrame
-            deviceType={settings.deviceFrame}
-            image={images[0]?.image}
-            mediaId={images[0]?.mediaId}
-            scale={scale * 0.9}
-            screenScale={settings.screenScale}
-            panX={settings.screenPanX}
-            panY={settings.screenPanY}
-            frameIndex={0}
-            isHighlighted={highlightedFrames.includes(0)}
-            isSelected={selectedFrameIndex === 0}
-            onClick={() => onSelectFrame?.(0)}
-            onDragOver={() => onFrameHover?.(0)}
-            onDragLeave={() => onFrameHover?.(null)}
-          />
-          <DeviceFrame
-            deviceType={settings.deviceFrame}
-            image={images[1]?.image}
-            mediaId={images[1]?.mediaId}
-            scale={scale * 0.9}
-            screenScale={settings.screenScale}
-            panX={settings.screenPanX}
-            panY={settings.screenPanY}
-            frameIndex={1}
-            isHighlighted={highlightedFrames.includes(1)}
-            isSelected={selectedFrameIndex === 1}
-            onClick={() => onSelectFrame?.(1)}
-            onDragOver={() => onFrameHover?.(1)}
-            onDragLeave={() => onFrameHover?.(null)}
-          />
+          <DraggableFrame index={0}>
+            <DeviceFrame {...getFrameProps(0, 0.9)} />
+          </DraggableFrame>
+          <DraggableFrame index={1}>
+            <DeviceFrame {...getFrameProps(1, 0.9)} />
+          </DraggableFrame>
         </Center>
       );
 
@@ -126,40 +150,18 @@ export function CompositionRenderer({
       return (
         <Center style={{ height: '100%', position: 'relative' }}>
           <Box style={{ position: 'relative' }}>
-            <Box style={{ position: 'absolute', top: -20, left: -20, zIndex: 1 }}>
-              <DeviceFrame
-                deviceType={settings.deviceFrame}
-                image={images[0]?.image}
-                mediaId={images[0]?.mediaId}
-                scale={scale * 0.85}
-                screenScale={settings.screenScale}
-                panX={settings.screenPanX}
-                panY={settings.screenPanY}
-                frameIndex={0}
-                isHighlighted={highlightedFrames.includes(0)}
-                isSelected={selectedFrameIndex === 0}
-                onClick={() => onSelectFrame?.(0)}
-                onDragOver={() => onFrameHover?.(0)}
-                onDragLeave={() => onFrameHover?.(null)}
-              />
-            </Box>
-            <Box style={{ position: 'relative', zIndex: 2 }}>
-              <DeviceFrame
-                deviceType={settings.deviceFrame}
-                image={images[1]?.image}
-                mediaId={images[1]?.mediaId}
-                scale={scale * 0.85}
-                screenScale={settings.screenScale}
-                panX={settings.screenPanX}
-                panY={settings.screenPanY}
-                frameIndex={1}
-                isHighlighted={highlightedFrames.includes(1)}
-                isSelected={selectedFrameIndex === 1}
-                onClick={() => onSelectFrame?.(1)}
-                onDragOver={() => onFrameHover?.(1)}
-                onDragLeave={() => onFrameHover?.(null)}
-              />
-            </Box>
+            <DraggableFrame
+              index={0}
+              baseStyle={{ position: 'absolute', top: -20, left: -20, zIndex: 1 }}
+            >
+              <DeviceFrame {...getFrameProps(0, 0.85)} />
+            </DraggableFrame>
+            <DraggableFrame
+              index={1}
+              baseStyle={{ position: 'relative', zIndex: 2 }}
+            >
+              <DeviceFrame {...getFrameProps(1, 0.85)} />
+            </DraggableFrame>
           </Box>
         </Center>
       );
@@ -167,51 +169,15 @@ export function CompositionRenderer({
     case 'triple':
       return (
         <Center style={{ height: '100%', gap: 15 }}>
-          <DeviceFrame
-            deviceType={settings.deviceFrame}
-            image={images[0]?.image}
-            mediaId={images[0]?.mediaId}
-            scale={scale * 0.75}
-            screenScale={settings.screenScale}
-            panX={settings.screenPanX}
-            panY={settings.screenPanY}
-            frameIndex={0}
-            isHighlighted={highlightedFrames.includes(0)}
-            isSelected={selectedFrameIndex === 0}
-            onClick={() => onSelectFrame?.(0)}
-            onDragOver={() => onFrameHover?.(0)}
-            onDragLeave={() => onFrameHover?.(null)}
-          />
-          <DeviceFrame
-            deviceType={settings.deviceFrame}
-            image={images[1]?.image}
-            mediaId={images[1]?.mediaId}
-            scale={scale * 0.75}
-            screenScale={settings.screenScale}
-            panX={settings.screenPanX}
-            panY={settings.screenPanY}
-            frameIndex={1}
-            isHighlighted={highlightedFrames.includes(1)}
-            isSelected={selectedFrameIndex === 1}
-            onClick={() => onSelectFrame?.(1)}
-            onDragOver={() => onFrameHover?.(1)}
-            onDragLeave={() => onFrameHover?.(null)}
-          />
-          <DeviceFrame
-            deviceType={settings.deviceFrame}
-            image={images[2]?.image}
-            mediaId={images[2]?.mediaId}
-            scale={scale * 0.75}
-            screenScale={settings.screenScale}
-            panX={settings.screenPanX}
-            panY={settings.screenPanY}
-            frameIndex={2}
-            isHighlighted={highlightedFrames.includes(2)}
-            isSelected={selectedFrameIndex === 2}
-            onClick={() => onSelectFrame?.(2)}
-            onDragOver={() => onFrameHover?.(2)}
-            onDragLeave={() => onFrameHover?.(null)}
-          />
+          <DraggableFrame index={0}>
+            <DeviceFrame {...getFrameProps(0, 0.75)} />
+          </DraggableFrame>
+          <DraggableFrame index={1}>
+            <DeviceFrame {...getFrameProps(1, 0.75)} />
+          </DraggableFrame>
+          <DraggableFrame index={2}>
+            <DeviceFrame {...getFrameProps(2, 0.75)} />
+          </DraggableFrame>
         </Center>
       );
 
@@ -219,8 +185,9 @@ export function CompositionRenderer({
       return (
         <Center style={{ height: '100%', position: 'relative' }}>
           <Box style={{ position: 'relative', width: 600, height: 500 }}>
-            <Box
-              style={{
+            <DraggableFrame
+              index={0}
+              baseStyle={{
                 position: 'absolute',
                 top: '50%',
                 left: '20%',
@@ -228,24 +195,11 @@ export function CompositionRenderer({
                 zIndex: 1,
               }}
             >
-              <DeviceFrame
-                deviceType={settings.deviceFrame}
-                image={images[0]?.image}
-                mediaId={images[0]?.mediaId}
-                scale={scale * 0.7}
-                screenScale={settings.screenScale}
-                panX={settings.screenPanX}
-                panY={settings.screenPanY}
-                frameIndex={0}
-                isHighlighted={highlightedFrames.includes(0)}
-                isSelected={selectedFrameIndex === 0}
-                onClick={() => onSelectFrame?.(0)}
-                onDragOver={() => onFrameHover?.(0)}
-                onDragLeave={() => onFrameHover?.(null)}
-              />
-            </Box>
-            <Box
-              style={{
+              <DeviceFrame {...getFrameProps(0, 0.7)} />
+            </DraggableFrame>
+            <DraggableFrame
+              index={1}
+              baseStyle={{
                 position: 'absolute',
                 top: '50%',
                 left: '50%',
@@ -253,24 +207,11 @@ export function CompositionRenderer({
                 zIndex: 3,
               }}
             >
-              <DeviceFrame
-                deviceType={settings.deviceFrame}
-                image={images[1]?.image}
-                mediaId={images[1]?.mediaId}
-                scale={scale * 0.7}
-                screenScale={settings.screenScale}
-                panX={settings.screenPanX}
-                panY={settings.screenPanY}
-                frameIndex={1}
-                isHighlighted={highlightedFrames.includes(1)}
-                isSelected={selectedFrameIndex === 1}
-                onClick={() => onSelectFrame?.(1)}
-                onDragOver={() => onFrameHover?.(1)}
-                onDragLeave={() => onFrameHover?.(null)}
-              />
-            </Box>
-            <Box
-              style={{
+              <DeviceFrame {...getFrameProps(1, 0.7)} />
+            </DraggableFrame>
+            <DraggableFrame
+              index={2}
+              baseStyle={{
                 position: 'absolute',
                 top: '50%',
                 left: '80%',
@@ -278,22 +219,8 @@ export function CompositionRenderer({
                 zIndex: 2,
               }}
             >
-              <DeviceFrame
-                deviceType={settings.deviceFrame}
-                image={images[2]?.image}
-                mediaId={images[2]?.mediaId}
-                scale={scale * 0.7}
-                screenScale={settings.screenScale}
-                panX={settings.screenPanX}
-                panY={settings.screenPanY}
-                frameIndex={2}
-                isHighlighted={highlightedFrames.includes(2)}
-                isSelected={selectedFrameIndex === 2}
-                onClick={() => onSelectFrame?.(2)}
-                onDragOver={() => onFrameHover?.(2)}
-                onDragLeave={() => onFrameHover?.(null)}
-              />
-            </Box>
+              <DeviceFrame {...getFrameProps(2, 0.7)} />
+            </DraggableFrame>
           </Box>
         </Center>
       );
