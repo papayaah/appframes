@@ -33,6 +33,27 @@ const ScreenThumbnail = memo(function ScreenThumbnail({
     selectedScreenIndex: screenIndex, // Use this screen's index
   };
 
+  // Check if this screen is part of a split pair
+  const isSplitPair = screen.splitPairId !== undefined;
+  let splitSide: 'left' | 'right' | undefined = undefined;
+
+  if (isSplitPair) {
+    // Find all screens with the same splitPairId
+    const pairScreens = allScreens
+      .map((s, idx) => ({ screen: s, index: idx }))
+      .filter(({ screen: s }) => s.splitPairId === screen.splitPairId)
+      .sort((a, b) => a.index - b.index);
+
+    // Determine if this is the left or right screen
+    if (pairScreens.length === 2) {
+      splitSide = pairScreens[0].index === screenIndex ? 'left' : 'right';
+    }
+  }
+
+  // For split composition thumbnails, we need to crop the device frame
+  // to show only the visible portion (left or right half)
+  const needsCropping = isSplitPair && splitSide;
+  
   return (
     <Box
       style={{
@@ -48,31 +69,83 @@ const ScreenThumbnail = memo(function ScreenThumbnail({
         pointerEvents: 'none', // Disable pointer events for the content to allow the parent to be clickable
       }}
     >
-      <Box
-        style={{
-          transform: 'scale(0.12)',
-          transformOrigin: 'center center',
-          width: '100%',
-          height: '100%',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}
-      >
-        {/* Use the same renderer as main canvas, showing this screen's composition */}
-        {/* Each screen uses its own images array */}
-        <CompositionRenderer
-          settings={settings}
-          screen={screen}
-        />
-      </Box>
+      {needsCropping ? (
+        // For split composition: render with cropping to match Canvas.tsx logic
+        // The device is rendered at 200% width, then we crop to show only the assigned half
+        <Box
+          style={{
+            position: 'relative',
+            width: '100%',
+            height: '100%',
+            overflow: 'hidden',
+          }}
+        >
+          <Box
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: splitSide === 'left' ? 0 : '-100%',
+              width: '200%',
+              height: '100%',
+            }}
+          >
+            <Box
+              style={{
+                width: '100%',
+                height: '100%',
+                clipPath: splitSide === 'left' ? 'inset(0 50% 0 0)' : 'inset(0 0 0 50%)',
+              }}
+            >
+              <Box
+                style={{
+                  transform: 'scale(0.12)',
+                  transformOrigin: 'center center',
+                  width: '100%',
+                  height: '100%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                {/* Render the full device with single composition */}
+                <CompositionRenderer
+                  settings={{ ...settings, composition: 'single' }}
+                  screen={screen}
+                  splitSide={splitSide}
+                />
+              </Box>
+            </Box>
+          </Box>
+        </Box>
+      ) : (
+        // For non-split compositions: render normally
+        <Box
+          style={{
+            transform: 'scale(0.12)',
+            transformOrigin: 'center center',
+            width: '100%',
+            height: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          {/* Use the same renderer as main canvas, showing this screen's composition */}
+          {/* Each screen uses its own images array */}
+          <CompositionRenderer
+            settings={settings}
+            screen={screen}
+          />
+        </Box>
+      )}
     </Box>
   );
 }, (prevProps, nextProps) => {
   // Only re-render if THIS screen's data or settings changed
   const screenChanged =
     prevProps.screen.id !== nextProps.screen.id ||
-    JSON.stringify(prevProps.screen.images) !== JSON.stringify(nextProps.screen.images);
+    JSON.stringify(prevProps.screen.images) !== JSON.stringify(nextProps.screen.images) ||
+    prevProps.screen.splitPairId !== nextProps.screen.splitPairId;
 
   // Check if this screen's settings changed
   const settingsChanged =

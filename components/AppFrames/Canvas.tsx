@@ -181,7 +181,7 @@ export function Canvas({
                       transform: `scale(${zoom / 100})`,
                       transformOrigin: 'center center',
                       height: '100%',
-                      width: aspectRatio > 1 ? '30vw' : '20vh',
+                      width: aspectRatio > 1 ? '45vw' : '35vh',
                       flexShrink: 0,
                       marginRight: 2.5, // Half of 5px gap for split composition
                     }}
@@ -244,7 +244,7 @@ export function Canvas({
                           style={{
                             position: 'absolute',
                             top: `${leftSettings.captionVertical}%`,
-                            left: `${leftSettings.captionHorizontal / 2}%`,
+                            left: `${leftSettings.captionHorizontal}%`,
                             transform: 'translate(-50%, -50%)',
                             color: '#1a1a1a',
                             fontSize: 32,
@@ -270,7 +270,7 @@ export function Canvas({
                       transform: `scale(${zoom / 100})`,
                       transformOrigin: 'center center',
                       height: '100%',
-                      width: aspectRatio > 1 ? '30vw' : '20vh',
+                      width: aspectRatio > 1 ? '45vw' : '35vh',
                       flexShrink: 0,
                       marginLeft: 2.5, // Half of 5px gap for split composition
                     }}
@@ -333,7 +333,7 @@ export function Canvas({
                           style={{
                             position: 'absolute',
                             top: `${rightSettings.captionVertical}%`,
-                            left: `${50 + rightSettings.captionHorizontal / 2}%`,
+                            left: `${rightSettings.captionHorizontal}%`,
                             transform: 'translate(-50%, -50%)',
                             color: '#1a1a1a',
                             fontSize: 32,

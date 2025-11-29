@@ -21,6 +21,7 @@ interface DeviceFrameProps {
   onClick?: () => void;
   onDragOver?: () => void;
   onDragLeave?: () => void;
+  splitSide?: 'left' | 'right';
 }
 
 interface DeviceConfig {
@@ -153,7 +154,8 @@ export function DeviceFrame({
   isSelected = false,
   onClick,
   onDragOver,
-  onDragLeave
+  onDragLeave,
+  splitSide
 }: DeviceFrameProps) {
   const { imageUrl } = useMediaImage(mediaId);
   const displayImage = imageUrl || image;
@@ -443,6 +445,11 @@ export function DeviceFrame({
                   backgroundPosition: `${panX}% ${panY}%`,
                   backgroundRepeat: 'no-repeat',
                   pointerEvents: 'none',
+                  clipPath: splitSide === 'left' 
+                    ? 'inset(0 50% 0 0)' 
+                    : splitSide === 'right' 
+                      ? 'inset(0 0 0 50%)' 
+                      : undefined,
                 }}
               />
             ) : showInstructions ? (
