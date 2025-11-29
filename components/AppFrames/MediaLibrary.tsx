@@ -1,11 +1,12 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Box, Text, SimpleGrid, ActionIcon, Loader, Center } from '@mantine/core';
+import { Box, Text, SimpleGrid, ActionIcon, Loader, Center, Button } from '@mantine/core';
 import { Dropzone, IMAGE_MIME_TYPE } from '@mantine/dropzone';
-import { IconX, IconUpload } from '@tabler/icons-react';
+import { IconX, IconUpload, IconPhoto } from '@tabler/icons-react';
 import { db, MediaFile } from '../../lib/db';
 import { OPFSManager } from '../../lib/opfs';
+import { PexelsImagePicker } from './PexelsImagePicker';
 
 interface MediaLibraryProps {
   onSelectMedia: (mediaId: number) => void;
@@ -16,6 +17,7 @@ export function MediaLibrary({ onSelectMedia, selectedSlot }: MediaLibraryProps)
   const [mediaFiles, setMediaFiles] = useState<MediaFile[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
+  const [pexelsPickerOpen, setPexelsPickerOpen] = useState(false);
 
   useEffect(() => {
     loadMedia();
@@ -160,6 +162,23 @@ export function MediaLibrary({ onSelectMedia, selectedSlot }: MediaLibraryProps)
           </Box>
         </Center>
       </Dropzone>
+
+      <Button
+        variant="light"
+        size="xs"
+        leftSection={<IconPhoto size={14} />}
+        onClick={() => setPexelsPickerOpen(true)}
+        mb="md"
+        fullWidth
+      >
+        Browse Pexels Images
+      </Button>
+
+      <PexelsImagePicker
+        opened={pexelsPickerOpen}
+        onClose={() => setPexelsPickerOpen(false)}
+        onImport={handleDrop}
+      />
 
       <Text size="xs" fw={700} c="dimmed" mb="xs" tt="uppercase">
         Library
