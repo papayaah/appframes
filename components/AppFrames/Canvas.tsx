@@ -5,6 +5,8 @@ import { Box } from '@mantine/core';
 import { CanvasSettings, Screen } from './AppFrames';
 import { CompositionRenderer } from './CompositionRenderer';
 import { DraggableText } from './DraggableText';
+import { useCrossCanvasDrag } from './CrossCanvasDragContext';
+import { OverflowDeviceRenderer } from './OverflowDeviceRenderer';
 
 interface CanvasProps {
   settings: CanvasSettings;
@@ -91,6 +93,10 @@ export function Canvas({
 
   const containerRef = useRef<HTMLDivElement>(null);
   const lastScrollTime = useRef<number>(0);
+  const canvasRefs = useRef<Map<number, HTMLElement>>(new Map());
+  
+  // Get cross-canvas drag context
+  const crossCanvasDrag = useCrossCanvasDrag();
 
   // Wheel handler: Cmd+Scroll = zoom, regular scroll = navigate screens
   useEffect(() => {
