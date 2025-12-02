@@ -123,7 +123,7 @@ export function TextStylePanel({ style, onStyleChange }: TextStylePanelProps) {
       <Text size="xs" fw={500} c="dimmed" mb={4}>Alignment</Text>
       <SegmentedControl
         value={style.textAlign}
-        onChange={(value: 'left' | 'center' | 'right') => onStyleChange({ textAlign: value })}
+        onChange={(value) => onStyleChange({ textAlign: value as 'left' | 'center' | 'right' })}
         data={[
           { value: 'left', label: <IconAlignLeft size={14} /> },
           { value: 'center', label: <IconAlignCenter size={14} /> },

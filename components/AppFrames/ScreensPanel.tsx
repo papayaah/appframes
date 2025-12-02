@@ -61,14 +61,21 @@ const ScreenThumbnail = memo(function ScreenThumbnail({
       >
         {/* Use the same renderer as main canvas, showing this screen's composition */}
         {/* Each screen uses its own images array */}
+        {/* Disable cross-canvas drag for thumbnails to prevent unnecessary re-renders */}
         <CompositionRenderer
           settings={settings}
           screen={screen}
+          disableCrossCanvasDrag={true}
         />
       </Box>
     </Box>
   );
 }, (prevProps, nextProps) => {
+  // Re-render if screenIndex changed
+  if (prevProps.screenIndex !== nextProps.screenIndex) {
+    return false;
+  }
+
   // Only re-render if THIS screen's data or settings changed
   const screenChanged =
     prevProps.screen.id !== nextProps.screen.id ||

@@ -40,7 +40,7 @@ export function CompositionRenderer({
   selectedFrameIndex,
   onSelectFrame,
   onMediaSelect,
-  onPexelsSelect
+  onPexelsSelect,
 }: CompositionRendererProps) {
   const scale = settings.compositionScale / 100;
   const images = screen.images || [];

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Box } from '@mantine/core';
 import { CanvasSettings, Screen } from './AppFrames';
 import { CompositionRenderer } from './CompositionRenderer';
@@ -12,6 +12,7 @@ interface CanvasProps {
   selectedScreenIndices: number[];
   selectedFrameIndex?: number;
   onSelectFrame?: (index: number) => void;
+  onSelectScreen?: (index: number, multi: boolean) => void;
   onReplaceScreen?: (files: File[], targetFrameIndex?: number, screenIndex?: number) => void;
   onPanChange?: (screenIndex: number, frameIndex: number, panX: number, panY: number) => void;
   onFramePositionChange?: (screenIndex: number, frameIndex: number, frameX: number, frameY: number) => void;
@@ -20,6 +21,7 @@ interface CanvasProps {
   onCaptionPositionChange?: (screenIndex: number, x: number, y: number) => void;
   onCaptionTextChange?: (screenIndex: number, text: string) => void;
   zoom?: number;
+  onZoomChange?: (zoom: number) => void;
 }
 
 // Canvas dimensions based on canvas size (App Store requirements)
@@ -70,6 +72,7 @@ export function Canvas({
   selectedScreenIndices,
   selectedFrameIndex,
   onSelectFrame,
+  onSelectScreen,
   onReplaceScreen,
   onPanChange,
   onFramePositionChange,
@@ -77,11 +80,130 @@ export function Canvas({
   onPexelsSelect,
   onCaptionPositionChange,
   onCaptionTextChange,
-  zoom = 100
+  zoom = 100,
+  onZoomChange,
 }: CanvasProps) {
   const [hoveredFrameIndex, setHoveredFrameIndex] = useState<number | null>(null);
   const [hoveredScreenIndex, setHoveredScreenIndex] = useState<number | null>(null);
   const [dragFileCount, setDragFileCount] = useState<number>(0);
+  const [isPanning, setIsPanning] = useState(false);
+  const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
+
+  const containerRef = useRef<HTMLDivElement>(null);
+  const lastScrollTime = useRef<number>(0);
+
+  // Wheel handler: Cmd+Scroll = zoom, regular scroll = navigate screens
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const handleWheel = (e: WheelEvent) => {
+      // Check for Cmd (Mac) or Ctrl (Windows/Linux) = zoom
+      if (e.metaKey || e.ctrlKey) {
+        if (!onZoomChange) return;
+        e.preventDefault();
+
+        // Calculate zoom delta (normalize across different browsers/devices)
+        // Negative deltaY = scroll up = zoom in
+        // Use smaller multiplier for smoother zooming
+        const zoomDelta = -e.deltaY * 0.1;
+
+        // Clamp zoom between 10% and 400%
+        const newZoom = Math.min(400, Math.max(10, zoom + zoomDelta));
+
+        onZoomChange(Math.round(newZoom));
+      } else if (onSelectScreen && screens.length > 0) {
+        // Regular scroll = navigate between screens
+        // Debounce to prevent too rapid navigation
+        const now = Date.now();
+        if (now - lastScrollTime.current < 200) return;
+        lastScrollTime.current = now;
+
+        e.preventDefault();
+
+        // Get current primary selected screen index
+        const currentIndex = selectedScreenIndices.length > 0
+          ? selectedScreenIndices[selectedScreenIndices.length - 1]
+          : 0;
+
+        // Scroll down = next screen, scroll up = previous screen
+        let newIndex: number;
+        if (e.deltaY > 0) {
+          // Next screen
+          newIndex = Math.min(screens.length - 1, currentIndex + 1);
+        } else {
+          // Previous screen
+          newIndex = Math.max(0, currentIndex - 1);
+        }
+
+        // Select single screen (remove multi-selection)
+        if (newIndex !== currentIndex || selectedScreenIndices.length > 1) {
+          onSelectScreen(newIndex, false);
+        }
+      }
+    };
+
+    // Use passive: false to allow preventDefault
+    container.addEventListener('wheel', handleWheel, { passive: false });
+
+    return () => {
+      container.removeEventListener('wheel', handleWheel);
+    };
+  }, [zoom, onZoomChange, onSelectScreen, screens.length, selectedScreenIndices]);
+
+  // Middle mouse button panning
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const handleMouseDown = (e: MouseEvent) => {
+      // Middle mouse button (button 1) or scroll wheel press
+      if (e.button === 1) {
+        e.preventDefault();
+        setIsPanning(true);
+        container.style.cursor = 'grabbing';
+
+        const startX = e.clientX;
+        const startY = e.clientY;
+        const startPanX = panOffset.x;
+        const startPanY = panOffset.y;
+
+        const handleMouseMove = (moveEvent: MouseEvent) => {
+          const deltaX = moveEvent.clientX - startX;
+          const deltaY = moveEvent.clientY - startY;
+          setPanOffset({
+            x: startPanX + deltaX,
+            y: startPanY + deltaY,
+          });
+        };
+
+        const handleMouseUp = () => {
+          setIsPanning(false);
+          container.style.cursor = '';
+          document.removeEventListener('mousemove', handleMouseMove);
+          document.removeEventListener('mouseup', handleMouseUp);
+        };
+
+        document.addEventListener('mousemove', handleMouseMove);
+        document.addEventListener('mouseup', handleMouseUp);
+      }
+    };
+
+    // Prevent default middle-click behavior (auto-scroll)
+    const handleAuxClick = (e: MouseEvent) => {
+      if (e.button === 1) {
+        e.preventDefault();
+      }
+    };
+
+    container.addEventListener('mousedown', handleMouseDown);
+    container.addEventListener('auxclick', handleAuxClick);
+
+    return () => {
+      container.removeEventListener('mousedown', handleMouseDown);
+      container.removeEventListener('auxclick', handleAuxClick);
+    };
+  }, [panOffset]);
 
   const handleDrop = (files: File[], targetFrameIndex?: number, screenIndex?: number) => {
     if (!onReplaceScreen || files.length === 0) {
@@ -95,6 +217,7 @@ export function Canvas({
 
   return (
     <Box
+      ref={containerRef}
       style={{
         flex: 1,
         backgroundColor: '#F9FAFB',
@@ -126,11 +249,16 @@ export function Canvas({
       <Box
         style={{
           display: 'flex',
-          gap: 60, // Space between canvases
+          gap: 60, // Fixed gap between canvases
           height: '100%',
           alignItems: 'center',
           margin: '0 auto', // Center if content is smaller than viewport
           minWidth: 'min-content', // Ensure container grows with content
+          // Apply zoom transform and pan offset to entire container
+          transform: `translate(${panOffset.x}px, ${panOffset.y}px) scale(${zoom / 100})`,
+          transformOrigin: 'center center',
+          // Change cursor when panning
+          cursor: isPanning ? 'grabbing' : undefined,
         }}
       >
         {selectedScreenIndices.map((screenIndex) => {
@@ -157,12 +285,11 @@ export function Canvas({
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                transform: `scale(${zoom / 100})`,
-                transformOrigin: 'center center',
                 height: '100%',
                 // We need to ensure the container has width so scaling works properly
                 width: aspectRatio > 1 ? '60vw' : '40vh', // Approximate sizing
                 flexShrink: 0,
+                position: 'relative', // For positioning overflow layer
               }}
               onDrop={(e) => {
                 e.preventDefault();
@@ -185,12 +312,15 @@ export function Canvas({
                   position: 'relative',
                   boxShadow: '0 10px 40px rgba(0,0,0,0.15)',
                   borderRadius: 8,
+                  // Clip content that goes outside the canvas boundaries
+                  // The overflow will be rendered in adjacent canvases via OverflowDeviceRenderer
                   overflow: 'hidden',
                 }}
               >
                 <CompositionRenderer
                   settings={screenSettings}
                   screen={screen}
+                  screenIndex={screenIndex}
                   onPanChange={(frameIndex, x, y) => onPanChange?.(screenIndex, frameIndex, x, y)}
                   onFramePositionChange={(frameIndex, x, y) => onFramePositionChange?.(screenIndex, frameIndex, x, y)}
                   hoveredFrameIndex={hoveredScreenIndex === screenIndex ? hoveredFrameIndex : null}
@@ -212,6 +342,48 @@ export function Canvas({
                   />
                 )}
               </Box>
+              {/* Render overflow from devices dragged from other canvases (or persisted shared devices) */}
+              {(() => {
+                const overflow = crossCanvasDrag.getOverflowForCanvas(screenIndex);
+                if (overflow && overflow.visible) {
+                  const sourceScreen = screens[overflow.sourceScreenIndex];
+                  const canvasEl = canvasRefs.current.get(screenIndex);
+                  if (sourceScreen && canvasEl) {
+                    // Get the canvas dimensions to calculate relative positioning
+                    const canvasRect = canvasEl.getBoundingClientRect();
+
+                    return (
+                      <Box
+                        style={{
+                          position: 'absolute',
+                          top: '50%',
+                          left: '50%',
+                          transform: 'translate(-50%, -50%)',
+                          width: canvasRect.width,
+                          height: canvasRect.height,
+                          pointerEvents: 'none',
+                          overflow: 'hidden',
+                          zIndex: 10,
+                        }}
+                      >
+                        <OverflowDeviceRenderer
+                          screen={sourceScreen}
+                          settings={{
+                            ...sourceScreen.settings,
+                            selectedScreenIndex: overflow.sourceScreenIndex,
+                          }}
+                          frameIndex={overflow.frameIndex}
+                          clipLeft={overflow.clipLeft}
+                          clipRight={overflow.clipRight}
+                          offsetX={overflow.offsetX}
+                          offsetY={overflow.offsetY}
+                        />
+                      </Box>
+                    );
+                  }
+                }
+                return null;
+              })()}
             </Box>
           );
         })}

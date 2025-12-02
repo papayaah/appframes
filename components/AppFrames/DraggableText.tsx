@@ -2,7 +2,25 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { Box, Textarea } from '@mantine/core';
+import ReactMarkdown from 'react-markdown';
 import { TextStyle, DEFAULT_TEXT_STYLE } from './types';
+
+// Decode HTML entities like &gt; &lt; &amp; etc.
+const decodeHtmlEntities = (text: string): string => {
+  const textarea = typeof document !== 'undefined' ? document.createElement('textarea') : null;
+  if (textarea) {
+    textarea.innerHTML = text;
+    return textarea.value;
+  }
+  // Fallback for SSR - decode common entities manually
+  return text
+    .replace(/&gt;/g, '>')
+    .replace(/&lt;/g, '<')
+    .replace(/&amp;/g, '&')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&nbsp;/g, ' ');
+};
 
 interface DraggableTextProps {
   text: string;
@@ -137,8 +155,9 @@ export function DraggableText({
     ? hexToRgba(style.backgroundColor, style.backgroundOpacity)
     : 'transparent';
 
-  // Display text (apply uppercase if needed)
-  const displayText = style.uppercase ? text.toUpperCase() : text;
+  // Decode HTML entities and apply uppercase if needed
+  const decodedText = decodeHtmlEntities(text);
+  const displayText = style.uppercase ? decodedText.toUpperCase() : decodedText;
 
   return (
     <Box
@@ -248,11 +267,32 @@ export function DraggableText({
                 letterSpacing: style.letterSpacing,
                 lineHeight: style.lineHeight,
                 textShadow: textShadowCss,
-                whiteSpace: 'pre-wrap',
                 wordBreak: 'break-word',
               }}
+              className="markdown-content"
             >
-              {displayText}
+              <ReactMarkdown
+                components={{
+                  // Style markdown elements to inherit parent styles
+                  p: ({ children }) => <p style={{ margin: '0 0 0.5em 0' }}>{children}</p>,
+                  h1: ({ children }) => <h1 style={{ margin: '0 0 0.5em 0', fontSize: '1.5em', fontWeight: 'bold' }}>{children}</h1>,
+                  h2: ({ children }) => <h2 style={{ margin: '0 0 0.5em 0', fontSize: '1.3em', fontWeight: 'bold' }}>{children}</h2>,
+                  h3: ({ children }) => <h3 style={{ margin: '0 0 0.5em 0', fontSize: '1.1em', fontWeight: 'bold' }}>{children}</h3>,
+                  h4: ({ children }) => <h4 style={{ margin: '0 0 0.5em 0', fontSize: '1em', fontWeight: 'bold' }}>{children}</h4>,
+                  h5: ({ children }) => <h5 style={{ margin: '0 0 0.5em 0', fontSize: '0.9em', fontWeight: 'bold' }}>{children}</h5>,
+                  h6: ({ children }) => <h6 style={{ margin: '0 0 0.5em 0', fontSize: '0.85em', fontWeight: 'bold' }}>{children}</h6>,
+                  ul: ({ children }) => <ul style={{ margin: '0 0 0.5em 0', paddingLeft: '1.5em' }}>{children}</ul>,
+                  ol: ({ children }) => <ol style={{ margin: '0 0 0.5em 0', paddingLeft: '1.5em' }}>{children}</ol>,
+                  li: ({ children }) => <li style={{ margin: '0.2em 0' }}>{children}</li>,
+                  a: ({ children, href }) => <a href={href} style={{ color: 'inherit', textDecoration: 'underline' }}>{children}</a>,
+                  strong: ({ children }) => <strong style={{ fontWeight: 'bold' }}>{children}</strong>,
+                  em: ({ children }) => <em style={{ fontStyle: 'italic' }}>{children}</em>,
+                  code: ({ children }) => <code style={{ fontFamily: 'monospace', backgroundColor: 'rgba(0,0,0,0.1)', padding: '0.1em 0.3em', borderRadius: '3px' }}>{children}</code>,
+                  blockquote: ({ children }) => <blockquote style={{ margin: '0.5em 0', paddingLeft: '1em', borderLeft: '3px solid currentColor', opacity: 0.8 }}>{children}</blockquote>,
+                }}
+              >
+                {displayText}
+              </ReactMarkdown>
             </Box>
           </Box>
           {isHovered && !isDragging && (

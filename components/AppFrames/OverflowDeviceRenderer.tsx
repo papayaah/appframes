@@ -1,0 +1,55 @@
+'use client';
+
+import { Box } from '@mantine/core';
+import { DeviceFrame } from './DeviceFrame';
+import { Screen, CanvasSettings } from './AppFrames';
+
+interface OverflowDeviceRendererProps {
+  screen: Screen;
+  settings: CanvasSettings;
+  frameIndex: number;
+  clipLeft: number; // Percentage to clip from left (0-100)
+  clipRight: number; // Percentage to clip from right (0-100)
+  offsetX: number; // Position offset within the target canvas (in pixels)
+  offsetY: number;
+}
+
+export function OverflowDeviceRenderer({
+  screen,
+  settings,
+  frameIndex,
+  clipLeft,
+  clipRight,
+  offsetX,
+  offsetY,
+}: OverflowDeviceRendererProps) {
+  const scale = settings.compositionScale / 100;
+  const image = screen.images?.[frameIndex];
+
+  // We render even without an image to show the device frame itself
+
+  return (
+    <Box
+      style={{
+        position: 'absolute',
+        left: offsetX,
+        top: offsetY,
+        overflow: 'hidden',
+        // Clip the device using clip-path
+        clipPath: `inset(0 ${clipRight}% 0 ${clipLeft}%)`,
+        pointerEvents: 'none', // Overflow portion is not interactive
+        zIndex: 100,
+      }}
+    >
+      <DeviceFrame
+        deviceType={settings.deviceFrame}
+        image={image?.image}
+        mediaId={image?.mediaId}
+        scale={scale}
+        screenScale={settings.screenScale}
+        panX={image?.panX ?? 50}
+        panY={image?.panY ?? 50}
+      />
+    </Box>
+  );
+}

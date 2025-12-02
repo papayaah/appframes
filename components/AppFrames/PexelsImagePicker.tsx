@@ -69,7 +69,7 @@ export function PexelsImagePicker({ opened, onClose, onImport }: PexelsImagePick
     setImporting(true);
     try {
       const files: File[] = [];
-      for (const url of selected) {
+      for (const url of Array.from(selected)) {
         const res = await fetch(url);
         const blob = await res.blob();
         const fileName = url.split('/').pop() || 'image.jpg';

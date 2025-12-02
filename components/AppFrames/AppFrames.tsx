@@ -8,6 +8,7 @@ import { Canvas } from './Canvas';
 import { ScreensPanel } from './ScreensPanel';
 import { useFrames, getCanvasDimensions, getCompositionFrameCount } from './FramesContext';
 import { Screen, CanvasSettings, ScreenImage, ScreensStudioActions } from './types';
+import { CrossCanvasDragProvider } from './CrossCanvasDragContext';
 
 // Re-export types for compatibility
 export type { Screen, CanvasSettings, ScreenImage, ScreensStudioActions };
@@ -235,6 +236,7 @@ export function AppFrames() {
   };
 
   return (
+    <CrossCanvasDragProvider>
     <AppShell
       header={{ height: 60 }}
       navbar={{ width: navWidth, breakpoint: 'sm' }}
@@ -282,7 +284,9 @@ export function AppFrames() {
             selectedScreenIndices={selectedScreenIndices}
             selectedFrameIndex={selectedFrameIndex}
             onSelectFrame={setSelectedFrameIndex}
+            onSelectScreen={handleScreenSelect}
             zoom={zoom}
+            onZoomChange={setZoom}
             onReplaceScreen={async (files, targetFrameIndex, targetScreenIndex) => {
               try {
                 // Use targetScreenIndex if provided, otherwise primarySelectedIndex
@@ -470,5 +474,6 @@ export function AppFrames() {
         </Box>
       </AppShell.Main>
     </AppShell>
+    </CrossCanvasDragProvider>
   );
 }
