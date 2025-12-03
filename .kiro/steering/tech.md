@@ -5,7 +5,7 @@
 - **React 19.2.0** - Latest React with improved performance
 - **Next.js 16.0.3** - App Router (not Pages Router)
 - **TypeScript 5.9.3** - Strict mode enabled
-- **Node.js 18+** required
+- **Node.js 24+** required (minimum version)
 
 ## UI & Styling
 
@@ -22,7 +22,7 @@
 
 ## Build & Development
 
-- **Yarn 4.12.0** - Package manager (required, not npm)
+- **npm** - Package manager
 - **ESLint 9** - Linting with eslint-config-mantine
 - **Prettier 3.6.2** - Code formatting with import sorting
 - **Stylelint 16** - CSS linting
@@ -38,29 +38,29 @@
 
 ```bash
 # Development
-yarn dev                    # Start dev server (localhost:3000)
-yarn build                  # Production build
-yarn start                  # Start production server
+npm run dev                 # Start dev server (localhost:3000)
+npm run build               # Production build
+npm start                   # Start production server
 
 # Code Quality
-yarn typecheck              # TypeScript type checking
-yarn lint                   # Run ESLint + Stylelint
-yarn eslint                 # ESLint only
-yarn stylelint              # Stylelint only
-yarn prettier:check         # Check formatting
-yarn prettier:write         # Fix formatting
+npm run typecheck           # TypeScript type checking
+npm run lint                # Run ESLint + Stylelint
+npm run eslint              # ESLint only
+npm run stylelint           # Stylelint only
+npm run prettier:check      # Check formatting
+npm run prettier:write      # Fix formatting
 
 # Testing
-yarn jest                   # Run tests once
-yarn jest:watch             # Run tests in watch mode
-yarn test                   # Full test suite (types + lint + jest)
+npm run jest                # Run tests once
+npm run jest:watch          # Run tests in watch mode
+npm test                    # Full test suite (types + lint + jest)
 
 # Storybook
-yarn storybook              # Start Storybook (localhost:6006)
-yarn storybook:build        # Build Storybook
+npm run storybook           # Start Storybook (localhost:6006)
+npm run storybook:build     # Build Storybook
 
 # Analysis
-yarn analyze                # Bundle size analysis
+npm run analyze             # Bundle size analysis
 ```
 
 ## Configuration Files
