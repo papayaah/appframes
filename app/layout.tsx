@@ -3,6 +3,7 @@ import '@mantine/dropzone/styles.css';
 import './globals.css';
 
 import React from 'react';
+import { Analytics } from '@vercel/analytics/react';
 import { ColorSchemeScript, mantineHtmlProps, MantineProvider } from '@mantine/core';
 import { theme } from '../theme';
 import { FramesProvider } from '../components/AppFrames/FramesContext';
@@ -27,6 +28,7 @@ export default function RootLayout({ children }: { children: any }) {
         <MantineProvider theme={theme}>
           <FramesProvider>{children}</FramesProvider>
         </MantineProvider>
+        <Analytics />
       </body>
     </html>
   );
