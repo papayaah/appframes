@@ -173,7 +173,7 @@
 
 ---
 
-## ScreensStudio Implementation
+## AppFrames Implementation
 
 ### Recommended Canvas Sizes for Google Play
 
@@ -193,7 +193,7 @@
 - 2560 × 1600 pixels
 - 2732 × 2048 pixels ✓
 
-**Note:** ScreensStudio can be configured to support any custom dimension within Google Play's requirements.
+**Note:** AppFrames can be configured to support any custom dimension within Google Play's requirements.
 
 ---
 

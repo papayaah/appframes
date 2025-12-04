@@ -106,9 +106,9 @@
 
 ---
 
-## ScreensStudio Implementation
+## AppFrames Implementation
 
-All these dimensions are available in ScreensStudio:
+All these dimensions are available in AppFrames:
 
 1. Go to **Layout** tab
 2. Select **Canvas Size** dropdown

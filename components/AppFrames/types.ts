@@ -78,7 +78,7 @@ export interface Screen {
   settings: Omit<CanvasSettings, 'selectedScreenIndex'>; // Each screen has its own settings
 }
 
-export interface ScreensStudioActions {
+export interface AppFramesActions {
   addScreen: (image: string) => void;
   replaceScreen: (index: number, image: string) => void;
   removeScreen: (id: string) => void;

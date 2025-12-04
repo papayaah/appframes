@@ -77,7 +77,7 @@ This directory contains comprehensive documentation for screenshot requirements 
 
 ---
 
-## Using ScreensStudio
+## Using AppFrames
 
 ### For Apple App Store
 1. Go to **Layout** tab
@@ -136,7 +136,7 @@ This directory contains comprehensive documentation for screenshot requirements 
 ## Workflow Tips
 
 ### Multi-Platform Submission
-1. Create mockup in ScreensStudio
+1. Create mockup in AppFrames
 2. Export Apple dimensions first (exact sizes)
 3. Export Google dimensions (flexible, use common sizes)
 4. Organize exports by platform and device
@@ -213,7 +213,7 @@ If you notice outdated information or have suggestions:
 - [Apple App Store Connect Guidelines](https://developer.apple.com/app-store/product-page/)
 - [Google Play Console Help](https://support.google.com/googleplay/android-developer/)
 
-### ScreensStudio Documentation
+### AppFrames Documentation
 - [README.md](../../README.md) - Getting started
 - [USAGE_GUIDE.md](../../USAGE_GUIDE.md) - How to use
 - [CONCEPTS.md](../../CONCEPTS.md) - Canvas size vs device frame

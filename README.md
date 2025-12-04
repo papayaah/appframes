@@ -1,6 +1,6 @@
-# ScreensStudio
+# AppFrames
 
-A modern web application for creating beautiful app screenshots and mockups with device frames. Built with React 19, Next.js 16, and Mantine 17.
+A modern web application for creating beautiful app screenshots and mockups with device frames. Built with React 19, Next.js 16, and Mantine 8.
 
 ## Features
 
@@ -75,12 +75,12 @@ See [APP_STORE_SIZES.md](./APP_STORE_SIZES.md) for complete list of supported di
 │   ├── page.tsx            # Home page
 │   └── globals.css         # Global styles
 ├── components/
-│   └── ScreensStudio/
-│       ├── ScreensStudio.tsx   # Main component
+│   └── AppFrames/
+│       ├── AppFrames.tsx       # Main component
 │       ├── Header.tsx          # Top header with export
-│       ├── Sidebar.tsx         # Left sidebar controls
+│       ├── SidebarTabs.tsx     # Left sidebar controls
 │       ├── Canvas.tsx          # Main canvas area
-│       ├── DeviceFrame.tsx     # iPhone frame component
+│       ├── DeviceFrame.tsx     # Device frame component
 │       └── ScreensPanel.tsx    # Bottom screens panel
 └── theme.ts                # Mantine theme configuration
 ```

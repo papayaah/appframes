@@ -19,7 +19,7 @@ All documentation reflects the requirements as of this date. Store requirements 
 ### For Apple App Store Submission
 1. Read [apple-app-store.md](./apple-app-store.md)
 2. Use exact dimensions specified
-3. Export from ScreensStudio with pre-configured sizes
+3. Export from AppFrames with pre-configured sizes
 
 ### For Google Play Store Submission
 1. Read [google-play-store.md](./google-play-store.md)
@@ -52,4 +52,4 @@ To update this documentation:
 
 ## Questions?
 
-See the main [README.md](../../README.md) or [USAGE_GUIDE.md](../../USAGE_GUIDE.md) for help using ScreensStudio.
+See the main [README.md](../../README.md) or [USAGE_GUIDE.md](../../USAGE_GUIDE.md) for help using AppFrames.

@@ -7,11 +7,11 @@ import { SidebarTabs } from './SidebarTabs';
 import { Canvas } from './Canvas';
 import { ScreensPanel } from './ScreensPanel';
 import { useFrames, getCanvasDimensions, getCompositionFrameCount } from './FramesContext';
-import { Screen, CanvasSettings, ScreenImage, ScreensStudioActions } from './types';
+import { Screen, CanvasSettings, ScreenImage, AppFramesActions } from './types';
 import { CrossCanvasDragProvider } from './CrossCanvasDragContext';
 
 // Re-export types for compatibility
-export type { Screen, CanvasSettings, ScreenImage, ScreensStudioActions };
+export type { Screen, CanvasSettings, ScreenImage, AppFramesActions };
 
 export function AppFrames() {
   const {
@@ -238,7 +238,7 @@ export function AppFrames() {
   return (
     <CrossCanvasDragProvider>
     <AppShell
-      header={{ height: 60 }}
+      header={{ height: 45 }}
       navbar={{ width: navWidth, breakpoint: 'sm' }}
       padding={0}
       styles={{
@@ -277,7 +277,7 @@ export function AppFrames() {
       </AppShell.Navbar>
 
       <AppShell.Main>
-        <Box style={{ height: 'calc(100vh - 60px)', display: 'flex', flexDirection: 'column' }}>
+        <Box style={{ height: 'calc(100vh - 40px)', display: 'flex', flexDirection: 'column' }}>
           <Canvas
             settings={settings}
             screens={screens}

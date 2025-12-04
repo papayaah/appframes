@@ -1,12 +1,12 @@
 'use client';
 
-import { Group, Text, ActionIcon, Button, Box, Slider } from '@mantine/core';
-import { IconDeviceDesktop, IconMoon, IconDownload, IconFileZip } from '@tabler/icons-react';
+import Image from 'next/image';
+import { Group, Text, ActionIcon, Box, Slider, Tooltip } from '@mantine/core';
+import { IconDownload, IconFileZip } from '@tabler/icons-react';
 
 interface HeaderProps {
   onDownload?: () => void; // Download currently visible screens individually
   onExport?: () => void; // Export all screens (zip if multiple)
-  outputDimensions?: string;
   zoom?: number;
   onZoomChange?: (zoom: number) => void;
   selectedCount?: number; // Number of currently visible/selected screens
@@ -16,7 +16,6 @@ interface HeaderProps {
 export function Header({
   onDownload,
   onExport,
-  outputDimensions = '1242 × 2688px',
   zoom = 100,
   onZoomChange,
   selectedCount = 1,
@@ -35,28 +34,14 @@ export function Header({
       }}
     >
       <Group gap="sm">
-        <Box
-          style={{
-            width: 36,
-            height: 36,
-            borderRadius: 8,
-            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: 'white',
-            fontWeight: 700,
-            fontSize: 18,
-          }}
-        >
-          AS
-        </Box>
-        <Text size="lg" fw={600}>
-          AppFrames
-        </Text>
-        <Text size="sm" c="dimmed">
-          v2.3
-        </Text>
+        <Image
+          src="/logo.png"
+          alt="AppFrames Logo"
+          width={180}
+          height={50}
+          style={{ objectFit: 'contain' }}
+          priority
+        />
       </Group>
 
       <Group gap="md" style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)' }}>
@@ -78,30 +63,25 @@ export function Header({
       </Group>
 
       <Group gap="xs">
-        <Text size="sm" c="dimmed">
-          OUTPUT: {outputDimensions}
-        </Text>
-        <ActionIcon variant="subtle" color="gray" size="lg">
-          <IconDeviceDesktop size={18} />
-        </ActionIcon>
-        <ActionIcon variant="subtle" color="gray" size="lg">
-          <IconMoon size={18} />
-        </ActionIcon>
-        <Button
-          leftSection={<IconDownload size={16} />}
-          size="sm"
-          variant="light"
-          onClick={onDownload}
-        >
-          Download{selectedCount > 1 ? ` (${selectedCount})` : ''}
-        </Button>
-        <Button
-          leftSection={<IconFileZip size={16} />}
-          size="sm"
-          onClick={onExport}
-        >
-          Export{totalCount > 1 ? ` All (${totalCount})` : ''}
-        </Button>
+        <Tooltip label={`Download${selectedCount > 1 ? ` (${selectedCount} screens)` : ''}`}>
+          <ActionIcon
+            size="lg"
+            variant="light"
+            onClick={onDownload}
+            aria-label="Download"
+          >
+            <IconDownload size={18} />
+          </ActionIcon>
+        </Tooltip>
+        <Tooltip label={`Export${totalCount > 1 ? ` All (${totalCount} screens)` : ''}`}>
+          <ActionIcon
+            size="lg"
+            onClick={onExport}
+            aria-label="Export"
+          >
+            <IconFileZip size={18} />
+          </ActionIcon>
+        </Tooltip>
       </Group>
     </Box>
   );
