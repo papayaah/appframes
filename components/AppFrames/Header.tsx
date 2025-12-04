@@ -7,6 +7,7 @@ import { IconDownload, IconFileZip } from '@tabler/icons-react';
 interface HeaderProps {
   onDownload?: () => void; // Download currently visible screens individually
   onExport?: () => void; // Export all screens (zip if multiple)
+  outputDimensions?: string; // Display dimensions (e.g., "1242 × 2688px")
   zoom?: number;
   onZoomChange?: (zoom: number) => void;
   selectedCount?: number; // Number of currently visible/selected screens
@@ -16,6 +17,7 @@ interface HeaderProps {
 export function Header({
   onDownload,
   onExport,
+  outputDimensions,
   zoom = 100,
   onZoomChange,
   selectedCount = 1,
@@ -42,6 +44,11 @@ export function Header({
           style={{ objectFit: 'contain' }}
           priority
         />
+        {outputDimensions && (
+          <Text size="xs" c="dimmed">
+            {outputDimensions}
+          </Text>
+        )}
       </Group>
 
       <Group gap="md" style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)' }}>

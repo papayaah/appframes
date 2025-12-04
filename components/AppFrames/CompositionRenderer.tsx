@@ -7,6 +7,8 @@ import { DeviceFrame } from './DeviceFrame';
 interface CompositionRendererProps {
   settings: CanvasSettings;
   screen: Screen;
+  screenIndex?: number;
+  disableCrossCanvasDrag?: boolean;
   onPanChange?: (frameIndex: number, panX: number, panY: number) => void;
   onFramePositionChange?: (frameIndex: number, frameX: number, frameY: number) => void;
   hoveredFrameIndex?: number | null;
@@ -32,6 +34,8 @@ const getCompositionFrameCount = (composition: string): number => {
 export function CompositionRenderer({
   settings,
   screen,
+  screenIndex,
+  disableCrossCanvasDrag = false,
   onPanChange,
   onFramePositionChange,
   hoveredFrameIndex,
