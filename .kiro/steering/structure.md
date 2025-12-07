@@ -49,10 +49,17 @@ components/
 
 ### Component Patterns
 
-- **AppFrames.tsx** - Main container, manages all state
-  - Screens array (list of screenshots)
+- **AppFrames.tsx** - Main container, coordinates UI and persistence
+  - Initializes persistence layer
+  - Handles export and download operations
+  - Manages error notifications
+  
+- **FramesContext.tsx** - State management provider
+  - screensByCanvasSize object (screens organized by canvas size)
+  - currentCanvasSize (active canvas size)
   - Settings object (all canvas/composition settings)
   - Handlers for add/remove/replace screens
+  - Canvas size switching logic
   
 - **Client Components** - All AppFrames components use 'use client'
 - **Props Pattern** - Pass settings + setSettings for two-way binding
@@ -89,6 +96,8 @@ interface Screen {
   mediaId?: number;        // Reference to media library
   image?: string;          // Base64 image (legacy)
   name: string;            // Display name
+  images: ScreenImage[];   // Array of images for multi-device compositions
+  settings: CanvasSettings; // Canvas configuration per screen
 }
 ```
 
@@ -114,11 +123,12 @@ interface CanvasSettings {
 
 ## State Management
 
-- **No global state library** - Uses React useState in AppFrames.tsx
+- **No global state library** - Uses React useState in FramesContext.tsx
+- **Canvas Size Organization** - Screens organized by canvas size in screensByCanvasSize object
 - **Props drilling** - Settings passed down to child components
 - **Callback props** - Child components call parent handlers
-- **Local storage** - Not currently implemented
-- **IndexedDB** - Media metadata via Dexie
+- **IndexedDB** - Workspace state and media metadata persisted via idb library
+- **Canvas Size Switching** - Each canvas size maintains independent screen sets
 
 ## File Naming Conventions
 
@@ -179,9 +189,11 @@ All config files at root:
 
 ## Key Architectural Decisions
 
-1. **Monolithic State** - All state in AppFrames.tsx, not distributed
-2. **OPFS + IndexedDB** - Files in OPFS, metadata in IndexedDB
-3. **No Server Components** - Main app is client-side for interactivity
-4. **Mantine AppShell** - Layout structure with header/navbar/main
-5. **Export via DOM** - Uses html-to-image to capture canvas element
-6. **No Routing** - Single page application
+1. **Canvas Size Organization** - Screens organized by canvas size, each size maintains independent screen sets
+2. **Centralized State** - All state in FramesContext.tsx, accessed via hooks
+3. **OPFS + IndexedDB** - Files in OPFS, metadata and workspace state in IndexedDB
+4. **State Persistence** - Automatic debounced saves to IndexedDB using idb library
+5. **No Server Components** - Main app is client-side for interactivity
+6. **Mantine AppShell** - Layout structure with header/navbar/main
+7. **Export via DOM** - Uses html-to-image to capture canvas element
+8. **No Routing** - Single page application

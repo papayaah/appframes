@@ -2,9 +2,33 @@
 
 ## Overview
 
-This feature implements comprehensive state persistence for AppFrames using IndexedDB with the idb library. The system automatically saves and restores the complete application state including screens, canvas settings, UI preferences, and user selections. The design prioritizes performance through debounced writes, efficient indexing, and asynchronous operations that don't block the UI.
+This feature implements comprehensive state persistence for AppFrames using IndexedDB with the idb library. The system automatically saves and restores the complete application state including projects, screens, canvas settings, UI preferences, and user selections. The design prioritizes performance through debounced writes, efficient indexing, and asynchronous operations that don't block the UI.
 
-The persistence layer extends the existing Dexie-based database to include workspace state while maintaining the current OPFS + IndexedDB architecture for media files. All state updates are debounced to prevent excessive writes during rapid user interactions like dragging sliders or panning images.
+The persistence layer extends the existing Dexie-based database to include project state while maintaining the current OPFS + IndexedDB architecture for media files. All state updates are debounced to prevent excessive writes during rapid user interactions like dragging sliders or panning images.
+
+### Multi-Project Architecture
+
+Users can create and manage multiple projects (e.g., "My Fitness App", "My Game App"). Each project is completely independent with its own:
+- Screens organized by canvas size
+- Canvas settings and preferences
+- Selection state
+
+**Free vs Pro Tiers:**
+- **Free users**: Limited to 1 project
+- **Pro users**: Unlimited projects
+
+This spec focuses on the persistence layer and multi-project data structure. The pro/billing enforcement will be handled in a separate "Pro Features" spec.
+
+### Canvas Size Organization
+
+Within each project, screens are organized by canvas size. Each canvas size (e.g., 'iphone-6.5', 'ipad-12.9') maintains its own independent array of screens. This design choice addresses several user needs:
+
+1. **Store Requirements** - Different app stores require different screenshot dimensions
+2. **Aspect Ratio Optimization** - Screenshots optimized for iPhone don't work well for iPad
+3. **Workflow Efficiency** - Users can work on multiple canvas sizes without losing progress
+4. **Context Switching** - Switching canvas sizes shows only relevant screens for that size
+
+When users change the canvas size setting, the application switches to the screen set for that size, preserving the previous size's screens for later access.
 
 ## Architecture
 
@@ -38,10 +62,13 @@ The persistence layer extends the existing Dexie-based database to include works
 ### Component Responsibilities
 
 **FramesContext.tsx**
-- Manages application state (screens, settings, selections)
+- Manages current project state (screensByCanvasSize, settings, selections)
+- Maintains current canvas size and provides screens for that size
 - Triggers persistence on state changes
-- Loads initial state from IndexedDB on mount
+- Loads project from IndexedDB on mount
 - Provides hooks for components to access state
+- Handles canvas size switching and screen set transitions
+- Handles project switching
 
 **PersistenceDB.ts** (New)
 - Wraps idb library for database operations
@@ -59,33 +86,51 @@ The persistence layer extends the existing Dexie-based database to include works
 **AppFrames.tsx**
 - Initializes persistence on mount
 - Coordinates between FramesContext and PersistenceDB
-- Handles workspace clear/reset operations
+- Handles project management UI (create, switch, delete, rename)
 - Manages error states and user notifications
+- Observes canvas size changes and triggers screen set switching
 
 ## Components and Interfaces
 
 ### Data Models
 
-#### WorkspaceState
+#### Project
 
 ```typescript
-interface WorkspaceState {
-  id: string;                          // Always 'current' for single workspace
-  screens: Screen[];                   // Array of all screens
-  selectedScreenIndices: number[];     // Currently selected screens
-  primarySelectedIndex: number;        // Primary selection
+interface Project {
+  id: string;                          // Unique project identifier (UUID)
+  name: string;                        // User-defined project name
+  screensByCanvasSize: Record<string, Screen[]>; // Screens organized by canvas size key
+  currentCanvasSize: string;           // Currently active canvas size
+  selectedScreenIndices: number[];     // Currently selected screens (for current canvas size)
+  primarySelectedIndex: number;        // Primary selection (for current canvas size)
   selectedFrameIndex: number | null;   // Selected frame within screen
   zoom: number;                        // Canvas zoom level (10-400)
-  createdAt: Date;                     // Workspace creation time
+  createdAt: Date;                     // Project creation time
   updatedAt: Date;                     // Last modification time
+  lastAccessedAt: Date;                // Last time project was opened
 }
 ```
 
-#### UIState
+**Project Organization:**
+- Each project is completely independent
+- Projects have user-defined names (e.g., "My Fitness App", "My Game App")
+- Free users limited to 1 project, Pro users unlimited
+- Within each project, screens are organized by canvas size
+
+**Canvas Size Organization:**
+- Screens are organized by canvas size (e.g., 'iphone-6.5', 'ipad-12.9')
+- Each canvas size maintains its own independent array of screens
+- When users switch canvas sizes, they see only screens for that size
+- Selection state (selectedScreenIndices, primarySelectedIndex) applies to current canvas size only
+- This allows users to maintain separate screenshot sets for different store requirements
+
+#### AppState
 
 ```typescript
-interface UIState {
-  id: string;                          // Always 'current' for single UI state
+interface AppState {
+  id: string;                          // Always 'current' for single app state
+  currentProjectId: string | null;     // ID of currently open project
   sidebarTab: string;                  // Selected tab: 'layout' | 'device' | 'media' | 'text'
   sidebarPanelOpen: boolean;           // Panel expanded/collapsed
   navWidth: number;                    // Sidebar width in pixels
@@ -145,20 +190,24 @@ interface CanvasSettings {
 
 #### Object Stores
 
-**workspace** (Primary Key: id)
-- Stores: WorkspaceState
-- Indexes: updatedAt
-- Single record with id='current'
+**projects** (Primary Key: id)
+- Stores: Project
+- Indexes: updatedAt, lastAccessedAt, name
+- Multiple records, one per project
+- Free users: max 1 project
+- Pro users: unlimited projects
 
-**uiState** (Primary Key: id)
-- Stores: UIState
+**appState** (Primary Key: id)
+- Stores: AppState
 - Indexes: none needed
 - Single record with id='current'
+- Tracks currently open project
 
 **mediaFiles** (Primary Key: ++id)
 - Stores: MediaFile (existing)
 - Indexes: name, createdAt
 - Multiple records for uploaded media
+- Shared across all projects
 
 #### Database Version History
 
@@ -166,9 +215,9 @@ interface CanvasSettings {
 - mediaFiles object store
 
 **Version 2** (New)
-- Add workspace object store
-- Add uiState object store
-- Migration: Initialize with empty state
+- Add projects object store
+- Add appState object store
+- Migration: Create default project from any existing data
 
 ### New Components
 
@@ -180,14 +229,14 @@ interface CanvasSettings {
 import { openDB, DBSchema, IDBPDatabase } from 'idb';
 
 interface AppFramesDBSchema extends DBSchema {
-  workspace: {
+  projects: {
     key: string;
-    value: WorkspaceState;
-    indexes: { 'updatedAt': Date };
+    value: Project;
+    indexes: { 'updatedAt': Date; 'lastAccessedAt': Date; 'name': string };
   };
-  uiState: {
+  appState: {
     key: string;
-    value: UIState;
+    value: AppState;
   };
   mediaFiles: {
     key: number;
@@ -212,14 +261,16 @@ class PersistenceDB {
           mediaStore.createIndex('createdAt', 'createdAt');
         }
         
-        // Version 2: workspace and uiState
+        // Version 2: projects and appState
         if (oldVersion < 2) {
-          const workspaceStore = db.createObjectStore('workspace', {
+          const projectsStore = db.createObjectStore('projects', {
             keyPath: 'id',
           });
-          workspaceStore.createIndex('updatedAt', 'updatedAt');
+          projectsStore.createIndex('updatedAt', 'updatedAt');
+          projectsStore.createIndex('lastAccessedAt', 'lastAccessedAt');
+          projectsStore.createIndex('name', 'name');
           
-          db.createObjectStore('uiState', {
+          db.createObjectStore('appState', {
             keyPath: 'id',
           });
         }
@@ -227,39 +278,72 @@ class PersistenceDB {
     });
   }
   
-  // Workspace operations
-  async saveWorkspace(state: WorkspaceState): Promise<void> {
+  // Project operations
+  async createProject(name: string): Promise<Project> {
     if (!this.db) await this.init();
-    await this.db!.put('workspace', {
+    const project: Project = {
+      id: crypto.randomUUID(),
+      name,
+      screensByCanvasSize: {},
+      currentCanvasSize: 'iphone-6.5',
+      selectedScreenIndices: [],
+      primarySelectedIndex: 0,
+      selectedFrameIndex: null,
+      zoom: 100,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      lastAccessedAt: new Date(),
+    };
+    await this.db!.put('projects', project);
+    return project;
+  }
+  
+  async saveProject(project: Project): Promise<void> {
+    if (!this.db) await this.init();
+    await this.db!.put('projects', {
+      ...project,
+      updatedAt: new Date(),
+      lastAccessedAt: new Date(),
+    });
+  }
+  
+  async loadProject(id: string): Promise<Project | null> {
+    if (!this.db) await this.init();
+    return await this.db!.get('projects', id) || null;
+  }
+  
+  async getAllProjects(): Promise<Project[]> {
+    if (!this.db) await this.init();
+    return await this.db!.getAll('projects');
+  }
+  
+  async deleteProject(id: string): Promise<void> {
+    if (!this.db) await this.init();
+    await this.db!.delete('projects', id);
+  }
+  
+  async renameProject(id: string, newName: string): Promise<void> {
+    if (!this.db) await this.init();
+    const project = await this.loadProject(id);
+    if (project) {
+      project.name = newName;
+      await this.saveProject(project);
+    }
+  }
+  
+  // App State operations
+  async saveAppState(state: AppState): Promise<void> {
+    if (!this.db) await this.init();
+    await this.db!.put('appState', {
       ...state,
       id: 'current',
       updatedAt: new Date(),
     });
   }
   
-  async loadWorkspace(): Promise<WorkspaceState | null> {
+  async loadAppState(): Promise<AppState | null> {
     if (!this.db) await this.init();
-    return await this.db!.get('workspace', 'current') || null;
-  }
-  
-  async clearWorkspace(): Promise<void> {
-    if (!this.db) await this.init();
-    await this.db!.delete('workspace', 'current');
-  }
-  
-  // UI State operations
-  async saveUIState(state: UIState): Promise<void> {
-    if (!this.db) await this.init();
-    await this.db!.put('uiState', {
-      ...state,
-      id: 'current',
-      updatedAt: new Date(),
-    });
-  }
-  
-  async loadUIState(): Promise<UIState | null> {
-    if (!this.db) await this.init();
-    return await this.db!.get('uiState', 'current') || null;
+    return await this.db!.get('appState', 'current') || null;
   }
 }
 
@@ -268,11 +352,14 @@ export const persistenceDB = new PersistenceDB();
 
 **Key Methods:**
 - `init()` - Opens database with version 2, runs migrations
-- `saveWorkspace(state)` - Saves complete workspace state
-- `loadWorkspace()` - Loads workspace state or returns null
-- `clearWorkspace()` - Deletes workspace for fresh start
-- `saveUIState(state)` - Saves UI preferences
-- `loadUIState()` - Loads UI preferences or returns null
+- `createProject(name)` - Creates new project with default state
+- `saveProject(project)` - Saves complete project state
+- `loadProject(id)` - Loads project by ID or returns null
+- `getAllProjects()` - Returns array of all projects
+- `deleteProject(id)` - Deletes project permanently
+- `renameProject(id, newName)` - Updates project name
+- `saveAppState(state)` - Saves app-level state (current project, UI prefs)
+- `loadAppState()` - Loads app state or returns null
 
 #### usePersistence.ts
 
@@ -350,20 +437,41 @@ export function usePersistence(options: UsePersistenceOptions = {}) {
 // Load state from IndexedDB
 async function loadPersistedState(): Promise<void> {
   try {
-    const workspace = await persistenceDB.loadWorkspace();
-    if (workspace) {
-      setScreens(workspace.screens);
-      setSelectedScreenIndices(workspace.selectedScreenIndices);
-      setPrimarySelectedIndex(workspace.primarySelectedIndex);
-      setSelectedFrameIndex(workspace.selectedFrameIndex);
-      setZoom(workspace.zoom);
+    const appState = await persistenceDB.loadAppState();
+    
+    // Load current project if one exists
+    if (appState?.currentProjectId) {
+      const project = await persistenceDB.loadProject(appState.currentProjectId);
+      if (project) {
+        loadProjectIntoState(project);
+      } else {
+        // Project was deleted, create new default project
+        await createNewProject('My Project');
+      }
+    } else {
+      // No current project, check if any projects exist
+      const projects = await persistenceDB.getAllProjects();
+      if (projects.length > 0) {
+        // Load most recently accessed project
+        const recent = projects.sort((a, b) => 
+          b.lastAccessedAt.getTime() - a.lastAccessedAt.getTime()
+        )[0];
+        loadProjectIntoState(recent);
+        await persistenceDB.saveAppState({
+          ...appState,
+          currentProjectId: recent.id,
+        });
+      } else {
+        // No projects exist, create default project
+        await createNewProject('My Project');
+      }
     }
     
-    const uiState = await persistenceDB.loadUIState();
-    if (uiState) {
-      setSidebarTab(uiState.sidebarTab);
-      setSidebarPanelOpen(uiState.sidebarPanelOpen);
-      setNavWidth(uiState.navWidth);
+    // Load UI preferences
+    if (appState) {
+      setSidebarTab(appState.sidebarTab);
+      setSidebarPanelOpen(appState.sidebarPanelOpen);
+      setNavWidth(appState.navWidth);
     }
   } catch (error) {
     console.error('Failed to load persisted state:', error);
@@ -371,41 +479,147 @@ async function loadPersistedState(): Promise<void> {
   }
 }
 
-// Save workspace state (debounced)
-function saveWorkspaceState(): void {
+// Load project data into React state
+function loadProjectIntoState(project: Project): void {
+  setCurrentProjectId(project.id);
+  setCurrentProjectName(project.name);
+  setScreensByCanvasSize(project.screensByCanvasSize);
+  setCurrentCanvasSize(project.currentCanvasSize);
+  setSelectedScreenIndices(project.selectedScreenIndices);
+  setPrimarySelectedIndex(project.primarySelectedIndex);
+  setSelectedFrameIndex(project.selectedFrameIndex);
+  setZoom(project.zoom);
+}
+
+// Save project state (debounced)
+function saveProjectState(): void {
+  if (!currentProjectId) return;
+  
   debouncedSave(async () => {
-    await persistenceDB.saveWorkspace({
-      id: 'current',
-      screens,
+    await persistenceDB.saveProject({
+      id: currentProjectId,
+      name: currentProjectName,
+      screensByCanvasSize,
+      currentCanvasSize,
       selectedScreenIndices,
       primarySelectedIndex,
       selectedFrameIndex,
       zoom,
-      createdAt: workspaceCreatedAt,
+      createdAt: projectCreatedAt,
       updatedAt: new Date(),
+      lastAccessedAt: new Date(),
     });
   });
 }
 
-// Clear workspace
-async function clearWorkspace(): Promise<void> {
-  await persistenceDB.clearWorkspace();
-  // Reset to default state
-  setScreens([]);
-  setSelectedScreenIndices([]);
-  setPrimarySelectedIndex(0);
+// Switch canvas size
+function switchCanvasSize(newCanvasSize: string): void {
+  // Save current selection state before switching
+  saveWorkspaceState();
+  
+  // Switch to new canvas size
+  setCurrentCanvasSize(newCanvasSize);
+  
+  // Initialize screens array for new canvas size if it doesn't exist
+  if (!screensByCanvasSize[newCanvasSize]) {
+    setScreensByCanvasSize(prev => ({
+      ...prev,
+      [newCanvasSize]: []
+    }));
+  }
+  
+  // Reset selection for new canvas size
+  const screensForSize = screensByCanvasSize[newCanvasSize] || [];
+  if (screensForSize.length > 0) {
+    setSelectedScreenIndices([0]);
+    setPrimarySelectedIndex(0);
+  } else {
+    setSelectedScreenIndices([]);
+    setPrimarySelectedIndex(0);
+  }
   setSelectedFrameIndex(null);
-  setZoom(100);
-  // Add one empty screen
-  addScreen();
+}
+
+// Get screens for current canvas size
+function getCurrentScreens(): Screen[] {
+  return screensByCanvasSize[currentCanvasSize] || [];
+}
+
+// Create new project
+async function createNewProject(name: string): Promise<void> {
+  const project = await persistenceDB.createProject(name);
+  loadProjectIntoState(project);
+  
+  // Update app state to track current project
+  await persistenceDB.saveAppState({
+    id: 'current',
+    currentProjectId: project.id,
+    sidebarTab,
+    sidebarPanelOpen,
+    navWidth,
+    updatedAt: new Date(),
+  });
+}
+
+// Switch to different project
+async function switchProject(projectId: string): Promise<void> {
+  // Save current project before switching
+  if (currentProjectId) {
+    await saveProjectState();
+  }
+  
+  // Load new project
+  const project = await persistenceDB.loadProject(projectId);
+  if (project) {
+    loadProjectIntoState(project);
+    
+    // Update app state
+    await persistenceDB.saveAppState({
+      id: 'current',
+      currentProjectId: projectId,
+      sidebarTab,
+      sidebarPanelOpen,
+      navWidth,
+      updatedAt: new Date(),
+    });
+  }
+}
+
+// Delete project
+async function deleteProject(projectId: string): Promise<void> {
+  await persistenceDB.deleteProject(projectId);
+  
+  // If deleting current project, switch to another or create new
+  if (projectId === currentProjectId) {
+    const projects = await persistenceDB.getAllProjects();
+    if (projects.length > 0) {
+      await switchProject(projects[0].id);
+    } else {
+      await createNewProject('My Project');
+    }
+  }
+}
+
+// Rename current project
+async function renameProject(newName: string): Promise<void> {
+  if (!currentProjectId) return;
+  
+  setCurrentProjectName(newName);
+  await persistenceDB.renameProject(currentProjectId, newName);
 }
 ```
 
 **State Change Triggers:**
-- useEffect watching screens → saveWorkspaceState()
-- useEffect watching selectedScreenIndices → saveWorkspaceState()
-- useEffect watching zoom → saveWorkspaceState()
-- useEffect watching sidebarTab → saveUIState()
+- useEffect watching screensByCanvasSize → saveProjectState()
+- useEffect watching currentCanvasSize → saveProjectState()
+- useEffect watching selectedScreenIndices → saveProjectState()
+- useEffect watching zoom → saveProjectState()
+- useEffect watching sidebarTab → saveAppState()
+- Canvas size change in settings → switchCanvasSize()
+- User creates new project → createNewProject()
+- User switches project → switchProject()
+- User deletes project → deleteProject()
+- User renames project → renameProject()
 
 #### AppFrames.tsx
 
@@ -442,15 +656,23 @@ useEffect(() => {
    - Runs migrations if needed
    ↓
 3. FramesContext.loadPersistedState()
-   - Loads workspace from IndexedDB
-   - Loads UI state from IndexedDB
+   - Loads appState from IndexedDB
+   - Gets currentProjectId from appState
    ↓
-4. State is restored
-   - Screens array populated
-   - Selections restored
+4. Load current project
+   - If currentProjectId exists, load that project
+   - If no currentProjectId, load most recent project
+   - If no projects exist, create default project
+   ↓
+5. State is restored
+   - Project loaded into React state
+   - screensByCanvasSize populated with all canvas size groups
+   - currentCanvasSize set to last used canvas size
+   - Screens for current canvas size displayed
+   - Selections restored for current canvas size
    - UI preferences applied
    ↓
-5. App renders with restored state
+6. App renders with restored project
 ```
 
 ### State Update Flow
@@ -468,30 +690,77 @@ useEffect(() => {
    ↓
 5. If no more changes in 500ms:
    ↓
-6. PersistenceDB.saveWorkspace()
-   - Writes to IndexedDB
-   - Updates timestamp
+6. PersistenceDB.saveProject()
+   - Writes current project to IndexedDB
+   - Updates timestamp and lastAccessedAt
    ↓
 7. Save completes (async, non-blocking)
 ```
 
-### Workspace Clear Flow
+### Project Switch Flow
 
 ```
-1. User clicks "Clear Workspace"
+1. User selects different project from dropdown
+   ↓
+2. FramesContext.switchProject(newProjectId) called
+   - Saves current project state
+   ↓
+3. Load new project from IndexedDB
+   - PersistenceDB.loadProject(newProjectId)
+   ↓
+4. Load project data into React state
+   - screensByCanvasSize
+   - currentCanvasSize
+   - selections, zoom, etc.
+   ↓
+5. Update appState with new currentProjectId
+   ↓
+6. UI updates to show new project's screens
+```
+
+### Canvas Size Switch Flow
+
+```
+1. User changes canvas size in settings
+   ↓
+2. FramesContext.switchCanvasSize() called
+   - Saves current workspace state
+   - Updates currentCanvasSize
+   ↓
+3. Check if screens exist for new canvas size
+   ↓
+4a. If screens exist:
+   - Load screens for new canvas size
+   - Restore selection to first screen
+   ↓
+4b. If no screens exist:
+   - Initialize empty array for canvas size
+   - Clear selection state
+   ↓
+5. Canvas displays screens for new size
+   ↓
+6. ScreensPanel shows screens for new size
+```
+
+### Project Delete Flow
+
+```
+1. User clicks "Delete Project"
    ↓
 2. Confirmation dialog shown
    ↓
 3. User confirms
    ↓
-4. FramesContext.clearWorkspace()
-   - Calls PersistenceDB.clearWorkspace()
-   - Resets React state to defaults
-   - Adds one empty screen
+4. FramesContext.deleteProject(projectId)
+   - Calls PersistenceDB.deleteProject(projectId)
    ↓
-5. Media library preserved
+5. If deleting current project:
+   - Load another project if available
+   - Or create new default project
    ↓
-6. UI updates with fresh workspace
+6. Media library preserved (shared across projects)
+   ↓
+7. UI updates with new current project
 ```
 
 ## Error Handling
@@ -569,15 +838,32 @@ useEffect(() => {
 ### Integration Testing
 
 **End-to-End Persistence:**
-- Create screens → reload page → verify screens restored
+- Create project → add screens → reload page → verify project and screens restored
+- Create multiple projects → reload page → verify all projects exist
+- Switch projects → reload page → verify last opened project is current
+- Create screens for canvas size A → reload page → verify screens restored for canvas size A
+- Switch to canvas size B → add screens → reload page → verify screens for both sizes restored
+- Change canvas size → verify correct screen set displayed
 - Change settings → reload page → verify settings restored
 - Select screens → reload page → verify selection restored
 - Change sidebar tab → reload page → verify tab restored
 
-**Workspace Management:**
-- Clear workspace → verify all screens deleted
-- Clear workspace → verify media library preserved
-- Clear workspace → verify one empty screen created
+**Project Management:**
+- Create new project → verify project appears in project list
+- Switch projects → verify correct project screens displayed
+- Delete project → verify project removed from list
+- Delete current project → verify switches to another project or creates new one
+- Rename project → verify name updated in project list
+- Delete project → verify media library preserved
+
+**Canvas Size Switching:**
+- Add screens to canvas size A → switch to canvas size B → verify empty state
+- Add screens to canvas size B → switch back to A → verify original screens restored
+- Switch canvas sizes rapidly → verify no data loss or corruption
+
+**Project Isolation:**
+- Create project A with screens → create project B with different screens → switch between → verify screens isolated
+- Add media to project A → switch to project B → verify media library shared
 
 **Error Scenarios:**
 - Simulate quota exceeded → verify user notification
@@ -592,8 +878,8 @@ Property-based tests will be defined after completing the prework analysis in th
 
 *A property is a characteristic or behavior that should hold true across all valid executions of a system-essentially, a formal statement about what the system should do. Properties serve as the bridge between human-readable specifications and machine-verifiable correctness guarantees.*
 
-### Property 1: Screen persistence
-*For any* screen added to the workspace, after saving and reloading, the screen should be present in the restored workspace with the same configuration
+### Property 1: Screen persistence by canvas size
+*For any* screen added to a specific canvas size in a project, after saving and reloading, the screen should be present in the restored project under the same canvas size with the same configuration
 **Validates: Requirements 1.1, 1.4**
 
 ### Property 2: Screen modification persistence
@@ -628,12 +914,12 @@ Property-based tests will be defined after completing the prework analysis in th
 *For any* pending save operation when the component unmounts, the save should complete before unmount finishes
 **Validates: Requirements 8.5**
 
-### Property 10: Workspace clear completeness
-*For any* workspace state, after clearing the workspace, all screens should be deleted and settings should be reset to defaults
+### Property 10: Project deletion completeness
+*For any* project, after deleting the project, all screens across all canvas sizes in that project should be deleted
 **Validates: Requirements 9.2, 9.3**
 
-### Property 11: Media library preservation
-*For any* workspace clear operation, the media library should remain unchanged with all uploaded images preserved
+### Property 11: Media library preservation across projects
+*For any* project deletion operation, the media library should remain unchanged with all uploaded images preserved and accessible to other projects
 **Validates: Requirements 9.4**
 
 ### Property 12: Error resilience
@@ -651,6 +937,26 @@ Property-based tests will be defined after completing the prework analysis in th
 ### Property 15: Database migration safety
 *For any* database version upgrade, existing data should be preserved and migrated to the new schema without loss
 **Validates: Requirements 7.3, 7.4**
+
+### Property 16: Canvas size isolation
+*For any* two different canvas sizes, screens added to one canvas size should not appear when viewing the other canvas size
+**Validates: Requirements 1.1, 2.5**
+
+### Property 17: Canvas size switching preserves state
+*For any* canvas size with existing screens, switching away and then back to that canvas size should restore the same screens and selection state
+**Validates: Requirements 1.4, 4.1**
+
+### Property 18: Project isolation
+*For any* two different projects, screens added to one project should not appear when viewing the other project
+**Validates: Requirements 1.1**
+
+### Property 19: Project switching preserves state
+*For any* project with existing screens, switching away to another project and then back should restore the same screens, canvas size, and selection state
+**Validates: Requirements 1.4, 4.1**
+
+### Property 20: Current project persistence
+*For any* project that is currently open, after reloading the application, the same project should be opened automatically
+**Validates: Requirements 1.4**
 
 ## Implementation Details
 
@@ -698,27 +1004,44 @@ Multiple state changes within the debounce window are automatically batched into
 **Version 2 Migration:**
 ```typescript
 if (oldVersion < 2) {
-  // Create workspace store
-  const workspaceStore = db.createObjectStore('workspace', {
+  // Create projects store
+  const projectsStore = db.createObjectStore('projects', {
     keyPath: 'id',
   });
-  workspaceStore.createIndex('updatedAt', 'updatedAt');
+  projectsStore.createIndex('updatedAt', 'updatedAt');
+  projectsStore.createIndex('lastAccessedAt', 'lastAccessedAt');
+  projectsStore.createIndex('name', 'name');
   
-  // Create uiState store
-  db.createObjectStore('uiState', {
+  // Create appState store
+  db.createObjectStore('appState', {
     keyPath: 'id',
   });
   
-  // Initialize with empty state
-  const tx = transaction.objectStore('workspace');
-  await tx.put({
-    id: 'current',
-    screens: [],
+  // Create default project
+  const defaultProject: Project = {
+    id: crypto.randomUUID(),
+    name: 'My Project',
+    screensByCanvasSize: {},
+    currentCanvasSize: 'iphone-6.5',
     selectedScreenIndices: [],
     primarySelectedIndex: 0,
     selectedFrameIndex: null,
     zoom: 100,
     createdAt: new Date(),
+    updatedAt: new Date(),
+    lastAccessedAt: new Date(),
+  };
+  
+  await projectsStore.put(defaultProject);
+  
+  // Initialize appState
+  const appStateStore = db.objectStore('appState');
+  await appStateStore.put({
+    id: 'current',
+    currentProjectId: defaultProject.id,
+    sidebarTab: 'layout',
+    sidebarPanelOpen: true,
+    navWidth: 360,
     updatedAt: new Date(),
   });
 }
@@ -728,6 +1051,43 @@ if (oldVersion < 2) {
 - Version 3: Add workspace templates
 - Version 4: Add undo/redo history
 - Version 5: Add project metadata
+
+### Canvas Size Switching Implementation
+
+**Canvas Size Key Format:**
+- Use kebab-case format: 'iphone-6.5', 'ipad-12.9', 'android-phone'
+- Keys match the canvasSize setting value
+- Consistent naming across the application
+
+**Initialization:**
+- On first load, initialize with default canvas size ('iphone-6.5')
+- Create empty screen array for default canvas size
+- Lazy-create arrays for other canvas sizes as needed
+
+**Switching Logic:**
+```typescript
+function handleCanvasSizeChange(newSize: string): void {
+  // Triggered when settings.canvasSize changes
+  const oldSize = currentCanvasSize;
+  
+  // Save current state before switching
+  saveWorkspaceState();
+  
+  // Switch to new canvas size
+  switchCanvasSize(newSize);
+  
+  // Update settings to reflect new canvas size
+  setSettings(prev => ({
+    ...prev,
+    canvasSize: newSize
+  }));
+}
+```
+
+**Screen Operations:**
+- All screen operations (add, remove, update) operate on current canvas size only
+- `getCurrentScreens()` helper returns screens for current canvas size
+- Selection state applies to current canvas size only
 
 ### Performance Optimizations
 
@@ -739,6 +1099,11 @@ Only save changed portions of state:
 - Workspace changes → save workspace only
 - UI changes → save uiState only
 - Don't save if state hasn't changed
+
+**Canvas Size Lazy Loading:**
+- Only create screen arrays when canvas size is first accessed
+- Don't pre-populate all possible canvas sizes
+- Reduces memory footprint for typical usage
 
 **Index Usage:**
 Use updatedAt index for efficient queries:

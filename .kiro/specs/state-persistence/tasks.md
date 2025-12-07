@@ -3,11 +3,12 @@
 - [ ] 1. Install idb library and set up database schema
   - Install idb package via npm (npm install idb)
   - Create lib/PersistenceDB.ts file
-  - Define AppFramesDBSchema interface with workspace, uiState, and mediaFiles stores
+  - Define AppFramesDBSchema interface with projects, appState, and mediaFiles stores
   - Implement database initialization with version 2
   - Add migration logic from version 1 to version 2
-  - Create workspace object store with updatedAt index
-  - Create uiState object store
+  - Create projects object store with updatedAt, lastAccessedAt, and name indexes
+  - Create appState object store (tracks currentProjectId and UI preferences)
+  - Create default project during migration
   - _Requirements: 6.1, 6.2, 7.1, 7.2, 7.5, 12.1_
 
 - [ ]* 1.1 Write unit tests for database initialization
@@ -18,17 +19,20 @@
 
 - [ ] 2. Implement PersistenceDB class methods
   - Implement init() method to open database
-  - Implement saveWorkspace() method using idb put
-  - Implement loadWorkspace() method using idb get
-  - Implement clearWorkspace() method using idb delete
-  - Implement saveUIState() method using idb put
-  - Implement loadUIState() method using idb get
+  - Implement createProject(name) method to create new project with default state
+  - Implement saveProject(project) method using idb put
+  - Implement loadProject(id) method using idb get
+  - Implement getAllProjects() method using idb getAll
+  - Implement deleteProject(id) method using idb delete
+  - Implement renameProject(id, newName) method
+  - Implement saveAppState(state) method using idb put
+  - Implement loadAppState() method using idb get
   - Add error handling for all database operations
   - Export singleton instance persistenceDB
   - _Requirements: 6.3, 6.4, 6.5, 10.1, 10.2, 10.3_
 
-- [ ]* 2.1 Write property test for screen persistence
-  - **Property 1: Screen persistence**
+- [ ]* 2.1 Write property test for screen persistence by canvas size
+  - **Property 1: Screen persistence by canvas size**
   - **Validates: Requirements 1.1, 1.4**
 
 - [ ]* 2.2 Write property test for screen modification persistence
@@ -58,14 +62,18 @@
 
 - [ ] 4. Integrate persistence into FramesContext
   - Import persistenceDB and usePersistence in FramesContext.tsx
-  - Add loadPersistedState() function to load workspace and UI state on mount
+  - Add state for currentProjectId, currentProjectName
+  - Add state for screensByCanvasSize (Record<string, Screen[]>) and currentCanvasSize (string)
+  - Add loadPersistedState() function to load appState and current project on mount
+  - Add loadProjectIntoState(project) helper to load project data into React state
   - Add useEffect to call loadPersistedState() on component mount
-  - Add saveWorkspaceState() function using debouncedSave
-  - Add useEffect watching screens array to trigger saveWorkspaceState
-  - Add useEffect watching selectedScreenIndices to trigger saveWorkspaceState
-  - Add useEffect watching zoom to trigger saveWorkspaceState
-  - Add saveUIState() function for sidebar preferences
-  - Add useEffect watching sidebarTab to trigger saveUIState
+  - Add saveProjectState() function using debouncedSave
+  - Add useEffect watching screensByCanvasSize to trigger saveProjectState
+  - Add useEffect watching currentCanvasSize to trigger saveProjectState
+  - Add useEffect watching selectedScreenIndices to trigger saveProjectState
+  - Add useEffect watching zoom to trigger saveProjectState
+  - Add saveAppState() function for UI preferences and currentProjectId
+  - Add useEffect watching sidebarTab to trigger saveAppState
   - Handle errors with console logging and fallback to defaults
   - _Requirements: 1.1, 1.2, 1.4, 3.1, 3.2, 3.3, 3.4, 4.1, 4.2, 5.1, 10.1, 10.2, 10.3_
 
@@ -81,47 +89,88 @@
   - **Property 6: Sidebar state persistence**
   - **Validates: Requirements 3.1, 3.2, 3.3, 3.4**
 
-- [ ] 5. Add workspace state validation and defaults
-  - Implement validateWorkspaceState() function to check data structure
-  - Validate required fields exist (screens, selectedScreenIndices, zoom)
+- [ ] 5. Implement canvas size switching logic
+  - Add switchCanvasSize(newSize: string) method to FramesContext
+  - Save current workspace state before switching
+  - Update currentCanvasSize to new size
+  - Initialize empty screen array for new canvas size if it doesn't exist
+  - Reset selection state for new canvas size (select first screen if exists, otherwise clear)
+  - Reset selectedFrameIndex to null
+  - Add getCurrentScreens() helper that returns screensByCanvasSize[currentCanvasSize]
+  - Update all screen operations to use getCurrentScreens()
+  - _Requirements: 2.5_
+
+- [ ]* 5.1 Write property test for canvas size isolation
+  - **Property 16: Canvas size isolation**
+  - **Validates: Requirements 1.1, 2.5**
+
+- [ ]* 5.2 Write property test for canvas size switching preserves state
+  - **Property 17: Canvas size switching preserves state**
+  - **Validates: Requirements 1.4, 4.1**
+
+- [ ] 6. Add project state validation and defaults
+  - Implement validateProject() function to check data structure
+  - Validate required fields exist (id, name, screensByCanvasSize, currentCanvasSize, selectedScreenIndices, zoom)
+  - Validate screensByCanvasSize is an object with string keys and Screen[] values
   - Validate data types are correct
   - Clamp zoom value to valid range (10-400%)
-  - Validate selectedScreenIndices are within bounds
-  - Return default state if validation fails
+  - Validate selectedScreenIndices are within bounds for current canvas size
+  - Return default state if validation fails (empty screensByCanvasSize, default canvas size)
   - _Requirements: 1.5, 4.4, 5.3, 5.4, 10.3_
 
-- [ ]* 5.1 Write property test for default value fallback
+- [ ]* 6.1 Write property test for default value fallback
   - **Property 13: Default value fallback**
   - **Validates: Requirements 1.5, 3.5, 4.4, 5.3**
 
-- [ ] 6. Implement clearWorkspace functionality
-  - Add clearWorkspace() method to FramesContext
-  - Call persistenceDB.clearWorkspace() to delete from IndexedDB
-  - Reset screens array to empty
-  - Reset selectedScreenIndices to empty
-  - Reset zoom to 100
-  - Reset other state to defaults
-  - Call addScreen() to create one empty screen
-  - Preserve media library (don't delete mediaFiles)
+- [ ] 7. Implement project management methods
+  - Add createNewProject(name) method to FramesContext
+  - Add switchProject(projectId) method to FramesContext (saves current, loads new)
+  - Add deleteProject(projectId) method to FramesContext
+  - Add renameProject(newName) method to FramesContext
+  - Handle edge cases (deleting current project, no projects exist)
+  - Preserve media library across all operations (don't delete mediaFiles)
+  - Update appState.currentProjectId when switching projects
   - _Requirements: 9.1, 9.2, 9.3, 9.4, 9.5_
 
-- [ ]* 6.1 Write property test for workspace clear completeness
-  - **Property 10: Workspace clear completeness**
+- [ ]* 7.1 Write property test for project deletion completeness
+  - **Property 10: Project deletion completeness**
   - **Validates: Requirements 9.2, 9.3**
 
-- [ ]* 6.2 Write property test for media library preservation
-  - **Property 11: Media library preservation**
+- [ ]* 7.2 Write property test for media library preservation across projects
+  - **Property 11: Media library preservation across projects**
   - **Validates: Requirements 9.4**
 
-- [ ] 7. Add UI for workspace management in AppFrames
-  - Add "Clear Workspace" button to Header or settings menu
-  - Implement confirmation dialog using Mantine Modal
-  - Show warning message about data loss
-  - Call FramesContext.clearWorkspace() on confirmation
-  - Show success notification after clearing
+- [ ]* 7.3 Write property test for project isolation
+  - **Property 18: Project isolation**
+  - **Validates: Requirements 1.1**
+
+- [ ]* 7.4 Write property test for project switching preserves state
+  - **Property 19: Project switching preserves state**
+  - **Validates: Requirements 1.4, 4.1**
+
+- [ ]* 7.5 Write property test for current project persistence
+  - **Property 20: Current project persistence**
+  - **Validates: Requirements 1.4**
+
+- [ ] 8. Add UI for project management in AppFrames
+  - Add project dropdown/selector to Header showing current project name
+  - Add "New Project" button to create new project
+  - Add "Rename Project" option in project menu
+  - Add "Delete Project" option in project menu
+  - Implement confirmation dialog for delete using Mantine Modal
+  - Show warning message about data loss when deleting
+  - Show project list with last accessed timestamps
+  - Add visual indicator for free tier limit (1 project max for free users)
   - _Requirements: 9.1_
 
-- [ ] 8. Implement error handling and user notifications
+- [ ] 9. Hook up canvas size changes to trigger switching
+  - Add useEffect in FramesContext watching settings.canvasSize
+  - When settings.canvasSize changes, call switchCanvasSize(newSize)
+  - Ensure smooth transition between canvas sizes
+  - Update screens prop passed to components to use getCurrentScreens()
+  - _Requirements: 2.5_
+
+- [ ] 10. Implement error handling and user notifications
   - Add error handling for database initialization failures
   - Show Mantine notification when persistence is unavailable
   - Add error handling for save operation failures
@@ -132,35 +181,36 @@
   - Continue operation without crashing on errors
   - _Requirements: 10.1, 10.2, 10.3, 10.4, 10.5_
 
-- [ ]* 8.1 Write property test for error resilience
+- [ ]* 10.1 Write property test for error resilience
   - **Property 12: Error resilience**
   - **Validates: Requirements 10.1, 10.2, 10.3**
 
-- [ ]* 8.2 Write property test for quota handling
+- [ ]* 10.2 Write property test for quota handling
   - **Property 14: Quota handling**
   - **Validates: Requirements 10.4**
 
-- [ ] 9. Add frame-specific settings persistence
+- [ ] 11. Add frame-specific settings persistence
   - Ensure ScreenImage interface includes panX, panY, frameX, frameY
-  - Save frame-specific settings when screens array is saved
+  - Save frame-specific settings when screensByCanvasSize is saved
   - Restore frame-specific settings when workspace is loaded
   - Validate frame settings on load
   - Handle missing frame settings gracefully with defaults
   - _Requirements: 11.1, 11.2, 11.3, 11.4, 11.5_
 
-- [ ]* 9.1 Write property test for frame-specific settings persistence
+- [ ]* 11.1 Write property test for frame-specific settings persistence
   - **Property 7: Frame-specific settings persistence**
   - **Validates: Requirements 11.1, 11.2, 11.3, 11.4**
 
-- [ ] 10. Optimize persistence performance
+- [ ] 12. Optimize persistence performance
   - Implement selective saves (only save changed portions)
   - Add check to skip save if state hasn't changed
   - Use transaction batching for multiple operations
   - Tune debounce delays for different interactions (slider: 500ms, text: 1000ms, selection: 300ms)
   - Add lazy database initialization (init on first access)
+  - Implement lazy canvas size array creation (only create when first accessed)
   - _Requirements: 8.1, 8.2, 8.3_
 
-- [ ] 11. Add persistence status indicators
+- [ ] 13. Add persistence status indicators
   - Add "Saving..." indicator to UI when save is in progress
   - Add "All changes saved" confirmation when save completes
   - Add error indicator when save fails
@@ -168,33 +218,42 @@
   - Position status indicator in Header or bottom corner
   - _Requirements: 1.1, 1.2_
 
-- [ ] 12. Update package.json Node.js requirement
+- [ ] 14. Update package.json Node.js requirement
   - Verify package.json has "engines": { "node": ">=24.0.0" }
   - Verify .nvmrc specifies Node.js 24
   - Add engine check script if needed
   - Update documentation to mention Node.js 24 requirement
   - _Requirements: 12.1, 12.2, 12.3, 12.4, 12.5_
 
-- [ ] 13. Add database migration testing
+- [ ] 15. Add database migration testing
   - Test migration from version 1 to version 2
   - Verify existing mediaFiles data is preserved
-  - Verify new object stores are created
+  - Verify new object stores are created (projects with proper indexes, appState)
+  - Verify default project is created during migration
   - Test upgrade function runs correctly
   - Handle migration errors gracefully
   - _Requirements: 7.3, 7.4_
 
-- [ ]* 13.1 Write property test for database migration safety
+- [ ]* 15.1 Write property test for database migration safety
   - **Property 15: Database migration safety**
   - **Validates: Requirements 7.3, 7.4**
 
-- [ ] 14. Add integration tests for persistence workflow
+- [ ] 16. Add integration tests for persistence workflow
   - Test complete save and restore workflow
-  - Test adding screens → reload → verify screens restored
+  - Test creating project → add screens → reload → verify project and screens restored
+  - Test creating multiple projects → reload → verify all projects exist
+  - Test switching projects → reload → verify last opened project is current
+  - Test adding screens to canvas size A → reload → verify screens restored for canvas size A
+  - Test switching to canvas size B → add screens → reload → verify screens for both sizes restored
+  - Test changing canvas size → verify correct screen set displayed
   - Test changing settings → reload → verify settings restored
   - Test selecting screens → reload → verify selection restored
   - Test changing sidebar tab → reload → verify tab restored
-  - Test clear workspace → verify all data cleared except media
+  - Test deleting project → verify project removed and media preserved
+  - Test canvas size switching → verify screens isolated by canvas size
+  - Test project switching → verify screens isolated by project
+  - Test switching projects rapidly → verify no data loss
   - _Requirements: 1.1, 1.2, 1.3, 1.4, 2.1, 2.2, 2.3, 2.4, 2.5, 3.1, 3.2, 3.3, 3.4, 4.1, 4.2, 4.3, 5.1, 5.2_
 
-- [ ] 15. Final checkpoint - Ensure all tests pass
+- [ ] 17. Final checkpoint - Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
