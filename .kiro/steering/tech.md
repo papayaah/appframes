@@ -16,7 +16,7 @@
 
 ## Data & Storage
 
-- **Dexie 4.2.1** - IndexedDB wrapper for media metadata
+- **idb 8.0.3** - IndexedDB wrapper for persistence and media metadata
 - **OPFS (Origin Private File System)** - Browser file storage for images
 - **React useState** - Local state management (no Redux/Zustand)
 
@@ -85,7 +85,7 @@ npm run analyze             # Bundle size analysis
 ## Browser APIs Used
 
 - **OPFS** - File storage (requires HTTPS or localhost)
-- **IndexedDB** - Metadata storage via Dexie
+- **IndexedDB** - Metadata storage via idb
 - **Canvas API** - Image export via html-to-image
 - **File API** - Drag & drop, file uploads
 - **createImageBitmap** - Image dimension detection

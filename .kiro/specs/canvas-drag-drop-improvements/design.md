@@ -9,7 +9,7 @@ This design enhances the canvas drag-and-drop functionality to automatically sav
 The enhancement follows the existing architecture pattern:
 - **AppFrames.tsx**: Manages state and media upload logic
 - **Canvas.tsx**: Handles drag-and-drop UI events
-- **lib/db.ts**: IndexedDB operations via Dexie
+- **lib/PersistenceDB.ts**: IndexedDB operations via idb
 - **lib/opfs.ts**: File system operations
 
 Data flow:

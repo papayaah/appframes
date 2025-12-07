@@ -69,7 +69,8 @@ components/
 
 ```
 lib/
-├── db.ts                   # Dexie IndexedDB setup
+├── db.ts                   # Legacy media file database (deprecated)
+├── PersistenceDB.ts        # idb IndexedDB setup for persistence
 └── opfs.ts                 # OPFS file system utilities
 ```
 
@@ -147,7 +148,7 @@ import { useState } from 'react';
 import { Box, Button } from '@mantine/core';
 
 // Internal imports with @/* alias
-import { db } from '@/lib/db';
+import { persistenceDB } from '@/lib/PersistenceDB';
 import { AppFrames } from '@/components/AppFrames/AppFrames';
 
 // Relative imports last

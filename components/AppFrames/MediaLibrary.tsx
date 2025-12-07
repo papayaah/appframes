@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { Box, Text, SimpleGrid, ActionIcon, Loader, Center, Button } from '@mantine/core';
 import { Dropzone, IMAGE_MIME_TYPE } from '@mantine/dropzone';
 import { IconX, IconUpload, IconPhoto } from '@tabler/icons-react';
-import { db, MediaFile } from '../../lib/db';
+import { persistenceDB, MediaFile } from '../../lib/PersistenceDB';
 import { OPFSManager } from '../../lib/opfs';
 import { PexelsImagePicker } from './PexelsImagePicker';
 
@@ -25,7 +25,7 @@ export function MediaLibrary({ onSelectMedia, selectedSlot }: MediaLibraryProps)
 
   const loadMedia = async () => {
     try {
-      const files = await db.mediaFiles.toArray();
+      const files = await persistenceDB.getAllMediaFiles();
       setMediaFiles(files.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()));
     } catch (error) {
       console.error('Error loading media:', error);
@@ -86,7 +86,7 @@ export function MediaLibrary({ onSelectMedia, selectedSlot }: MediaLibraryProps)
         const height = img.height;
 
         // Save metadata to IndexedDB
-        await db.mediaFiles.add({
+        await persistenceDB.addMediaFile({
           name: file.name,
           fileHandle: fileName,
           thumbnail,
@@ -108,7 +108,7 @@ export function MediaLibrary({ onSelectMedia, selectedSlot }: MediaLibraryProps)
 
   const handleDelete = async (id: number, fileHandle: string) => {
     try {
-      await db.mediaFiles.delete(id);
+      await persistenceDB.deleteMediaFile(id);
       await OPFSManager.deleteFile(fileHandle);
       await loadMedia();
     } catch (error) {

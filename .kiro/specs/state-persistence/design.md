@@ -4,7 +4,7 @@
 
 This feature implements comprehensive state persistence for AppFrames using IndexedDB with the idb library. The system automatically saves and restores the complete application state including projects, screens, canvas settings, UI preferences, and user selections. The design prioritizes performance through debounced writes, efficient indexing, and asynchronous operations that don't block the UI.
 
-The persistence layer extends the existing Dexie-based database to include project state while maintaining the current OPFS + IndexedDB architecture for media files. All state updates are debounced to prevent excessive writes during rapid user interactions like dragging sliders or panning images.
+The persistence layer uses idb (a lightweight IndexedDB wrapper) to store project state, app state, and media files. All state updates are debounced to prevent excessive writes during rapid user interactions like dragging sliders or panning images.
 
 ### Multi-Project Architecture
 
@@ -970,19 +970,13 @@ npm install idb
 **Type Safety:**
 The idb library provides full TypeScript support through the DBSchema interface, ensuring type-safe database operations.
 
-**Advantages over Dexie:**
-- Lighter weight (3KB vs 50KB)
+**Why idb:**
+- Lightweight (3KB gzipped)
 - Closer to native IndexedDB API
 - Better tree-shaking
 - Simpler Promise-based API
+- Full TypeScript support
 - No class-based abstractions
-
-**Migration from Dexie:**
-The existing Dexie database will be migrated to idb:
-1. Keep Dexie for media files (already working)
-2. Use idb for new workspace/uiState stores
-3. Both can coexist in same database
-4. Future: migrate media files to idb
 
 ### Debounce Implementation
 
@@ -1001,56 +995,36 @@ Multiple state changes within the debounce window are automatically batched into
 
 ### Database Schema Evolution
 
-**Version 2 Migration:**
+**Initial Schema (Version 1):**
 ```typescript
-if (oldVersion < 2) {
-  // Create projects store
+upgrade(db) {
+  // Create mediaFiles object store
+  const mediaStore = db.createObjectStore('mediaFiles', {
+    keyPath: 'id',
+    autoIncrement: true,
+  });
+  mediaStore.createIndex('name', 'name');
+  mediaStore.createIndex('createdAt', 'createdAt');
+
+  // Create projects object store with indexes
   const projectsStore = db.createObjectStore('projects', {
     keyPath: 'id',
   });
   projectsStore.createIndex('updatedAt', 'updatedAt');
   projectsStore.createIndex('lastAccessedAt', 'lastAccessedAt');
   projectsStore.createIndex('name', 'name');
-  
-  // Create appState store
+
+  // Create appState object store
   db.createObjectStore('appState', {
     keyPath: 'id',
-  });
-  
-  // Create default project
-  const defaultProject: Project = {
-    id: crypto.randomUUID(),
-    name: 'My Project',
-    screensByCanvasSize: {},
-    currentCanvasSize: 'iphone-6.5',
-    selectedScreenIndices: [],
-    primarySelectedIndex: 0,
-    selectedFrameIndex: null,
-    zoom: 100,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-    lastAccessedAt: new Date(),
-  };
-  
-  await projectsStore.put(defaultProject);
-  
-  // Initialize appState
-  const appStateStore = db.objectStore('appState');
-  await appStateStore.put({
-    id: 'current',
-    currentProjectId: defaultProject.id,
-    sidebarTab: 'layout',
-    sidebarPanelOpen: true,
-    navWidth: 360,
-    updatedAt: new Date(),
   });
 }
 ```
 
-**Future Migrations:**
-- Version 3: Add workspace templates
-- Version 4: Add undo/redo history
-- Version 5: Add project metadata
+**Future Schema Versions:**
+- Version 2: Add workspace templates
+- Version 3: Add undo/redo history
+- Version 4: Add project metadata
 
 ### Canvas Size Switching Implementation
 
@@ -1154,7 +1128,6 @@ Group multiple operations in single transaction when possible.
 - React 19.2.0 - Hooks and effects
 - TypeScript 5.9.3 - Type safety
 - Mantine 8.3.9 - Notifications UI
-- Dexie 4.2.1 - Media files (existing)
 
 ## Browser Compatibility
 

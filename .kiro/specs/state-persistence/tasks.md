@@ -1,23 +1,22 @@
 # Implementation Plan
 
-- [ ] 1. Install idb library and set up database schema
+- [x] 1. Install idb library and set up database schema
   - Install idb package via npm (npm install idb)
   - Create lib/PersistenceDB.ts file
   - Define AppFramesDBSchema interface with projects, appState, and mediaFiles stores
-  - Implement database initialization with version 2
-  - Add migration logic from version 1 to version 2
+  - Implement database initialization with version 1
   - Create projects object store with updatedAt, lastAccessedAt, and name indexes
   - Create appState object store (tracks currentProjectId and UI preferences)
-  - Create default project during migration
+  - Create mediaFiles object store with name and createdAt indexes
+  - Remove Dexie dependency
   - _Requirements: 6.1, 6.2, 7.1, 7.2, 7.5, 12.1_
 
 - [ ]* 1.1 Write unit tests for database initialization
   - Test database opens successfully
-  - Test version 2 migration runs
-  - Test object stores are created
+  - Test object stores are created with correct indexes
   - _Requirements: 7.1, 7.2_
 
-- [ ] 2. Implement PersistenceDB class methods
+- [x] 2. Implement PersistenceDB class methods
   - Implement init() method to open database
   - Implement createProject(name) method to create new project with default state
   - Implement saveProject(project) method using idb put
@@ -43,7 +42,7 @@
   - **Property 3: Screen deletion persistence**
   - **Validates: Requirements 1.3**
 
-- [ ] 3. Create usePersistence custom hook
+- [x] 3. Create usePersistence custom hook
   - Create hooks/usePersistence.ts file
   - Implement debounced save function with configurable delay (default 500ms)
   - Use useRef to store timeout and pending save function
@@ -60,7 +59,7 @@
   - **Property 9: Flush on unmount**
   - **Validates: Requirements 8.5**
 
-- [ ] 4. Integrate persistence into FramesContext
+- [x] 4. Integrate persistence into FramesContext
   - Import persistenceDB and usePersistence in FramesContext.tsx
   - Add state for currentProjectId, currentProjectName
   - Add state for screensByCanvasSize (Record<string, Screen[]>) and currentCanvasSize (string)
@@ -89,7 +88,7 @@
   - **Property 6: Sidebar state persistence**
   - **Validates: Requirements 3.1, 3.2, 3.3, 3.4**
 
-- [ ] 5. Implement canvas size switching logic
+- [x] 5. Implement canvas size switching logic
   - Add switchCanvasSize(newSize: string) method to FramesContext
   - Save current workspace state before switching
   - Update currentCanvasSize to new size
@@ -108,7 +107,7 @@
   - **Property 17: Canvas size switching preserves state**
   - **Validates: Requirements 1.4, 4.1**
 
-- [ ] 6. Add project state validation and defaults
+- [x] 6. Add project state validation and defaults
   - Implement validateProject() function to check data structure
   - Validate required fields exist (id, name, screensByCanvasSize, currentCanvasSize, selectedScreenIndices, zoom)
   - Validate screensByCanvasSize is an object with string keys and Screen[] values

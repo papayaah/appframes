@@ -16,7 +16,7 @@ This feature enhances the drag-and-drop functionality in the AppFrames canvas ed
 - **Media Library**: The persistent storage system using IndexedDB for metadata and OPFS for image files
 - **OPFS**: Origin Private File System - browser-based file storage
 - **IndexedDB**: Browser database storing media file metadata
-- **AppFrames Database**: The Dexie database instance named "AppFrames" with a mediaFiles table
+- **AppFrames Database**: The idb database instance named "AppFrames" with mediaFiles, projects, and appState stores
 
 ## Requirements
 

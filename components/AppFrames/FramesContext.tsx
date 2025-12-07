@@ -1,7 +1,9 @@
 'use client';
 
-import React, { createContext, useContext, useState, useRef, ReactNode, useCallback } from 'react';
+import React, { createContext, useContext, useState, useRef, ReactNode, useCallback, useEffect } from 'react';
 import { Screen, ScreenImage, CanvasSettings, DEFAULT_TEXT_STYLE } from './types';
+import { persistenceDB, Project } from '@/lib/PersistenceDB';
+import { usePersistence } from '@/hooks/usePersistence';
 
 // Canvas dimensions helper (App Store requirements)
 export const getCanvasDimensions = (canvasSize: string, _orientation: string) => {
@@ -130,6 +132,21 @@ interface FramesContextType {
   // Media Cache
   mediaCache: Record<number, string>;
   setCachedMedia: (mediaId: number, url: string) => void;
+  // Project state
+  currentProjectId: string | null;
+  currentProjectName: string;
+  screensByCanvasSize: Record<string, Screen[]>;
+  currentCanvasSize: string;
+  // Sidebar state
+  sidebarTab: string;
+  setSidebarTab: (tab: string) => void;
+  sidebarPanelOpen: boolean;
+  setSidebarPanelOpen: (open: boolean) => void;
+  navWidth: number;
+  setNavWidth: (width: number) => void;
+  // Canvas size switching
+  switchCanvasSize: (newSize: string) => void;
+  getCurrentScreens: () => Screen[];
 }
 
 const FramesContext = createContext<FramesContextType | undefined>(undefined);
@@ -137,6 +154,24 @@ const FramesContext = createContext<FramesContextType | undefined>(undefined);
 export function FramesProvider({ children }: { children: ReactNode }) {
   // Use a counter for screen IDs to avoid hydration issues
   const screenIdCounter = useRef(0);
+  
+  // Flag to prevent infinite loops between syncing effects
+  const isSyncing = useRef(false);
+  
+  // Flag to track if initial state has been loaded
+  const hasLoadedInitialState = useRef(false);
+
+  // Project state
+  const [currentProjectId, setCurrentProjectId] = useState<string | null>(null);
+  const [currentProjectName, setCurrentProjectName] = useState<string>('My Project');
+  const [screensByCanvasSize, setScreensByCanvasSize] = useState<Record<string, Screen[]>>({});
+  const [currentCanvasSize, setCurrentCanvasSize] = useState<string>('iphone-6.5');
+  const projectCreatedAt = useRef<Date>(new Date());
+
+  // Sidebar state
+  const [sidebarTab, setSidebarTab] = useState<string>('layout');
+  const [sidebarPanelOpen, setSidebarPanelOpen] = useState<boolean>(true);
+  const [navWidth, setNavWidth] = useState<number>(300);
 
   // Initialize with one empty screen with default settings
   const [screens, setScreens] = useState<Screen[]>([
@@ -159,6 +194,14 @@ export function FramesProvider({ children }: { children: ReactNode }) {
   const setCachedMedia = useCallback((mediaId: number, url: string) => {
     setMediaCache(prev => ({ ...prev, [mediaId]: url }));
   }, []);
+
+  // Initialize persistence hook
+  const { debouncedSave } = usePersistence({
+    debounceMs: 500,
+    onError: (error) => {
+      console.error('Persistence error:', error);
+    },
+  });
 
   // Primary selected screen is the last one in the selection list (most recently selected)
   const primarySelectedIndex = selectedScreenIndices.length > 0
@@ -341,6 +384,274 @@ export function FramesProvider({ children }: { children: ReactNode }) {
     });
   };
 
+  // Get screens for current canvas size
+  const getCurrentScreens = useCallback((): Screen[] => {
+    return screensByCanvasSize[currentCanvasSize] || [];
+  }, [screensByCanvasSize, currentCanvasSize]);
+
+  // Switch canvas size
+  const switchCanvasSize = useCallback((newSize: string) => {
+    // Save current workspace state before switching (will be triggered by useEffect)
+    
+    // Update to new canvas size
+    setCurrentCanvasSize(newSize);
+    
+    // Initialize empty screen array for new canvas size if it doesn't exist
+    setScreensByCanvasSize(prev => {
+      if (!prev[newSize]) {
+        return {
+          ...prev,
+          [newSize]: []
+        };
+      }
+      return prev;
+    });
+    
+    // Reset selection state for new canvas size
+    const screensForNewSize = screensByCanvasSize[newSize] || [];
+    if (screensForNewSize.length > 0) {
+      setSelectedScreenIndices([0]);
+    } else {
+      setSelectedScreenIndices([]);
+    }
+    
+    // Reset selected frame index
+    setSelectedFrameIndex(0);
+  }, [screensByCanvasSize]);
+
+  // Load project data into React state
+  const loadProjectIntoState = useCallback((project: Project) => {
+    setCurrentProjectId(project.id);
+    setCurrentProjectName(project.name);
+    setScreensByCanvasSize(project.screensByCanvasSize);
+    setCurrentCanvasSize(project.currentCanvasSize);
+    setSelectedScreenIndices(project.selectedScreenIndices);
+    setSelectedFrameIndex(project.selectedFrameIndex ?? 0);
+    setZoom(project.zoom);
+    projectCreatedAt.current = project.createdAt;
+
+    // Update screens to reflect current canvas size
+    const screensForCurrentSize = project.screensByCanvasSize[project.currentCanvasSize] || [];
+    setScreens(screensForCurrentSize);
+  }, []);
+
+  // Load persisted state on mount
+  const loadPersistedState = useCallback(async () => {
+    try {
+      const appState = await persistenceDB.loadAppState();
+      
+      // Load current project if one exists
+      if (appState?.currentProjectId) {
+        const project = await persistenceDB.loadProject(appState.currentProjectId);
+        if (project) {
+          loadProjectIntoState(project);
+        } else {
+          // Project was deleted, create new default project
+          const newProject = await persistenceDB.createProject('My Project');
+          loadProjectIntoState(newProject);
+        }
+      } else {
+        // No current project, check if any projects exist
+        const projects = await persistenceDB.getAllProjects();
+        if (projects.length > 0) {
+          // Load most recently accessed project
+          const recent = projects.sort((a, b) => 
+            b.lastAccessedAt.getTime() - a.lastAccessedAt.getTime()
+          )[0];
+          loadProjectIntoState(recent);
+          await persistenceDB.saveAppState({
+            currentProjectId: recent.id,
+            sidebarTab,
+            sidebarPanelOpen,
+            navWidth,
+          });
+        } else {
+          // No projects exist, create default project with current screens
+          const newProject = await persistenceDB.createProject('My Project');
+          // Save the initial default screen to the new project
+          newProject.screensByCanvasSize[currentCanvasSize] = screens;
+          await persistenceDB.saveProject(newProject);
+          // Don't load the empty project - keep the initial default screen
+          // Just set the project ID so saves will work
+          setCurrentProjectId(newProject.id);
+          setCurrentProjectName(newProject.name);
+          projectCreatedAt.current = newProject.createdAt;
+        }
+      }
+      
+      // Load UI preferences
+      if (appState) {
+        setSidebarTab(appState.sidebarTab);
+        setSidebarPanelOpen(appState.sidebarPanelOpen);
+        setNavWidth(appState.navWidth);
+      }
+    } catch (error) {
+      console.error('Failed to load persisted state:', error);
+      // Continue with default state
+    } finally {
+      // Mark that initial state has been loaded - use setTimeout to ensure
+      // all state updates have been applied before enabling syncing
+      console.log('[Persistence] loadPersistedState: Complete, enabling syncing in 100ms');
+      setTimeout(() => {
+        hasLoadedInitialState.current = true;
+        console.log('[Persistence] Syncing enabled!');
+        
+        // Manually trigger initial sync by updating screensByCanvasSize with current screens
+        setScreensByCanvasSize(prev => {
+          const currentScreens = prev[currentCanvasSize] || [];
+          if (JSON.stringify(currentScreens) !== JSON.stringify(screens)) {
+            console.log('[Persistence] Initial sync: Syncing screens to screensByCanvasSize', {
+              from: currentScreens.length,
+              to: screens.length,
+            });
+            return {
+              ...prev,
+              [currentCanvasSize]: screens,
+            };
+          }
+          return prev;
+        });
+      }, 100);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loadProjectIntoState]);
+
+  // Save project state (debounced)
+  // Don't use useCallback - we need fresh values on each call
+  const saveProjectState = () => {
+    if (!currentProjectId) {
+      console.log('[Persistence] saveProjectState: No currentProjectId, skipping save');
+      return;
+    }
+    
+    console.log('[Persistence] saveProjectState: Scheduling save with', {
+      projectId: currentProjectId,
+      screenCount: Object.keys(screensByCanvasSize).reduce((sum, key) => sum + screensByCanvasSize[key].length, 0),
+      canvasSize: currentCanvasSize,
+      screensForCurrentSize: screensByCanvasSize[currentCanvasSize]?.length || 0,
+    });
+    
+    debouncedSave(async () => {
+      console.log('[Persistence] saveProjectState: Executing save to IndexedDB with', {
+        screenCount: Object.keys(screensByCanvasSize).reduce((sum, key) => sum + screensByCanvasSize[key].length, 0),
+      });
+      await persistenceDB.saveProject({
+        id: currentProjectId,
+        name: currentProjectName,
+        screensByCanvasSize,
+        currentCanvasSize,
+        selectedScreenIndices,
+        primarySelectedIndex,
+        selectedFrameIndex,
+        zoom,
+        createdAt: projectCreatedAt.current,
+        updatedAt: new Date(),
+        lastAccessedAt: new Date(),
+      });
+      console.log('[Persistence] saveProjectState: Save completed!');
+    });
+  };
+
+  // Save app state (UI preferences and currentProjectId)
+  // Don't use useCallback - we need fresh values on each call
+  const saveAppState = () => {
+    debouncedSave(async () => {
+      await persistenceDB.saveAppState({
+        currentProjectId,
+        sidebarTab,
+        sidebarPanelOpen,
+        navWidth,
+      });
+    });
+  };
+
+  // Load persisted state on mount
+  useEffect(() => {
+    loadPersistedState();
+  }, [loadPersistedState]);
+
+  // Save project state when screensByCanvasSize changes
+  useEffect(() => {
+    saveProjectState();
+  }, [screensByCanvasSize, saveProjectState]);
+
+  // Save project state when currentCanvasSize changes
+  useEffect(() => {
+    saveProjectState();
+  }, [currentCanvasSize, saveProjectState]);
+
+  // Save project state when selectedScreenIndices changes
+  useEffect(() => {
+    saveProjectState();
+  }, [selectedScreenIndices, saveProjectState]);
+
+  // Save project state when zoom changes
+  useEffect(() => {
+    saveProjectState();
+  }, [zoom, saveProjectState]);
+
+  // Save app state when sidebarTab changes
+  useEffect(() => {
+    saveAppState();
+  }, [sidebarTab, saveAppState]);
+
+  // Sync screens with screensByCanvasSize for current canvas size
+  // This ensures screens always reflects the current canvas size
+  useEffect(() => {
+    // Skip syncing until initial state is loaded
+    if (!hasLoadedInitialState.current) return;
+    if (isSyncing.current) return;
+    
+    const screensForCurrentSize = screensByCanvasSize[currentCanvasSize] || [];
+    // Only update if different to avoid infinite loops
+    if (JSON.stringify(screens) !== JSON.stringify(screensForCurrentSize)) {
+      isSyncing.current = true;
+      setScreens(screensForCurrentSize);
+      // Reset flag after state update completes
+      setTimeout(() => { isSyncing.current = false; }, 0);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [screensByCanvasSize, currentCanvasSize]);
+
+  // Update screensByCanvasSize when screens change
+  // This ensures changes to screens are reflected in the project state
+  useEffect(() => {
+    // Skip syncing until initial state is loaded
+    if (!hasLoadedInitialState.current) {
+      console.log('[Persistence] Sync screens→screensByCanvasSize: Skipped (initial state not loaded)');
+      return;
+    }
+    if (isSyncing.current) {
+      console.log('[Persistence] Sync screens→screensByCanvasSize: Skipped (already syncing)');
+      return;
+    }
+    
+    console.log('[Persistence] Sync screens→screensByCanvasSize: Checking if sync needed', {
+      screensCount: screens.length,
+      currentCanvasSize,
+    });
+    
+    setScreensByCanvasSize(prev => {
+      const currentScreens = prev[currentCanvasSize] || [];
+      // Only update if screens actually changed
+      if (JSON.stringify(currentScreens) !== JSON.stringify(screens)) {
+        console.log('[Persistence] Sync screens→screensByCanvasSize: Syncing!', {
+          from: currentScreens.length,
+          to: screens.length,
+        });
+        isSyncing.current = true;
+        // Reset flag after state update completes
+        setTimeout(() => { isSyncing.current = false; }, 0);
+        return {
+          ...prev,
+          [currentCanvasSize]: screens,
+        };
+      }
+      console.log('[Persistence] Sync screens→screensByCanvasSize: No change needed');
+      return prev;
+    });
+  }, [screens, currentCanvasSize]);
+
   return (
     <FramesContext.Provider
       value={{
@@ -362,6 +673,18 @@ export function FramesProvider({ children }: { children: ReactNode }) {
         replaceScreen,
         mediaCache,
         setCachedMedia,
+        currentProjectId,
+        currentProjectName,
+        screensByCanvasSize,
+        currentCanvasSize,
+        sidebarTab,
+        setSidebarTab,
+        sidebarPanelOpen,
+        setSidebarPanelOpen,
+        navWidth,
+        setNavWidth,
+        switchCanvasSize,
+        getCurrentScreens,
       }}
     >
       {children}

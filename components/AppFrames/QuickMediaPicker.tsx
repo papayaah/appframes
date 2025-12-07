@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Box, Text, SimpleGrid, Loader, Center, Tabs, ScrollArea } from '@mantine/core';
 import { IconPhoto, IconCloud } from '@tabler/icons-react';
-import { db, MediaFile } from '../../lib/db';
+import { persistenceDB, MediaFile } from '../../lib/PersistenceDB';
 
 interface PexelsImage {
   name: string;
@@ -29,7 +29,7 @@ export function QuickMediaPicker({ onSelectMedia, onSelectPexels, onClose }: Qui
 
   const loadMedia = async () => {
     try {
-      const files = await db.mediaFiles.toArray();
+      const files = await persistenceDB.getAllMediaFiles();
       setMediaFiles(files.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()));
     } catch (error) {
       console.error('Error loading media:', error);

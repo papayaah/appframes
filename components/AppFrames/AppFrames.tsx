@@ -35,7 +35,7 @@ export function AppFrames() {
 
   const handleMediaUpload = async (file: File): Promise<number | null> => {
     try {
-      const { db } = await import('../../lib/db');
+      const { persistenceDB } = await import('../../lib/PersistenceDB');
       const { OPFSManager } = await import('../../lib/opfs');
 
       // Save to OPFS
@@ -51,7 +51,7 @@ export function AppFrames() {
       const height = img.height;
 
       // Save metadata to IndexedDB
-      const id = await db.mediaFiles.add({
+      const id = await persistenceDB.addMediaFile({
         name: file.name,
         fileHandle: fileName,
         thumbnail,

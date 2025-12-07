@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { db } from '../lib/db';
+import { persistenceDB } from '../lib/PersistenceDB';
 import { OPFSManager } from '../lib/opfs';
 import { useFrames } from '../components/AppFrames/FramesContext';
 
@@ -39,7 +39,7 @@ export function useMediaImage(mediaId: number | undefined) {
           return;
         }
 
-        const media = await db.mediaFiles.get(mediaId);
+        const media = await persistenceDB.getMediaFile(mediaId);
         if (!media) {
           if (active) {
             setImageUrl(undefined);
