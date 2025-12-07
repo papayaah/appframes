@@ -146,73 +146,50 @@ export function Sidebar({ settings, setSettings, screens }: SidebarProps) {
         <Select
           size="xs"
           value={settings.canvasSize}
-          onChange={(value) => setSettings({ ...settings, canvasSize: value || 'iphone-6.5-1' })}
+          onChange={(value) => setSettings({ ...settings, canvasSize: value || 'iphone-6.9' })}
           data={[
             { 
-              group: 'iPhone 6.5" Display',
+              group: 'Apple App Store - iPhone',
               items: [
-                { value: 'iphone-6.5-1', label: '1242 × 2688' },
-                { value: 'iphone-6.5-2', label: '2688 × 1242' },
-                { value: 'iphone-6.5-3', label: '1284 × 2778' },
-                { value: 'iphone-6.5-4', label: '2778 × 1284' },
+                { value: 'iphone-6.9', label: '1320 × 2868 (6.9")' },
+                { value: 'iphone-6.5', label: '1284 × 2778 (6.5")' },
+                { value: 'iphone-6.3', label: '1206 × 2622 (6.3")' },
+                { value: 'iphone-6.1', label: '1179 × 2556 (6.1")' },
+                { value: 'iphone-5.5', label: '1242 × 2208 (5.5")' },
+                { value: 'iphone-4.7', label: '750 × 1334 (4.7")' },
+                { value: 'iphone-4.0', label: '640 × 1136 (4.0")' },
+                { value: 'iphone-3.5', label: '640 × 960 (3.5")' },
               ]
             },
             { 
-              group: 'iPad 13" Display',
+              group: 'Apple App Store - iPad',
               items: [
-                { value: 'ipad-13-1', label: '2064 × 2752' },
-                { value: 'ipad-13-2', label: '2752 × 2064' },
-                { value: 'ipad-13-3', label: '2048 × 2732' },
-                { value: 'ipad-13-4', label: '2732 × 2048' },
+                { value: 'ipad-13', label: '2064 × 2752 (13")' },
+                { value: 'ipad-11', label: '1668 × 2388 (11")' },
+                { value: 'ipad-12.9-gen2', label: '2048 × 2732 (12.9" 2nd Gen)' },
+                { value: 'ipad-10.5', label: '1668 × 2224 (10.5")' },
+                { value: 'ipad-9.7', label: '1536 × 2048 (9.7")' },
               ]
             },
             { 
-              group: 'Apple Watch Ultra 3',
+              group: 'Apple Watch',
               items: [
-                { value: 'watch-ultra-3-1', label: '422 × 514' },
-                { value: 'watch-ultra-3-2', label: '410 × 502' },
+                { value: 'watch-ultra-3', label: '422 × 514 (Ultra 3)' },
+                { value: 'watch-ultra-3-alt', label: '410 × 502 (Ultra 3 Alt)' },
+                { value: 'watch-s11', label: '416 × 496 (Series 11)' },
+                { value: 'watch-s9', label: '396 × 484 (Series 9)' },
+                { value: 'watch-s6', label: '368 × 448 (Series 6)' },
+                { value: 'watch-s3', label: '312 × 390 (Series 3)' },
               ]
             },
             { 
-              group: 'Apple Watch Series 11',
+              group: 'Google Play Store',
               items: [
-                { value: 'watch-s11', label: '416 × 496' },
-              ]
-            },
-            { 
-              group: 'Apple Watch Series 9',
-              items: [
-                { value: 'watch-s9', label: '396 × 484' },
-              ]
-            },
-            { 
-              group: 'Apple Watch Series 6',
-              items: [
-                { value: 'watch-s6', label: '368 × 448' },
-              ]
-            },
-            { 
-              group: 'Apple Watch Series 3',
-              items: [
-                { value: 'watch-s3', label: '312 × 390' },
-              ]
-            },
-            { 
-              group: 'Google Play - Phone',
-              items: [
-                { value: 'google-phone-1', label: '1080 × 1920 (Portrait)' },
-                { value: 'google-phone-2', label: '1920 × 1080 (Landscape)' },
-                { value: 'google-phone-3', label: '1440 × 2560 (Portrait 2K)' },
-                { value: 'google-phone-4', label: '2560 × 1440 (Landscape 2K)' },
-              ]
-            },
-            { 
-              group: 'Google Play - Tablet',
-              items: [
-                { value: 'google-tablet-1', label: '1600 × 2560 (Portrait)' },
-                { value: 'google-tablet-2', label: '2560 × 1600 (Landscape)' },
-                { value: 'google-tablet-3', label: '2048 × 2732 (Portrait)' },
-                { value: 'google-tablet-4', label: '2732 × 2048 (Landscape)' },
+                { value: 'google-phone', label: '1080 × 1920 (Phone)' },
+                { value: 'google-tablet-7', label: '1536 × 2048 (7" Tablet)' },
+                { value: 'google-tablet-10', label: '2048 × 2732 (10" Tablet)' },
+                { value: 'google-chromebook', label: '1920 × 1080 (Chromebook)' },
+                { value: 'google-xr', label: '1920 × 1080 (Android XR)' },
               ]
             },
           ]}

@@ -1,10 +1,11 @@
 'use client';
 
-import { memo } from 'react';
+import { memo, useState } from 'react';
 import { Box, Group, Text, ActionIcon } from '@mantine/core';
-import { IconPlus, IconX } from '@tabler/icons-react';
+import { IconPlus, IconX, IconCheck } from '@tabler/icons-react';
 import { Screen, CanvasSettings } from './AppFrames';
 import { CompositionRenderer } from './CompositionRenderer';
+import { getCanvasSizeLabel } from './FramesContext';
 
 interface ScreensPanelProps {
   screens: Screen[];
@@ -103,6 +104,8 @@ export function ScreensPanel({
   onSelectScreen,
   onMediaUpload,
 }: ScreensPanelProps) {
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+
   const handleDrop = async (files: File[]) => {
     for (const file of files) {
       if (onMediaUpload) {
@@ -163,51 +166,111 @@ export function ScreensPanel({
                 }}
                 onClick={(e) => onSelectScreen(index, e.metaKey || e.ctrlKey || e.shiftKey)}
                 onMouseEnter={(e) => {
-                  const deleteBtn = e.currentTarget.querySelector('.delete-btn') as HTMLElement;
-                  if (deleteBtn) deleteBtn.style.opacity = '1';
+                  if (deleteConfirmId !== screen.id) {
+                    const deleteBtn = e.currentTarget.querySelector('.delete-btn') as HTMLElement;
+                    if (deleteBtn) deleteBtn.style.opacity = '1';
+                  }
                 }}
                 onMouseLeave={(e) => {
-                  const deleteBtn = e.currentTarget.querySelector('.delete-btn') as HTMLElement;
-                  if (deleteBtn) deleteBtn.style.opacity = '0';
+                  if (deleteConfirmId !== screen.id) {
+                    const deleteBtn = e.currentTarget.querySelector('.delete-btn') as HTMLElement;
+                    if (deleteBtn) deleteBtn.style.opacity = '0';
+                  }
                 }}
               >
                 <ScreenThumbnail screen={screen} allScreens={screens} screenIndex={index} />
-                <ActionIcon
-                  className="delete-btn"
+                
+                {deleteConfirmId === screen.id ? (
+                  // Show confirmation buttons
+                  <Box
+                    style={{
+                      position: 'absolute',
+                      top: 4,
+                      right: 4,
+                      display: 'flex',
+                      gap: 4,
+                      pointerEvents: 'auto',
+                    }}
+                  >
+                    <ActionIcon
+                      size="xs"
+                      color="green"
+                      variant="filled"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        removeScreen(screen.id);
+                        setDeleteConfirmId(null);
+                      }}
+                    >
+                      <IconCheck size={12} />
+                    </ActionIcon>
+                    <ActionIcon
+                      size="xs"
+                      color="gray"
+                      variant="filled"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setDeleteConfirmId(null);
+                      }}
+                    >
+                      <IconX size={12} />
+                    </ActionIcon>
+                  </Box>
+                ) : (
+                  // Show delete button
+                  <ActionIcon
+                    className="delete-btn"
+                    size="xs"
+                    color="red"
+                    variant="filled"
+                    style={{
+                      position: 'absolute',
+                      top: 4,
+                      right: 4,
+                      opacity: 0,
+                      transition: 'opacity 0.2s',
+                      pointerEvents: 'auto',
+                    }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setDeleteConfirmId(screen.id);
+                    }}
+                  >
+                    <IconX size={12} />
+                  </ActionIcon>
+                )}
+              </Box>
+              <Box style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+                <Text
                   size="xs"
-                  color="red"
-                  variant="filled"
                   style={{
-                    position: 'absolute',
-                    top: 4,
-                    right: 4,
-                    opacity: 0,
-                    transition: 'opacity 0.2s',
-                    pointerEvents: 'auto', // Re-enable pointer events for the delete button
-                  }}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    removeScreen(screen.id);
+                    marginTop: 4,
+                    color: '#666',
+                    textAlign: 'center',
+                    fontSize: 10,
+                    maxWidth: 60,
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
                   }}
                 >
-                  <IconX size={12} />
-                </ActionIcon>
+                  {screen.name}
+                </Text>
+                <Text
+                  size="xs"
+                  style={{
+                    color: '#999',
+                    textAlign: 'center',
+                    fontSize: 9,
+                    maxWidth: 60,
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {getCanvasSizeLabel(screen.settings.canvasSize)}
+                </Text>
               </Box>
-              <Text
-                size="xs"
-                style={{
-                  marginTop: 4,
-                  color: '#666',
-                  textAlign: 'center',
-                  fontSize: 10,
-                  maxWidth: 60,
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                {screen.name}
-              </Text>
             </Box>
           );
         })}

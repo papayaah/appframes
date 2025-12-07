@@ -6,43 +6,76 @@ import { Screen, ScreenImage, CanvasSettings, DEFAULT_TEXT_STYLE } from './types
 // Canvas dimensions helper (App Store requirements)
 export const getCanvasDimensions = (canvasSize: string, _orientation: string) => {
   const dimensions: Record<string, { width: number; height: number }> = {
-    // iPhone 6.5" Display
-    'iphone-6.5-1': { width: 1242, height: 2688 },
-    'iphone-6.5-2': { width: 2688, height: 1242 },
-    'iphone-6.5-3': { width: 1284, height: 2778 },
-    'iphone-6.5-4': { width: 2778, height: 1284 },
-    // iPad 13" Display
-    'ipad-13-1': { width: 2064, height: 2752 },
-    'ipad-13-2': { width: 2752, height: 2064 },
-    'ipad-13-3': { width: 2048, height: 2732 },
-    'ipad-13-4': { width: 2732, height: 2048 },
-    // Apple Watch Ultra 3
-    'watch-ultra-3-1': { width: 422, height: 514 },
-    'watch-ultra-3-2': { width: 410, height: 502 },
-    // Apple Watch Series 11
+    // Apple App Store - iPhone (Portrait only)
+    'iphone-6.9': { width: 1320, height: 2868 },
+    'iphone-6.5': { width: 1284, height: 2778 },
+    'iphone-6.3': { width: 1206, height: 2622 },
+    'iphone-6.1': { width: 1179, height: 2556 },
+    'iphone-5.5': { width: 1242, height: 2208 },
+    'iphone-4.7': { width: 750, height: 1334 },
+    'iphone-4.0': { width: 640, height: 1136 },
+    'iphone-3.5': { width: 640, height: 960 },
+    // Apple App Store - iPad (Portrait only)
+    'ipad-13': { width: 2064, height: 2752 },
+    'ipad-11': { width: 1668, height: 2388 },
+    'ipad-12.9-gen2': { width: 2048, height: 2732 },
+    'ipad-10.5': { width: 1668, height: 2224 },
+    'ipad-9.7': { width: 1536, height: 2048 },
+    // Apple Watch
+    'watch-ultra-3': { width: 422, height: 514 },
+    'watch-ultra-3-alt': { width: 410, height: 502 },
     'watch-s11': { width: 416, height: 496 },
-    // Apple Watch Series 9
     'watch-s9': { width: 396, height: 484 },
-    // Apple Watch Series 6
     'watch-s6': { width: 368, height: 448 },
-    // Apple Watch Series 3
     'watch-s3': { width: 312, height: 390 },
-    // Google Play - Phone
-    'google-phone-1': { width: 1080, height: 1920 },
-    'google-phone-2': { width: 1920, height: 1080 },
-    'google-phone-3': { width: 1440, height: 2560 },
-    'google-phone-4': { width: 2560, height: 1440 },
-    // Google Play - Tablet
-    'google-tablet-1': { width: 1600, height: 2560 },
-    'google-tablet-2': { width: 2560, height: 1600 },
-    'google-tablet-3': { width: 2048, height: 2732 },
-    'google-tablet-4': { width: 2732, height: 2048 },
+    // Google Play Store (Portrait only for phones and tablets)
+    'google-phone': { width: 1080, height: 1920 },
+    'google-tablet-7': { width: 1536, height: 2048 },
+    'google-tablet-10': { width: 2048, height: 2732 },
+    'google-chromebook': { width: 1920, height: 1080 },
+    'google-xr': { width: 1920, height: 1080 },
   };
 
-  const dim = dimensions[canvasSize] || { width: 1242, height: 2688 };
+  const dim = dimensions[canvasSize] || { width: 1284, height: 2778 };
 
   // Don't apply orientation transform since dimensions already include orientation
   return dim;
+};
+
+// Helper function to convert canvas size ID to readable label
+export const getCanvasSizeLabel = (canvasSize: string): string => {
+  const labels: Record<string, string> = {
+    // Apple App Store - iPhone
+    'iphone-6.9': 'iPhone 6.9"',
+    'iphone-6.5': 'iPhone 6.5"',
+    'iphone-6.3': 'iPhone 6.3"',
+    'iphone-6.1': 'iPhone 6.1"',
+    'iphone-5.5': 'iPhone 5.5"',
+    'iphone-4.7': 'iPhone 4.7"',
+    'iphone-4.0': 'iPhone 4.0"',
+    'iphone-3.5': 'iPhone 3.5"',
+    // Apple App Store - iPad
+    'ipad-13': 'iPad 13"',
+    'ipad-11': 'iPad 11"',
+    'ipad-12.9-gen2': 'iPad 12.9"',
+    'ipad-10.5': 'iPad 10.5"',
+    'ipad-9.7': 'iPad 9.7"',
+    // Apple Watch
+    'watch-ultra-3': 'Watch Ultra 3',
+    'watch-ultra-3-alt': 'Watch Ultra 3',
+    'watch-s11': 'Watch S11',
+    'watch-s9': 'Watch S9',
+    'watch-s6': 'Watch S6',
+    'watch-s3': 'Watch S3',
+    // Google Play Store
+    'google-phone': 'Phone',
+    'google-tablet-7': '7" Tablet',
+    'google-tablet-10': '10" Tablet',
+    'google-chromebook': 'Chromebook',
+    'google-xr': 'Android XR',
+  };
+
+  return labels[canvasSize] || canvasSize;
 };
 
 // Helper function to determine how many device frames a composition uses
@@ -60,7 +93,7 @@ export const getCompositionFrameCount = (composition: string): number => {
 // Helper function to get default settings for a new screen
 export const getDefaultScreenSettings = (): Omit<CanvasSettings, 'selectedScreenIndex'> => {
   return {
-    canvasSize: 'iphone-6.5-1',
+    canvasSize: 'iphone-6.9',
     deviceFrame: 'iphone-14-pro',
     composition: 'single',
     compositionScale: 85,
