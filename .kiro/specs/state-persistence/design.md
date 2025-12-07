@@ -2,14 +2,17 @@
 
 ## Overview
 
-This feature implements comprehensive state persistence for AppFrames using IndexedDB with the idb library. The system automatically saves and restores the complete application state including screens, canvas settings, UI preferences, and user selections. The design prioritizes performance through debounced writes, efficient indexing, and asynchronous operations that don't block the UI.
+This feature implements comprehensive state persistence for AppFrames using IndexedDB with the idb library for local storage, with optional cloud storage for premium users. The system automatically saves and restores the complete application state including screens, canvas settings, UI preferences, and user selections. The design prioritizes performance through debounced writes, efficient indexing, and asynchronous operations that don't block the UI.
 
 The persistence layer extends the existing Dexie-based database to include workspace state while maintaining the current OPFS + IndexedDB architecture for media files. All state updates are debounced to prevent excessive writes during rapid user interactions like dragging sliders or panning images.
+
+Premium users have their data synced to cloud storage: Neon database for workspace data, Vercel Storage for media files, and Vercel Edge Config for app preferences. The architecture uses a StorageAdapter pattern to abstract local vs cloud storage, allowing seamless switching based on subscription status.
 
 ## Architecture
 
 ### High-Level Architecture
 
+**Local Storage (Free Users):**
 ```
 ┌─────────────────────────────────────────────────────────┐
 │                    AppFrames (Root)                      │
@@ -21,18 +24,64 @@ The persistence layer extends the existing Dexie-based database to include works
         ┌────────────┴────────────┐
         │                         │
 ┌───────▼────────┐       ┌───────▼────────┐
-│  FramesContext │       │ PersistenceDB   │
-│  - State mgmt  │       │ - idb wrapper   │
-│  - Triggers    │       │ - CRUD ops      │
-│    saves       │       │ - Migrations    │
-└────────────────┘       └────────┬────────┘
+│  FramesContext │       │ StorageManager │
+│  - State mgmt  │       │ - Adapter sel   │
+│  - Triggers    │       │ - Fallback      │
+│    saves       │       └────────┬────────┘
+└────────────────┘                │
+                         ┌────────▼────────┐
+                         │LocalStorageAdap │
+                         │  - PersistenceDB│
+                         │  - OPFSManager  │
+                         └────────┬────────┘
                                   │
                          ┌────────▼────────┐
                          │   IndexedDB     │
                          │  - workspace    │
                          │  - uiState      │
                          │  - mediaFiles   │
+                         │   OPFS (files)  │
                          └─────────────────┘
+```
+
+**Cloud Storage (Premium Users):**
+```
+┌─────────────────────────────────────────────────────────┐
+│                    AppFrames (Root)                      │
+│  - Manages screens array                                 │
+│  - Coordinates state persistence                         │
+│  - Handles debounced saves                               │
+│  - Manages subscription status                           │
+└────────────────────┬────────────────────────────────────┘
+                     │
+        ┌────────────┴────────────┐
+        │                         │
+┌───────▼────────┐       ┌───────▼────────┐
+│  FramesContext │       │ StorageManager │
+│  - State mgmt  │       │ - Adapter sel   │
+│  - Triggers    │       │ - Hybrid mode   │
+│    saves       │       └────────┬────────┘
+└────────────────┘                │
+                         ┌────────▼────────┐
+                         │HybridStorageAdap│
+                         │  - Cloud + Local│
+                         └────┬────────────┘
+                              │
+        ┌─────────────────────┴─────────────────────┐
+        │                                           │
+┌───────▼────────┐                          ┌───────▼────────┐
+│CloudStorageAdap│                          │LocalStorageAdap│
+│  - Neon DB     │                          │  - IndexedDB    │
+│  - Vercel Stor │                          │  - OPFS         │
+│  - Edge Config │                          └─────────────────┘
+└───────┬────────┘
+        │
+   ┌────┴────┐
+   │         │
+┌──▼──┐  ┌──▼──────────────┐
+│Neon │  │ Vercel Storage  │
+│DB   │  │ Edge Config      │
+└─────┘  └──────────────────┘
 ```
 
 ### Component Responsibilities
@@ -61,6 +110,33 @@ The persistence layer extends the existing Dexie-based database to include works
 - Coordinates between FramesContext and PersistenceDB
 - Handles workspace clear/reset operations
 - Manages error states and user notifications
+- Checks subscription status for storage adapter selection
+
+**StorageManager.ts** (New - Premium)
+- Selects appropriate storage adapter based on subscription status
+- Provides LocalStorageAdapter for free users
+- Provides HybridStorageAdapter for premium users
+- Handles fallback from cloud to local on errors
+
+**StorageAdapter Interface** (New - Premium)
+- Abstract interface for storage operations
+- Implemented by LocalStorageAdapter and CloudStorageAdapter
+- Provides consistent API regardless of storage backend
+
+**LocalStorageAdapter** (New - Premium)
+- Implements StorageAdapter using IndexedDB + OPFS
+- Used for free users and offline mode
+- Maintains existing local storage behavior
+
+**CloudStorageAdapter** (New - Premium)
+- Implements StorageAdapter using Neon + Vercel Storage + Edge Config
+- Used for premium users
+- Handles authentication and API calls
+
+**HybridStorageAdapter** (New - Premium)
+- Combines cloud and local storage for premium users
+- Saves to both cloud and local for offline support
+- Loads from cloud first, falls back to local
 
 ## Components and Interfaces
 
@@ -169,6 +245,180 @@ interface CanvasSettings {
 - Add workspace object store
 - Add uiState object store
 - Migration: Initialize with empty state
+
+### Cloud Storage Schema (Premium Users)
+
+#### Neon Database Schema
+
+**workspaces table:**
+```sql
+CREATE TABLE workspaces (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id TEXT NOT NULL,
+  data JSONB NOT NULL,  -- WorkspaceState JSON
+  version INTEGER NOT NULL DEFAULT 1,
+  created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  synced_at TIMESTAMP,
+  INDEX idx_user_id (user_id),
+  INDEX idx_updated_at (updated_at)
+);
+```
+
+**media_files table:**
+```sql
+CREATE TABLE media_files (
+  id SERIAL PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  name TEXT NOT NULL,
+  storage_url TEXT NOT NULL,  -- Vercel Storage URL
+  thumbnail TEXT,              -- Base64 thumbnail
+  width INTEGER NOT NULL,
+  height INTEGER NOT NULL,
+  size BIGINT NOT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  INDEX idx_user_id (user_id),
+  INDEX idx_created_at (created_at)
+);
+```
+
+#### Vercel Edge Config Schema
+
+**Key:** `preferences:{userId}`
+**Value:** JSON string of AppPreferences
+
+**Example:**
+```json
+{
+  "userId": "user_123",
+  "sidebarTab": "layout",
+  "sidebarPanelOpen": true,
+  "navWidth": 360,
+  "theme": "light",
+  "zoomDefault": 100,
+  "updatedAt": "2024-01-01T00:00:00Z"
+}
+```
+
+#### Cloud Storage Data Models
+
+**WorkspaceState (Cloud):**
+```typescript
+interface WorkspaceState {
+  id: string;                          // UUID for cloud storage
+  userId: string;                      // User ID from auth
+  screens: Screen[];                   // Array of all screens
+  selectedScreenIndices: number[];     // Currently selected screens
+  primarySelectedIndex: number;        // Primary selection
+  selectedFrameIndex: number | null;   // Selected frame within screen
+  zoom: number;                        // Canvas zoom level (10-400)
+  createdAt: Date;                     // Workspace creation time
+  updatedAt: Date;                     // Last modification time
+  syncedAt: Date;                      // Last successful sync time
+  version: number;                     // Version for conflict resolution
+}
+```
+
+**MediaFile (Cloud):**
+```typescript
+interface MediaFile {
+  id: number;                          // Media ID (same as local)
+  userId: string;                      // User ID from auth
+  name: string;                        // Original filename
+  storageUrl: string;                  // Vercel Storage URL
+  thumbnail: string;                   // Base64 thumbnail (cached)
+  width: number;                       // Image width
+  height: number;                      // Image height
+  size: number;                        // File size in bytes
+  createdAt: Date;                     // Upload time
+  updatedAt: Date;                     // Last modification time
+}
+```
+
+**AppPreferences (Cloud):**
+```typescript
+interface AppPreferences {
+  userId: string;                      // User ID from auth
+  sidebarTab: string;                  // Selected tab: 'layout' | 'device' | 'media' | 'text'
+  sidebarPanelOpen: boolean;           // Panel expanded/collapsed
+  navWidth: number;                    // Sidebar width in pixels
+  theme: string;                       // Theme preference
+  zoomDefault: number;                  // Default zoom level
+  updatedAt: Date;                     // Last modification time
+}
+```
+
+### StorageAdapter Interface (Premium)
+
+```typescript
+export interface StorageAdapter {
+  // Workspace
+  saveWorkspace(state: WorkspaceState): Promise<void>;
+  loadWorkspace(): Promise<WorkspaceState | null>;
+  clearWorkspace(): Promise<void>;
+  
+  // Media
+  saveMediaFile(file: File): Promise<MediaFile>;
+  getMediaFile(mediaId: number): Promise<File | null>;
+  deleteMediaFile(mediaId: number): Promise<void>;
+  listMediaFiles(): Promise<MediaFile[]>;
+  
+  // Preferences
+  savePreferences(prefs: AppPreferences): Promise<void>;
+  loadPreferences(): Promise<AppPreferences | null>;
+  
+  // Sync
+  sync(): Promise<SyncResult>;
+  getSyncStatus(): SyncStatus;
+}
+
+export interface SyncResult {
+  success: boolean;
+  conflicts?: Conflict[];
+  syncedAt?: Date;
+}
+
+export interface Conflict {
+  type: 'workspace' | 'media' | 'preferences';
+  localVersion: number;
+  cloudVersion: number;
+  resolution: 'local' | 'cloud' | 'merge';
+}
+
+export interface SyncStatus {
+  isSyncing: boolean;
+  lastSyncedAt: Date | null;
+  hasPendingChanges: boolean;
+  error: string | null;
+}
+```
+
+### API Routes (Premium)
+
+**app/api/workspace/route.ts**
+- GET: Load workspace from Neon database
+- PUT: Save workspace to Neon database
+- DELETE: Clear workspace from Neon database
+- Requires authentication
+
+**app/api/media/upload/route.ts**
+- POST: Upload file to Vercel Storage, save metadata to Neon
+- Returns MediaFile object
+
+**app/api/media/[id]/route.ts**
+- GET: Download file from Vercel Storage
+- DELETE: Delete file from Vercel Storage and Neon
+
+**app/api/media/route.ts**
+- GET: List user's media files from Neon
+
+**app/api/preferences/route.ts**
+- GET: Read preferences from Edge Config
+- PUT: Write preferences to Edge Config
+
+**app/api/sync/route.ts**
+- POST: Detect and resolve conflicts between local and cloud
 
 ### New Components
 
