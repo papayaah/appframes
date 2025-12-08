@@ -131,9 +131,9 @@ export function ScreensPanel({
     <Box
       style={{
         borderTop: '1px solid #E5E7EB',
-        padding: '16px 20px',
+        padding: '12px 20px',
         backgroundColor: 'white',
-        height: 140,
+        height: 104,
         boxShadow: '0 -2px 8px rgba(0,0,0,0.05)',
         overflowX: 'auto', // Allow horizontal scrolling if many screens
       }}
@@ -169,12 +169,16 @@ export function ScreensPanel({
                   if (deleteConfirmId !== screen.id) {
                     const deleteBtn = e.currentTarget.querySelector('.delete-btn') as HTMLElement;
                     if (deleteBtn) deleteBtn.style.opacity = '1';
+                    const screenNumber = e.currentTarget.querySelector('.screen-number') as HTMLElement;
+                    if (screenNumber) screenNumber.style.opacity = '1';
                   }
                 }}
                 onMouseLeave={(e) => {
                   if (deleteConfirmId !== screen.id) {
                     const deleteBtn = e.currentTarget.querySelector('.delete-btn') as HTMLElement;
                     if (deleteBtn) deleteBtn.style.opacity = '0';
+                    const screenNumber = e.currentTarget.querySelector('.screen-number') as HTMLElement;
+                    if (screenNumber) screenNumber.style.opacity = '0';
                   }
                 }}
               >
@@ -239,37 +243,26 @@ export function ScreensPanel({
                     <IconX size={12} />
                   </ActionIcon>
                 )}
-              </Box>
-              <Box style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
-                <Text
-                  size="xs"
+                
+                {/* Floating number on hover */}
+                <Box
+                  className="screen-number"
                   style={{
-                    marginTop: 4,
-                    color: '#666',
-                    textAlign: 'center',
-                    fontSize: 10,
-                    maxWidth: 60,
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
+                    position: 'absolute',
+                    top: '50%',
+                    left: '50%',
+                    transform: 'translate(-50%, -50%)',
+                    fontSize: 32,
+                    fontWeight: 700,
+                    color: 'rgba(255, 255, 255, 0.9)',
+                    textShadow: '0 2px 8px rgba(0, 0, 0, 0.3)',
+                    opacity: 0,
+                    transition: 'opacity 0.2s',
+                    pointerEvents: 'none',
                   }}
                 >
-                  {screen.name}
-                </Text>
-                <Text
-                  size="xs"
-                  style={{
-                    color: '#999',
-                    textAlign: 'center',
-                    fontSize: 9,
-                    maxWidth: 60,
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
-                  }}
-                >
-                  {getCanvasSizeLabel(screen.settings.canvasSize)}
-                </Text>
+                  {index + 1}
+                </Box>
               </Box>
             </Box>
           );

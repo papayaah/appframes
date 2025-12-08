@@ -162,14 +162,14 @@
   - Add visual indicator for free tier limit (1 project max for free users)
   - _Requirements: 9.1_
 
-- [ ] 9. Hook up canvas size changes to trigger switching
+- [x] 9. Hook up canvas size changes to trigger switching
   - Add useEffect in FramesContext watching settings.canvasSize
   - When settings.canvasSize changes, call switchCanvasSize(newSize)
   - Ensure smooth transition between canvas sizes
   - Update screens prop passed to components to use getCurrentScreens()
   - _Requirements: 2.5_
 
-- [ ] 10. Implement error handling and user notifications
+- [x] 10. Implement error handling and user notifications
   - Add error handling for database initialization failures
   - Show Mantine notification when persistence is unavailable
   - Add error handling for save operation failures
@@ -188,7 +188,7 @@
   - **Property 14: Quota handling**
   - **Validates: Requirements 10.4**
 
-- [ ] 11. Add frame-specific settings persistence
+- [x] 11. Add frame-specific settings persistence
   - Ensure ScreenImage interface includes panX, panY, frameX, frameY
   - Save frame-specific settings when screensByCanvasSize is saved
   - Restore frame-specific settings when workspace is loaded

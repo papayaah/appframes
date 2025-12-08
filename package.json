@@ -21,6 +21,7 @@
     "@mantine/core": "8.3.9",
     "@mantine/dropzone": "^8.3.9",
     "@mantine/hooks": "8.3.9",
+    "@mantine/notifications": "^8.3.9",
     "@next/bundle-analyzer": "^16.0.0",
     "@tabler/icons-react": "^3.35.0",
     "@types/jszip": "^3.4.0",

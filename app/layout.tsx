@@ -1,10 +1,12 @@
 import '@mantine/core/styles.css';
 import '@mantine/dropzone/styles.css';
+import '@mantine/notifications/styles.css';
 import './globals.css';
 
 import React from 'react';
 import { Analytics } from '@vercel/analytics/react';
 import { ColorSchemeScript, mantineHtmlProps, MantineProvider } from '@mantine/core';
+import { Notifications } from '@mantine/notifications';
 import { theme } from '../theme';
 import { FramesProvider } from '../components/AppFrames/FramesContext';
 
@@ -26,6 +28,7 @@ export default function RootLayout({ children }: { children: any }) {
       </head>
       <body>
         <MantineProvider theme={theme}>
+          <Notifications position="top-right" />
           <FramesProvider>{children}</FramesProvider>
         </MantineProvider>
         <Analytics />

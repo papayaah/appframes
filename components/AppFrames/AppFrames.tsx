@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { AppShell, Box } from '@mantine/core';
+import { notifications } from '@mantine/notifications';
 import { Header } from './Header';
 import { SidebarTabs } from './SidebarTabs';
 import { Canvas } from './Canvas';
@@ -38,6 +39,26 @@ export function AppFrames() {
   } = useFrames();
 
   const [navWidth, setNavWidth] = useState(360); // Rail (80) + Panel (~280)
+
+  // Initialize persistence database and handle errors
+  useEffect(() => {
+    const initPersistence = async () => {
+      try {
+        const { persistenceDB } = await import('../../lib/PersistenceDB');
+        await persistenceDB.init();
+      } catch (error) {
+        console.error('Failed to initialize persistence:', error);
+        notifications.show({
+          title: 'Persistence Unavailable',
+          message: 'Your work will not be saved across sessions. The app will continue to work in memory-only mode.',
+          color: 'yellow',
+          autoClose: 10000,
+        });
+      }
+    };
+
+    initPersistence();
+  }, []);
 
   const handleMediaUpload = async (file: File): Promise<number | null> => {
     try {

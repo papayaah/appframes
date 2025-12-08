@@ -256,4 +256,70 @@ describe('FramesContext - Project Management', () => {
     expect(persistenceDB.deleteProject).toHaveBeenCalledWith(currentId);
     // Media library operations are not called during project deletion
   });
+
+  it('should switch canvas size when settings change', async () => {
+    const { result } = renderHook(() => useFrames(), {
+      wrapper: FramesProvider,
+    });
+
+    await waitFor(() => {
+      expect(result.current.currentProjectId).toBeDefined();
+    });
+
+    // Initial canvas size should be default
+    const initialCanvasSize = result.current.currentCanvasSize;
+    expect(initialCanvasSize).toBe('iphone-6.5');
+
+    // Directly call switchCanvasSize to test the functionality
+    await act(async () => {
+      result.current.switchCanvasSize('ipad-13');
+    });
+
+    // The canvas size should update
+    await waitFor(() => {
+      expect(result.current.currentCanvasSize).toBe('ipad-13');
+    });
+
+    // Verify screens are isolated by canvas size
+    expect(result.current.screens).toEqual([]);
+  });
+
+  it('should switch canvas size via updateSelectedScreenSettings', async () => {
+    const { result } = renderHook(() => useFrames(), {
+      wrapper: FramesProvider,
+    });
+
+    await waitFor(() => {
+      expect(result.current.currentProjectId).toBeDefined();
+    });
+
+    // Initial state - should have default screen
+    expect(result.current.currentCanvasSize).toBe('iphone-6.5');
+    expect(result.current.screens.length).toBeGreaterThanOrEqual(0);
+
+    // Change canvas size via settings update (simulating UI change)
+    await act(async () => {
+      result.current.updateSelectedScreenSettings({
+        canvasSize: 'ipad-13',
+      });
+    });
+
+    // Canvas size should switch
+    await waitFor(() => {
+      expect(result.current.currentCanvasSize).toBe('ipad-13');
+    });
+
+    // Screens should be empty for new canvas size (no screens added yet)
+    expect(result.current.screens).toEqual([]);
+
+    // Switch back to original canvas size
+    await act(async () => {
+      result.current.switchCanvasSize('iphone-6.5');
+    });
+
+    // Should be back to original canvas size
+    await waitFor(() => {
+      expect(result.current.currentCanvasSize).toBe('iphone-6.5');
+    });
+  });
 });

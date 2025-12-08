@@ -201,11 +201,40 @@ export function FramesProvider({ children }: { children: ReactNode }) {
     setMediaCache(prev => ({ ...prev, [mediaId]: url }));
   }, []);
 
-  // Initialize persistence hook
+  // Initialize persistence hook with error handling
   const { debouncedSave } = usePersistence({
     debounceMs: 500,
+    maxRetries: 1,
+    retryDelayMs: 1000,
     onError: (error) => {
       console.error('Persistence error:', error);
+      
+      // Handle quota exceeded errors
+      if (error.message === 'QUOTA_EXCEEDED') {
+        // Show notification with suggestion to clear workspace
+        if (typeof window !== 'undefined') {
+          import('@mantine/notifications').then(({ notifications }) => {
+            notifications.show({
+              title: 'Storage Quota Exceeded',
+              message: 'Your browser storage is full. Consider deleting old projects or clearing your media library to free up space.',
+              color: 'red',
+              autoClose: false,
+            });
+          });
+        }
+      } else {
+        // Show generic error notification
+        if (typeof window !== 'undefined') {
+          import('@mantine/notifications').then(({ notifications }) => {
+            notifications.show({
+              title: 'Save Failed',
+              message: 'Failed to save your work. Your changes may not be persisted.',
+              color: 'red',
+              autoClose: 5000,
+            });
+          });
+        }
+      }
     },
   });
 
@@ -217,8 +246,8 @@ export function FramesProvider({ children }: { children: ReactNode }) {
   // Get current screen's settings (computed from primary selected screen)
   const currentScreen = screens[primarySelectedIndex];
   const settings: CanvasSettings = currentScreen
-    ? { ...currentScreen.settings, selectedScreenIndex: primarySelectedIndex }
-    : { ...getDefaultScreenSettings(), selectedScreenIndex: 0 };
+    ? { ...currentScreen.settings, selectedScreenIndex: primarySelectedIndex, canvasSize: currentCanvasSize }
+    : { ...getDefaultScreenSettings(), selectedScreenIndex: 0, canvasSize: currentCanvasSize };
 
   const handleScreenSelect = (index: number, multi: boolean) => {
     if (multi) {
@@ -271,6 +300,13 @@ export function FramesProvider({ children }: { children: ReactNode }) {
   // Currently we only update the primary selected screen to avoid complexity,
   // but we could potentially update all selected screens here.
   const updateSelectedScreenSettings = (updates: Partial<Omit<CanvasSettings, 'selectedScreenIndex'>>) => {
+    // Check if canvas size is being changed
+    if (updates.canvasSize && updates.canvasSize !== currentCanvasSize) {
+      // Trigger canvas size switch
+      switchCanvasSize(updates.canvasSize);
+      return; // Don't update screen settings - the canvas size switch handles everything
+    }
+
     setScreens((prevScreens) => {
       const updated = [...prevScreens];
       // Only update the primary selected screen for now
