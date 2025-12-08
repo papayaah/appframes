@@ -433,6 +433,19 @@ export function FramesProvider({ children }: { children: ReactNode }) {
     // Update screens to reflect current canvas size
     const screensForCurrentSize = project.screensByCanvasSize[project.currentCanvasSize] || [];
     setScreens(screensForCurrentSize);
+    
+    // Update screenIdCounter to avoid duplicate IDs
+    let maxId = 0;
+    Object.values(project.screensByCanvasSize).forEach(screens => {
+      screens.forEach(screen => {
+        const match = screen.id.match(/screen-(\d+)/);
+        if (match) {
+          const id = parseInt(match[1], 10);
+          if (id > maxId) maxId = id;
+        }
+      });
+    });
+    screenIdCounter.current = maxId;
   }, []);
 
   // Load persisted state on mount
@@ -489,29 +502,8 @@ export function FramesProvider({ children }: { children: ReactNode }) {
       console.error('Failed to load persisted state:', error);
       // Continue with default state
     } finally {
-      // Mark that initial state has been loaded - use setTimeout to ensure
-      // all state updates have been applied before enabling syncing
-      console.log('[Persistence] loadPersistedState: Complete, enabling syncing in 100ms');
-      setTimeout(() => {
-        hasLoadedInitialState.current = true;
-        console.log('[Persistence] Syncing enabled!');
-        
-        // Manually trigger initial sync by updating screensByCanvasSize with current screens
-        setScreensByCanvasSize(prev => {
-          const currentScreens = prev[currentCanvasSize] || [];
-          if (JSON.stringify(currentScreens) !== JSON.stringify(screens)) {
-            console.log('[Persistence] Initial sync: Syncing screens to screensByCanvasSize', {
-              from: currentScreens.length,
-              to: screens.length,
-            });
-            return {
-              ...prev,
-              [currentCanvasSize]: screens,
-            };
-          }
-          return prev;
-        });
-      }, 100);
+      // Mark that initial state has been loaded
+      hasLoadedInitialState.current = true;
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loadProjectIntoState]);
@@ -519,22 +511,11 @@ export function FramesProvider({ children }: { children: ReactNode }) {
   // Save project state (debounced)
   // Don't use useCallback - we need fresh values on each call
   const saveProjectState = () => {
-    if (!currentProjectId) {
-      console.log('[Persistence] saveProjectState: No currentProjectId, skipping save');
+    if (!currentProjectId || !hasLoadedInitialState.current) {
       return;
     }
     
-    console.log('[Persistence] saveProjectState: Scheduling save with', {
-      projectId: currentProjectId,
-      screenCount: Object.keys(screensByCanvasSize).reduce((sum, key) => sum + screensByCanvasSize[key].length, 0),
-      canvasSize: currentCanvasSize,
-      screensForCurrentSize: screensByCanvasSize[currentCanvasSize]?.length || 0,
-    });
-    
     debouncedSave(async () => {
-      console.log('[Persistence] saveProjectState: Executing save to IndexedDB with', {
-        screenCount: Object.keys(screensByCanvasSize).reduce((sum, key) => sum + screensByCanvasSize[key].length, 0),
-      });
       await persistenceDB.saveProject({
         id: currentProjectId,
         name: currentProjectName,
@@ -548,7 +529,6 @@ export function FramesProvider({ children }: { children: ReactNode }) {
         updatedAt: new Date(),
         lastAccessedAt: new Date(),
       });
-      console.log('[Persistence] saveProjectState: Save completed!');
     });
   };
 
@@ -573,27 +553,32 @@ export function FramesProvider({ children }: { children: ReactNode }) {
   // Save project state when screensByCanvasSize changes
   useEffect(() => {
     saveProjectState();
-  }, [screensByCanvasSize, saveProjectState]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [screensByCanvasSize]);
 
   // Save project state when currentCanvasSize changes
   useEffect(() => {
     saveProjectState();
-  }, [currentCanvasSize, saveProjectState]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentCanvasSize]);
 
   // Save project state when selectedScreenIndices changes
   useEffect(() => {
     saveProjectState();
-  }, [selectedScreenIndices, saveProjectState]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedScreenIndices]);
 
   // Save project state when zoom changes
   useEffect(() => {
     saveProjectState();
-  }, [zoom, saveProjectState]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [zoom]);
 
   // Save app state when sidebarTab changes
   useEffect(() => {
     saveAppState();
-  }, [sidebarTab, saveAppState]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sidebarTab]);
 
   // Sync screens with screensByCanvasSize for current canvas size
   // This ensures screens always reflects the current canvas size
@@ -617,28 +602,14 @@ export function FramesProvider({ children }: { children: ReactNode }) {
   // This ensures changes to screens are reflected in the project state
   useEffect(() => {
     // Skip syncing until initial state is loaded
-    if (!hasLoadedInitialState.current) {
-      console.log('[Persistence] Sync screens→screensByCanvasSize: Skipped (initial state not loaded)');
+    if (!hasLoadedInitialState.current || isSyncing.current) {
       return;
     }
-    if (isSyncing.current) {
-      console.log('[Persistence] Sync screens→screensByCanvasSize: Skipped (already syncing)');
-      return;
-    }
-    
-    console.log('[Persistence] Sync screens→screensByCanvasSize: Checking if sync needed', {
-      screensCount: screens.length,
-      currentCanvasSize,
-    });
     
     setScreensByCanvasSize(prev => {
       const currentScreens = prev[currentCanvasSize] || [];
       // Only update if screens actually changed
       if (JSON.stringify(currentScreens) !== JSON.stringify(screens)) {
-        console.log('[Persistence] Sync screens→screensByCanvasSize: Syncing!', {
-          from: currentScreens.length,
-          to: screens.length,
-        });
         isSyncing.current = true;
         // Reset flag after state update completes
         setTimeout(() => { isSyncing.current = false; }, 0);
@@ -647,7 +618,6 @@ export function FramesProvider({ children }: { children: ReactNode }) {
           [currentCanvasSize]: screens,
         };
       }
-      console.log('[Persistence] Sync screens→screensByCanvasSize: No change needed');
       return prev;
     });
   }, [screens, currentCanvasSize]);
