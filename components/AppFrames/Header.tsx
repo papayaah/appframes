@@ -1,8 +1,8 @@
 'use client';
 
 import Image from 'next/image';
-import { Group, Text, ActionIcon, Box, Slider, Tooltip, Menu, Button, Modal, TextInput, Stack } from '@mantine/core';
-import { IconDownload, IconFileZip, IconChevronDown, IconPlus, IconEdit, IconTrash, IconFolder } from '@tabler/icons-react';
+import { Group, Text, ActionIcon, Box, Slider, Tooltip, Menu, Button, Modal, TextInput, Stack, Badge } from '@mantine/core';
+import { IconDownload, IconFileZip, IconChevronDown, IconPlus, IconEdit, IconTrash, IconFolder, IconCheck, IconAlertCircle } from '@tabler/icons-react';
 import { useState, useEffect } from 'react';
 import type { Project } from '@/lib/PersistenceDB';
 
@@ -21,6 +21,8 @@ interface HeaderProps {
   onRenameProject?: (newName: string) => Promise<void>;
   onDeleteProject?: (projectId: string) => Promise<void>;
   onGetAllProjects?: () => Promise<Project[]>;
+  // Save status
+  saveStatus?: 'idle' | 'saving' | 'saved' | 'error';
 }
 
 export function Header({
@@ -37,6 +39,7 @@ export function Header({
   onRenameProject,
   onDeleteProject,
   onGetAllProjects,
+  saveStatus = 'idle',
 }: HeaderProps) {
   const [projects, setProjects] = useState<Project[]>([]);
   const [showNewProjectModal, setShowNewProjectModal] = useState(false);
@@ -207,6 +210,33 @@ export function Header({
       </Group>
 
         <Group gap="xs">
+          {/* Save Status Indicator */}
+          {saveStatus !== 'idle' && (
+            <Badge
+              size="xs"
+              variant="light"
+              color={
+                saveStatus === 'saving' ? 'blue' :
+                saveStatus === 'saved' ? 'green' :
+                'red'
+              }
+              leftSection={
+                saveStatus === 'saved' ? <IconCheck size={10} /> :
+                saveStatus === 'error' ? <IconAlertCircle size={10} /> :
+                null
+              }
+              style={{
+                padding: '4px 8px',
+                fontSize: '11px',
+                height: 'auto',
+              }}
+            >
+              {saveStatus === 'saving' ? 'Saving...' :
+               saveStatus === 'saved' ? 'Saved' :
+               'Error'}
+            </Badge>
+          )}
+          
           <Tooltip label={`Download${selectedCount > 1 ? ` (${selectedCount} screens)` : ''}`}>
             <ActionIcon
               size="lg"

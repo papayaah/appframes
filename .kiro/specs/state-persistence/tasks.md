@@ -200,7 +200,7 @@
   - **Property 7: Frame-specific settings persistence**
   - **Validates: Requirements 11.1, 11.2, 11.3, 11.4**
 
-- [ ] 12. Optimize persistence performance
+- [x] 12. Optimize persistence performance
   - Implement selective saves (only save changed portions)
   - Add check to skip save if state hasn't changed
   - Use transaction batching for multiple operations
@@ -209,7 +209,7 @@
   - Implement lazy canvas size array creation (only create when first accessed)
   - _Requirements: 8.1, 8.2, 8.3_
 
-- [ ] 13. Add persistence status indicators
+- [x] 13. Add persistence status indicators
   - Add "Saving..." indicator to UI when save is in progress
   - Add "All changes saved" confirmation when save completes
   - Add error indicator when save fails
@@ -217,14 +217,14 @@
   - Position status indicator in Header or bottom corner
   - _Requirements: 1.1, 1.2_
 
-- [ ] 14. Update package.json Node.js requirement
+- [x] 14. Update package.json Node.js requirement
   - Verify package.json has "engines": { "node": ">=24.0.0" }
   - Verify .nvmrc specifies Node.js 24
   - Add engine check script if needed
   - Update documentation to mention Node.js 24 requirement
   - _Requirements: 12.1, 12.2, 12.3, 12.4, 12.5_
 
-- [ ] 15. Add database migration testing
+- [x] 15. Add database migration testing
   - Test migration from version 1 to version 2
   - Verify existing mediaFiles data is preserved
   - Verify new object stores are created (projects with proper indexes, appState)
@@ -237,7 +237,7 @@
   - **Property 15: Database migration safety**
   - **Validates: Requirements 7.3, 7.4**
 
-- [ ] 16. Add integration tests for persistence workflow
+- [x] 16. Add integration tests for persistence workflow
   - Test complete save and restore workflow
   - Test creating project → add screens → reload → verify project and screens restored
   - Test creating multiple projects → reload → verify all projects exist

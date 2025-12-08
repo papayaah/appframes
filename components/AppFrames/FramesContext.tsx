@@ -137,6 +137,7 @@ interface FramesContextType {
   currentProjectName: string;
   screensByCanvasSize: Record<string, Screen[]>;
   currentCanvasSize: string;
+  saveStatus: 'idle' | 'saving' | 'saved' | 'error';
   // Sidebar state
   sidebarTab: string;
   setSidebarTab: (tab: string) => void;
@@ -201,11 +202,17 @@ export function FramesProvider({ children }: { children: ReactNode }) {
     setMediaCache(prev => ({ ...prev, [mediaId]: url }));
   }, []);
 
+  // Track save status
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+
   // Initialize persistence hook with error handling
   const { debouncedSave } = usePersistence({
     debounceMs: 500,
     maxRetries: 1,
     retryDelayMs: 1000,
+    onStatusChange: (status) => {
+      setSaveStatus(status);
+    },
     onError: (error) => {
       console.error('Persistence error:', error);
       
@@ -844,6 +851,7 @@ export function FramesProvider({ children }: { children: ReactNode }) {
         currentProjectName,
         screensByCanvasSize,
         currentCanvasSize,
+        saveStatus,
         sidebarTab,
         setSidebarTab,
         sidebarPanelOpen,

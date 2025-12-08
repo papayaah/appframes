@@ -36,6 +36,7 @@ export function AppFrames() {
     deleteProject,
     renameProject,
     getAllProjects,
+    saveStatus,
   } = useFrames();
 
   const [navWidth, setNavWidth] = useState(360); // Rail (80) + Panel (~280)
@@ -288,6 +289,7 @@ export function AppFrames() {
           onRenameProject={renameProject}
           onDeleteProject={deleteProject}
           onGetAllProjects={getAllProjects}
+          saveStatus={saveStatus}
         />
       </AppShell.Header>
 
