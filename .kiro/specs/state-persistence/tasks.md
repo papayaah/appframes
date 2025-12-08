@@ -121,7 +121,7 @@
   - **Property 13: Default value fallback**
   - **Validates: Requirements 1.5, 3.5, 4.4, 5.3**
 
-- [ ] 7. Implement project management methods
+- [x] 7. Implement project management methods
   - Add createNewProject(name) method to FramesContext
   - Add switchProject(projectId) method to FramesContext (saves current, loads new)
   - Add deleteProject(projectId) method to FramesContext
@@ -151,7 +151,7 @@
   - **Property 20: Current project persistence**
   - **Validates: Requirements 1.4**
 
-- [ ] 8. Add UI for project management in AppFrames
+- [x] 8. Add UI for project management in AppFrames
   - Add project dropdown/selector to Header showing current project name
   - Add "New Project" button to create new project
   - Add "Rename Project" option in project menu

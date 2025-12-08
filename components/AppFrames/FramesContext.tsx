@@ -147,6 +147,12 @@ interface FramesContextType {
   // Canvas size switching
   switchCanvasSize: (newSize: string) => void;
   getCurrentScreens: () => Screen[];
+  // Project management
+  createNewProject: (name: string) => Promise<void>;
+  switchProject: (projectId: string) => Promise<void>;
+  deleteProject: (projectId: string) => Promise<void>;
+  renameProject: (newName: string) => Promise<void>;
+  getAllProjects: () => Promise<Project[]>;
 }
 
 const FramesContext = createContext<FramesContextType | undefined>(undefined);
@@ -622,6 +628,161 @@ export function FramesProvider({ children }: { children: ReactNode }) {
     });
   }, [screens, currentCanvasSize]);
 
+  // Project management methods
+
+  /**
+   * Create a new project with the given name
+   * Saves current project before creating new one
+   */
+  const createNewProject = useCallback(async (name: string) => {
+    try {
+      // Save current project before creating new one
+      if (currentProjectId) {
+        await persistenceDB.saveProject({
+          id: currentProjectId,
+          name: currentProjectName,
+          screensByCanvasSize,
+          currentCanvasSize,
+          selectedScreenIndices,
+          primarySelectedIndex,
+          selectedFrameIndex,
+          zoom,
+          createdAt: projectCreatedAt.current,
+          updatedAt: new Date(),
+          lastAccessedAt: new Date(),
+        });
+      }
+
+      // Create new project
+      const newProject = await persistenceDB.createProject(name);
+      
+      // Load new project into state
+      loadProjectIntoState(newProject);
+      
+      // Update app state to track current project
+      await persistenceDB.saveAppState({
+        currentProjectId: newProject.id,
+        sidebarTab,
+        sidebarPanelOpen,
+        navWidth,
+      });
+    } catch (error) {
+      console.error('Failed to create new project:', error);
+      throw error;
+    }
+  }, [currentProjectId, currentProjectName, screensByCanvasSize, currentCanvasSize, 
+      selectedScreenIndices, primarySelectedIndex, selectedFrameIndex, zoom, 
+      sidebarTab, sidebarPanelOpen, navWidth, loadProjectIntoState]);
+
+  /**
+   * Switch to a different project
+   * Saves current project before loading new one
+   */
+  const switchProject = useCallback(async (projectId: string) => {
+    try {
+      // Save current project before switching
+      if (currentProjectId) {
+        await persistenceDB.saveProject({
+          id: currentProjectId,
+          name: currentProjectName,
+          screensByCanvasSize,
+          currentCanvasSize,
+          selectedScreenIndices,
+          primarySelectedIndex,
+          selectedFrameIndex,
+          zoom,
+          createdAt: projectCreatedAt.current,
+          updatedAt: new Date(),
+          lastAccessedAt: new Date(),
+        });
+      }
+      
+      // Load new project
+      const project = await persistenceDB.loadProject(projectId);
+      if (project) {
+        loadProjectIntoState(project);
+        
+        // Update app state
+        await persistenceDB.saveAppState({
+          currentProjectId: projectId,
+          sidebarTab,
+          sidebarPanelOpen,
+          navWidth,
+        });
+      } else {
+        console.error('Project not found:', projectId);
+      }
+    } catch (error) {
+      console.error('Failed to switch project:', error);
+      throw error;
+    }
+  }, [currentProjectId, currentProjectName, screensByCanvasSize, currentCanvasSize,
+      selectedScreenIndices, primarySelectedIndex, selectedFrameIndex, zoom,
+      sidebarTab, sidebarPanelOpen, navWidth, loadProjectIntoState]);
+
+  /**
+   * Delete a project by ID
+   * If deleting current project, switches to another project or creates new one
+   * Media library is preserved across all operations
+   */
+  const deleteProject = useCallback(async (projectId: string) => {
+    try {
+      // Delete the project from database
+      await persistenceDB.deleteProject(projectId);
+      
+      // If deleting current project, switch to another or create new
+      if (projectId === currentProjectId) {
+        const projects = await persistenceDB.getAllProjects();
+        if (projects.length > 0) {
+          // Switch to the most recently accessed project
+          const recent = projects.sort((a, b) => 
+            b.lastAccessedAt.getTime() - a.lastAccessedAt.getTime()
+          )[0];
+          await switchProject(recent.id);
+        } else {
+          // No projects left, create a new default project
+          await createNewProject('My Project');
+        }
+      }
+    } catch (error) {
+      console.error('Failed to delete project:', error);
+      throw error;
+    }
+  }, [currentProjectId, switchProject, createNewProject]);
+
+  /**
+   * Rename the current project
+   */
+  const renameProject = useCallback(async (newName: string) => {
+    try {
+      if (!currentProjectId) {
+        console.error('No current project to rename');
+        return;
+      }
+      
+      // Update local state
+      setCurrentProjectName(newName);
+      
+      // Update in database
+      await persistenceDB.renameProject(currentProjectId, newName);
+    } catch (error) {
+      console.error('Failed to rename project:', error);
+      throw error;
+    }
+  }, [currentProjectId]);
+
+  /**
+   * Get all projects from database
+   */
+  const getAllProjects = useCallback(async (): Promise<Project[]> => {
+    try {
+      return await persistenceDB.getAllProjects();
+    } catch (error) {
+      console.error('Failed to get all projects:', error);
+      return [];
+    }
+  }, []);
+
   return (
     <FramesContext.Provider
       value={{
@@ -655,6 +816,11 @@ export function FramesProvider({ children }: { children: ReactNode }) {
         setNavWidth,
         switchCanvasSize,
         getCurrentScreens,
+        createNewProject,
+        switchProject,
+        deleteProject,
+        renameProject,
+        getAllProjects,
       }}
     >
       {children}

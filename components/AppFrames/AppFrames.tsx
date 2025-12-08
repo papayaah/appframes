@@ -29,6 +29,12 @@ export function AppFrames() {
     removeScreen,
     handleScreenSelect,
     replaceScreen,
+    currentProjectName,
+    createNewProject,
+    switchProject,
+    deleteProject,
+    renameProject,
+    getAllProjects,
   } = useFrames();
 
   const [navWidth, setNavWidth] = useState(360); // Rail (80) + Panel (~280)
@@ -255,6 +261,12 @@ export function AppFrames() {
           onZoomChange={setZoom}
           selectedCount={selectedScreenIndices.length}
           totalCount={screens.length}
+          currentProjectName={currentProjectName}
+          onCreateProject={createNewProject}
+          onSwitchProject={switchProject}
+          onRenameProject={renameProject}
+          onDeleteProject={deleteProject}
+          onGetAllProjects={getAllProjects}
         />
       </AppShell.Header>
 
