@@ -129,6 +129,39 @@ export function AppFrames() {
     });
   };
 
+  // Handle device frame change for a specific frame
+  const handleFrameDeviceChange = (frameIndex: number, deviceFrame: string) => {
+    setScreens((prevScreens) => {
+      const updated = [...prevScreens];
+      const screen = updated[primarySelectedIndex];
+      
+      if (screen) {
+        const newImages = [...(screen.images || [])];
+        
+        // Ensure the images array has enough slots
+        const frameCount = getCompositionFrameCount(screen.settings.composition);
+        while (newImages.length < frameCount) {
+          newImages.push({});
+        }
+        
+        // Update the specific frame's device
+        if (frameIndex < newImages.length) {
+          newImages[frameIndex] = {
+            ...newImages[frameIndex],
+            deviceFrame,
+          };
+        }
+        
+        updated[primarySelectedIndex] = {
+          ...screen,
+          images: newImages,
+        };
+      }
+      
+      return updated;
+    });
+  };
+
   // Helper to convert canvas element to PNG blob
   const canvasToBlob = async (element: HTMLElement): Promise<Blob> => {
     const { toPng } = await import('html-to-image');
@@ -298,6 +331,8 @@ export function AppFrames() {
           settings={settings}
           setSettings={setSettings}
           screens={screens}
+          selectedFrameIndex={selectedFrameIndex}
+          onFrameDeviceChange={handleFrameDeviceChange}
           onPanelToggle={(isOpen) => setNavWidth(isOpen ? 360 : 80)}
           onMediaSelect={(mediaId) => {
             // If no screens exist, create one

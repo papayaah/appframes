@@ -1,6 +1,7 @@
 export interface ScreenImage {
   image?: string; // Base64 image (legacy support)
   mediaId?: number; // Reference to media library
+  deviceFrame: string; // Device frame type for this specific frame
   // Per-frame image pan (position of image inside the frame)
   panX?: number; // 0-100, default 50 (centered)
   panY?: number; // 0-100, default 50 (centered)
@@ -55,7 +56,6 @@ export const DEFAULT_TEXT_STYLE: TextStyle = {
 
 export interface CanvasSettings {
   canvasSize: string; // Export dimensions (App Store requirements)
-  deviceFrame: string; // Visual frame type
   composition: 'single' | 'dual' | 'stack' | 'triple' | 'fan';
   compositionScale: number;
   captionVertical: number;

@@ -46,10 +46,9 @@ describe('validateProject', () => {
           {
             id: 'screen-1',
             name: 'Screen 1',
-            images: [],
+            images: [{ deviceFrame: 'iphone-14-pro' }],
             settings: {
               canvasSize: 'iphone-6.5',
-              deviceFrame: 'iphone-14-pro',
               composition: 'single',
               compositionScale: 85,
               captionVertical: 10,
@@ -148,10 +147,9 @@ describe('validateProject', () => {
           {
             id: 'screen-1',
             name: 'Screen 1',
-            images: [],
+            images: [{ deviceFrame: 'iphone-14-pro' }],
             settings: {
               canvasSize: 'iphone-6.5',
-              deviceFrame: 'iphone-14-pro',
               composition: 'single',
               compositionScale: 85,
               captionVertical: 10,

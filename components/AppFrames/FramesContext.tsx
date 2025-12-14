@@ -96,7 +96,6 @@ export const getCompositionFrameCount = (composition: string): number => {
 export const getDefaultScreenSettings = (): Omit<CanvasSettings, 'selectedScreenIndex'> => {
   return {
     canvasSize: 'iphone-6.9',
-    deviceFrame: 'iphone-14-pro',
     composition: 'single',
     compositionScale: 85,
     captionVertical: 10,
@@ -185,7 +184,7 @@ export function FramesProvider({ children }: { children: ReactNode }) {
     {
       id: `screen-0`,
       name: 'Screen 1',
-      images: [], // Empty images array - will be populated based on composition
+      images: [{ deviceFrame: 'iphone-14-pro' }], // Single composition by default
       settings: getDefaultScreenSettings(),
     },
   ]);
@@ -278,15 +277,17 @@ export function FramesProvider({ children }: { children: ReactNode }) {
     const defaultSettings = getDefaultScreenSettings();
     const frameCount = getCompositionFrameCount(defaultSettings.composition);
 
-    // Initialize images array based on composition type
-    const images: ScreenImage[] = Array(frameCount).fill(null).map(() => ({}));
+    // Initialize images array based on composition type with default device frame
+    const images: ScreenImage[] = Array(frameCount).fill(null).map(() => ({
+      deviceFrame: 'iphone-14-pro'
+    }));
 
     // If an image was provided, add it to the first slot
     if (imageOrMediaId) {
       if (typeof imageOrMediaId === 'number') {
-        images[0] = { mediaId: imageOrMediaId };
+        images[0] = { mediaId: imageOrMediaId, deviceFrame: 'iphone-14-pro' };
       } else {
-        images[0] = { image: imageOrMediaId };
+        images[0] = { image: imageOrMediaId, deviceFrame: 'iphone-14-pro' };
       }
     }
 
@@ -338,9 +339,9 @@ export function FramesProvider({ children }: { children: ReactNode }) {
           }));
 
           if (newFrameCount > newImages.length) {
-            // Add empty slots
+            // Add empty slots with default device frame
             while (newImages.length < newFrameCount) {
-              newImages.push({});
+              newImages.push({ deviceFrame: 'iphone-14-pro' });
             }
           } else if (newFrameCount < newImages.length) {
             // Remove extra slots (keep first N)
@@ -415,13 +416,14 @@ export function FramesProvider({ children }: { children: ReactNode }) {
         // Ensure the images array has enough slots
         const frameCount = getCompositionFrameCount(screen.settings.composition);
         while (newImages.length < frameCount) {
-          newImages.push({});
+          newImages.push({ deviceFrame: 'iphone-14-pro' });
         }
 
         if (imageSlotIndex < newImages.length) {
+          const existingFrame = newImages[imageSlotIndex];
           newImages[imageSlotIndex] = typeof imageOrMediaId === 'number'
-            ? { mediaId: imageOrMediaId, image: undefined }
-            : { image: imageOrMediaId, mediaId: undefined };
+            ? { ...existingFrame, mediaId: imageOrMediaId, image: undefined }
+            : { ...existingFrame, image: imageOrMediaId, mediaId: undefined };
         }
 
         updatedScreens[index] = {

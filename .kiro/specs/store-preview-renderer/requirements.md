@@ -2,69 +2,66 @@
 
 ## Introduction
 
-The Store Preview Renderer feature provides users with a comprehensive preview of all their created screenshots across different device categories and canvas sizes required by Apple App Store and Google Play Store. This allows users to visualize how their entire screenshot set will appear in store listings before export, ensuring consistency and completeness across all required dimensions.
+The Store Preview Renderer feature provides users with a preview of all their created screenshots organized by canvas size. Since each canvas size maintains its own independent set of screens, this view shows users which canvas sizes they have created screenshots for and allows them to review all their work in one place. This helps users visualize their screenshot portfolio and identify which canvas sizes still need attention.
 
 ## Glossary
 
-- **Store Preview Renderer**: A view that displays all created screens rendered at different canvas sizes grouped by device category
-- **Canvas Size**: The export dimensions required by app stores (e.g., 1242×2688 for iPhone 6.5")
-- **Device Category**: A grouping of related devices (e.g., iOS Phones, iPad, Android Phones, Android Tablets)
-- **Screen**: A single screenshot composition with its associated settings (device frame, composition, images, etc.)
-- **Preview Frame**: A rendered representation of a screen at a specific canvas size within the preview view
-- **Platform Tab**: A tab selector that switches between Apple App Store and Google Play Store preview views
-- **Default Canvas Sizes**: The standard canvas dimensions required by each platform for different device categories
+- **Store Preview Renderer**: A view that displays all created screens organized by their canvas size
+- **Canvas Size**: The export dimensions for screenshots (e.g., 1284×2778 for iPhone 6.5"). Each canvas size maintains its own independent set of screens
+- **Screen**: A single screenshot composition with its associated settings (device frame, composition, images, etc.) that belongs to a specific canvas size
+- **Preview Frame**: A rendered representation of a screen within the preview view
+- **Canvas Size Group**: A section in the preview that shows all screens for a specific canvas size
+- **screensByCanvasSize**: The data structure that organizes screens by canvas size (e.g., `{ "iphone-6.5": [screen1, screen2], "ipad-13": [screen3] }`)
 
 ## Requirements
 
 ### Requirement 1
 
-**User Story:** As an app developer, I want to switch between Apple App Store and Google Play Store preview views, so that I can focus on one platform at a time without being overwhelmed.
+**User Story:** As an app developer, I want to see all canvas sizes where I have created screens, so that I can review my screenshot portfolio and see what I've completed.
 
 #### Acceptance Criteria
 
-1. WHEN a user navigates to the preview page THEN the system SHALL display two platform tabs (Apple App Store and Google Play Store)
-2. WHEN the preview page loads THEN the system SHALL default to showing the Apple App Store tab
-3. WHEN a user clicks a platform tab THEN the system SHALL display only the device categories and canvas sizes for that platform
-4. WHEN switching between tabs THEN the system SHALL preserve the scroll position and state of each tab
-5. WHEN a tab is active THEN the system SHALL provide visual indication of which platform is currently displayed
+1. WHEN a user navigates to the preview page THEN the system SHALL display all canvas sizes that have at least one screen
+2. WHEN a canvas size has no screens THEN the system SHALL NOT display that canvas size in the preview
+3. WHEN displaying canvas sizes THEN the system SHALL group them by platform (Apple App Store and Google Play Store)
+4. WHEN multiple canvas sizes exist for a platform THEN the system SHALL display them in a logical order (largest to smallest display size)
+5. WHEN no screens exist in any canvas size THEN the system SHALL display an empty state message prompting users to create screenshots
 
 ### Requirement 2
 
-**User Story:** As an app developer, I want to see all my screenshots rendered across different device categories for the selected platform, so that I can verify I have complete coverage for that store's submission requirements.
+**User Story:** As an app developer, I want to see canvas size information for each group, so that I understand which store requirements each set of screenshots satisfies.
 
 #### Acceptance Criteria
 
-1. WHEN viewing the Apple App Store tab THEN the system SHALL display device categories for iPhone, iPad, and Apple Watch
-2. WHEN viewing the Google Play Store tab THEN the system SHALL display device categories for Phone, 7-inch Tablet, 10-inch Tablet, Chromebook, and Android XR
-3. WHEN displaying Apple iPhone categories THEN the system SHALL default to showing only the largest display size (6.9") with an option to expand and view all sizes (6.9", 6.5", 6.3", 6.1", 5.5", 4.7", 4", 3.5")
-4. WHEN displaying Apple iPad categories THEN the system SHALL default to showing only the largest display size (13") with an option to expand and view all sizes (13", 11", 12.9" 2nd Gen, 10.5", 9.7")
-5. WHEN displaying Apple Watch categories THEN the system SHALL default to showing only the largest display size (Ultra 3) with an option to expand and view all sizes (Ultra 3, Series 11, Series 9, Series 6, Series 3)
-6. WHEN a user expands iPhone, iPad, or Apple Watch size options THEN the system SHALL display all display sizes with their respective canvas dimensions
-7. WHEN displaying device categories THEN the system SHALL show the category name, canvas dimensions, and submission requirements (e.g., "2-8 screenshots")
-8. WHEN a device category has multiple orientation options THEN the system SHALL display both portrait and landscape previews
-9. WHEN no screens exist THEN the system SHALL display an empty state message prompting users to create screenshots
+1. WHEN displaying a canvas size group THEN the system SHALL show the canvas size label (e.g., "iPhone 6.5"", "iPad 13"")
+2. WHEN displaying a canvas size group THEN the system SHALL show the exact dimensions in pixels (e.g., "1284 × 2778")
+3. WHEN displaying a canvas size group THEN the system SHALL indicate the platform (Apple App Store or Google Play Store)
+4. WHEN displaying canvas size groups THEN the system SHALL visually separate different platforms with section headers or dividers
+5. WHEN a canvas size corresponds to specific devices THEN the system SHALL optionally display device names (e.g., "iPhone 14 Pro Max, iPhone 13 Pro Max")
 
 ### Requirement 3
 
-**User Story:** As an app developer, I want to see each of my created screens rendered at every required canvas size for the selected platform, so that I can ensure my screenshots look good across all store requirements.
+**User Story:** As an app developer, I want to see all screens for each canvas size rendered accurately, so that I can review how my screenshots will look when exported.
 
 #### Acceptance Criteria
 
-1. WHEN the system renders preview frames THEN the system SHALL apply each screen's settings (device frame, composition, images, background, caption) to generate the preview
-2. WHEN rendering a screen at a specific canvas size THEN the system SHALL maintain the screen's composition layout and scaling
+1. WHEN displaying a canvas size group THEN the system SHALL render all screens that belong to that canvas size
+2. WHEN rendering a screen THEN the system SHALL apply the screen's settings (device frame, composition, images, background, caption) to generate the preview
 3. WHEN a screen contains multiple images in a composition THEN the system SHALL render all images according to the composition type (single, dual, stack, triple, fan)
 4. WHEN a screen has a caption enabled THEN the system SHALL render the caption with the configured text style and position
-5. WHEN a screen uses a device frame THEN the system SHALL render the appropriate device frame at the target canvas size
+5. WHEN a screen uses a device frame THEN the system SHALL render the appropriate device frame
+6. WHEN rendering preview frames THEN the system SHALL use the same rendering logic as the export functionality to ensure accuracy
 
 ### Requirement 4
 
-**User Story:** As an app developer, I want to see screen names or identifiers in the preview, so that I can easily identify which screenshot is which.
+**User Story:** As an app developer, I want to see screen names and ordering in the preview, so that I can easily identify which screenshot is which and understand the sequence.
 
 #### Acceptance Criteria
 
 1. WHEN displaying preview frames THEN the system SHALL show the screen name below or above each rendered preview
-2. WHEN multiple screens exist THEN the system SHALL display them in the order they were created
+2. WHEN displaying screens within a canvas size group THEN the system SHALL display them in the order they appear in the screensByCanvasSize array
 3. WHEN a screen name is long THEN the system SHALL truncate or wrap the text to fit within the preview frame width
+4. WHEN displaying multiple screens THEN the system SHALL show a count indicator (e.g., "3 screens" for the canvas size group)
 
 ### Requirement 5
 
@@ -84,19 +81,22 @@ The Store Preview Renderer feature provides users with a comprehensive preview o
 #### Acceptance Criteria
 
 1. WHEN a user modifies a screen in the editor THEN the system SHALL update the preview to reflect those changes when the preview is next viewed
-2. WHEN a user adds a new screen THEN the system SHALL include that screen in all device category previews
-3. WHEN a user deletes a screen THEN the system SHALL remove that screen from all device category previews
-4. WHEN rendering preview frames THEN the system SHALL use the same rendering logic as the export functionality to ensure accuracy
+2. WHEN a user adds a new screen to a canvas size THEN the system SHALL include that screen in the preview for that canvas size
+3. WHEN a user deletes a screen from a canvas size THEN the system SHALL remove that screen from the preview for that canvas size
+4. WHEN a user switches to a different canvas size and creates screens THEN the system SHALL display those screens in a separate canvas size group
+5. WHEN all screens are deleted from a canvas size THEN the system SHALL remove that canvas size group from the preview
 
 ### Requirement 7
 
-**User Story:** As an app developer, I want to see the exact dimensions for each canvas size in the preview, so that I know which store requirements each preview satisfies.
+**User Story:** As an app developer, I want to navigate from the preview back to the editor for a specific canvas size, so that I can quickly make changes to screenshots I'm reviewing.
 
 #### Acceptance Criteria
 
-1. WHEN displaying a device category section THEN the system SHALL show the canvas dimensions in pixels (e.g., "1242 × 2688")
-2. WHEN displaying canvas dimensions THEN the system SHALL indicate the orientation (portrait or landscape)
-3. WHEN a canvas size corresponds to specific devices THEN the system SHALL optionally display the device names (e.g., "iPhone 14 Pro Max, iPhone 13 Pro Max")
+1. WHEN viewing a canvas size group in the preview THEN the system SHALL provide a control to switch to that canvas size in the editor
+2. WHEN a user clicks the control to edit a canvas size THEN the system SHALL navigate to the main editor
+3. WHEN navigating to the editor THEN the system SHALL set the currentCanvasSize to the selected canvas size
+4. WHEN navigating to the editor THEN the system SHALL preserve all screen data and settings
+5. WHEN the user returns to the editor THEN the system SHALL display the screens for the selected canvas size
 
 ### Requirement 8
 
@@ -105,81 +105,31 @@ The Store Preview Renderer feature provides users with a comprehensive preview o
 #### Acceptance Criteria
 
 1. WHEN rendering preview frames THEN the system SHALL scale them proportionally to fit within a reasonable viewport size
-2. WHEN multiple preview frames are displayed in a row THEN the system SHALL ensure consistent scaling across all frames in that row
+2. WHEN multiple preview frames are displayed for a canvas size THEN the system SHALL ensure consistent scaling across all frames in that group
 3. WHEN the viewport width changes THEN the system SHALL adjust the preview frame scaling to maintain optimal layout
 4. WHEN preview frames are scaled THEN the system SHALL maintain the aspect ratio of the original canvas size
+5. WHEN displaying canvas sizes with different aspect ratios THEN the system SHALL scale each group independently to optimize space usage
 
 ### Requirement 9
 
-**User Story:** As an app developer, I want the system to use the official default canvas sizes for each platform, so that my screenshots meet store submission requirements without manual configuration.
+**User Story:** As an app developer, I want to access the screensByCanvasSize data structure, so that the preview can display all canvas sizes with their respective screens.
 
 #### Acceptance Criteria
 
-1. WHEN rendering Apple App Store iPhone 6.9" previews THEN the system SHALL use canvas size 1320×2868 (portrait) or 2868×1320 (landscape)
-2. WHEN rendering Apple App Store iPhone 6.5" previews THEN the system SHALL use canvas size 1284×2778 (portrait) or 2778×1284 (landscape)
-3. WHEN rendering Apple App Store iPhone 6.3" previews THEN the system SHALL use canvas size 1206×2622 (portrait) or 2622×1206 (landscape)
-4. WHEN rendering Apple App Store iPhone 6.1" previews THEN the system SHALL use canvas size 1179×2556 (portrait) or 2556×1179 (landscape)
-5. WHEN rendering Apple App Store iPhone 5.5" previews THEN the system SHALL use canvas size 1242×2208 (portrait) or 2208×1242 (landscape)
-6. WHEN rendering Apple App Store iPhone 4.7" previews THEN the system SHALL use canvas size 750×1334 (portrait) or 1334×750 (landscape)
-7. WHEN rendering Apple App Store iPhone 4" previews THEN the system SHALL use canvas size 640×1136 (portrait) or 1136×640 (landscape)
-8. WHEN rendering Apple App Store iPhone 3.5" previews THEN the system SHALL use canvas size 640×960 (portrait) or 960×640 (landscape)
-9. WHEN rendering Apple App Store iPad 13" previews THEN the system SHALL use canvas size 2064×2752 (portrait) or 2752×2064 (landscape)
-10. WHEN rendering Apple App Store iPad 11" previews THEN the system SHALL use canvas size 1668×2388 (portrait) or 2388×1668 (landscape)
-11. WHEN rendering Apple App Store iPad Pro 12.9" 2nd Gen previews THEN the system SHALL use canvas size 2048×2732 (portrait) or 2732×2048 (landscape)
-12. WHEN rendering Apple App Store iPad 10.5" previews THEN the system SHALL use canvas size 1668×2224 (portrait) or 2224×1668 (landscape)
-13. WHEN rendering Apple App Store iPad 9.7" previews THEN the system SHALL use canvas size 1536×2048 (portrait) or 2048×1536 (landscape)
-14. WHEN rendering Apple App Store Apple Watch Ultra 3 previews THEN the system SHALL use canvas size 422×514 or 410×502
-15. WHEN rendering Apple App Store Apple Watch Series 11 previews THEN the system SHALL use canvas size 416×496
-16. WHEN rendering Apple App Store Apple Watch Series 9 previews THEN the system SHALL use canvas size 396×484
-17. WHEN rendering Apple App Store Apple Watch Series 6 previews THEN the system SHALL use canvas size 368×448
-18. WHEN rendering Apple App Store Apple Watch Series 3 previews THEN the system SHALL use canvas size 312×390
-19. WHEN rendering Google Play Store Phone previews THEN the system SHALL use canvas size 1080×1920 (portrait, 9:16 aspect ratio, within 320-3840px range)
-20. WHEN rendering Google Play Store 7-inch Tablet previews THEN the system SHALL use canvas size 1536×2048 (portrait, 9:16 aspect ratio, within 320-3840px range)
-21. WHEN rendering Google Play Store 10-inch Tablet previews THEN the system SHALL use canvas size 2048×2732 (portrait, 9:16 aspect ratio, within 1080-7680px range)
-22. WHEN rendering Google Play Store Chromebook previews THEN the system SHALL use canvas size 1920×1080 (landscape, 16:9 aspect ratio, within 1080-7680px range)
-23. WHEN rendering Google Play Store Android XR previews THEN the system SHALL use canvas size 1920×1080 (landscape, 16:9 aspect ratio, within 720-7680px range)
-24. WHEN the system defines default canvas sizes THEN the system SHALL store these as configuration constants that can be easily updated
-25. WHEN rendering previews THEN the system SHALL apply the appropriate canvas size to each screen's settings before rendering
-
+1. WHEN the preview component loads THEN the system SHALL access the screensByCanvasSize object from FramesContext
+2. WHEN iterating through canvas sizes THEN the system SHALL use the canvas size keys from screensByCanvasSize (e.g., "iphone-6.5", "ipad-13")
+3. WHEN displaying screens for a canvas size THEN the system SHALL use the screen array from screensByCanvasSize[canvasSize]
+4. WHEN a canvas size has an empty array THEN the system SHALL NOT display that canvas size in the preview
+5. WHEN screensByCanvasSize is updated THEN the system SHALL reflect those changes in the preview
 
 ### Requirement 10
 
-**User Story:** As an app developer, I want to see the submission requirements for each device category, so that I know how many screenshots are required and what the file constraints are.
+**User Story:** As an app developer, I want to see canvas size metadata, so that I understand which platform and device each canvas size represents.
 
 #### Acceptance Criteria
 
-1. WHEN displaying a Google Play Store Phone category THEN the system SHALL show "2-8 screenshots required, PNG or JPEG, up to 8 MB each, 16:9 or 9:16 aspect ratio"
-2. WHEN displaying a Google Play Store 7-inch Tablet category THEN the system SHALL show "Up to 8 screenshots, PNG or JPEG, up to 8 MB each, 16:9 or 9:16 aspect ratio"
-3. WHEN displaying a Google Play Store 10-inch Tablet category THEN the system SHALL show "Up to 8 screenshots, PNG or JPEG, up to 8 MB each, 16:9 or 9:16 aspect ratio"
-4. WHEN displaying a Google Play Store Chromebook category THEN the system SHALL show "4-8 screenshots, PNG or JPEG, up to 8 MB each, 16:9 or 9:16 aspect ratio"
-5. WHEN displaying a Google Play Store Android XR category THEN the system SHALL show "4-8 screenshots, PNG or JPEG, up to 15 MB each, 16:9 or 9:16 aspect ratio"
-6. WHEN displaying an Apple App Store category THEN the system SHALL show "Up to 10 screenshots, PNG or JPEG format"
-7. WHEN displaying submission requirements THEN the system SHALL present them in a clear, readable format near the device category heading
-
-### Requirement 11
-
-**User Story:** As an app developer, I want to optionally view all iPhone, iPad, and Apple Watch display sizes, so that I can verify my screenshots work across legacy devices without being overwhelmed by default.
-
-#### Acceptance Criteria
-
-1. WHEN viewing the Apple App Store iPhone section THEN the system SHALL default to showing only the largest iPhone display size (6.9")
-2. WHEN viewing the Apple App Store iPad section THEN the system SHALL default to showing only the largest iPad display size (13")
-3. WHEN viewing the Apple App Store Apple Watch section THEN the system SHALL default to showing only the largest Apple Watch display size (Ultra 3)
-4. WHEN the iPhone, iPad, or Apple Watch section is collapsed THEN the system SHALL display a control to expand and show all sizes
-5. WHEN a user expands the iPhone section THEN the system SHALL display all iPhone display sizes (6.9", 6.5", 6.3", 6.1", 5.5", 4.7", 4", 3.5")
-6. WHEN a user expands the iPad section THEN the system SHALL display all iPad display sizes (13", 11", 12.9" 2nd Gen, 10.5", 9.7")
-7. WHEN a user expands the Apple Watch section THEN the system SHALL display all Apple Watch display sizes (Ultra 3, Series 11, Series 9, Series 6, Series 3)
-8. WHEN a user collapses the iPhone, iPad, or Apple Watch section THEN the system SHALL hide all sizes except the largest
-9. WHEN the iPhone, iPad, or Apple Watch section is expanded or collapsed THEN the system SHALL preserve this state during the session
-
-### Requirement 12
-
-**User Story:** As a system maintainer, I want canvas size definitions to be centralized and maintainable, so that I can easily update them when store requirements change.
-
-#### Acceptance Criteria
-
-1. WHEN defining canvas sizes THEN the system SHALL store them in a centralized configuration file or constant
-2. WHEN a canvas size definition includes metadata THEN the system SHALL store the device category name, dimensions, orientation, and platform
-3. WHEN store requirements change THEN the system SHALL allow updates to canvas sizes without modifying component logic
-4. WHEN adding new device categories THEN the system SHALL support extending the canvas size configuration
-5. WHEN the system references canvas sizes THEN the system SHALL use the centralized configuration as the single source of truth
+1. WHEN displaying a canvas size THEN the system SHALL use getCanvasSizeLabel() to convert the canvas size ID to a readable label
+2. WHEN displaying a canvas size THEN the system SHALL use getCanvasDimensions() to show the exact pixel dimensions
+3. WHEN displaying canvas sizes THEN the system SHALL group them by platform based on the canvas size ID prefix (iphone/ipad/watch for Apple, google for Google Play)
+4. WHEN displaying Apple canvas sizes THEN the system SHALL show them under an "Apple App Store" section header
+5. WHEN displaying Google canvas sizes THEN the system SHALL show them under a "Google Play Store" section header

@@ -31,6 +31,40 @@ const getCompositionFrameCount = (composition: string): number => {
   }
 };
 
+// Helper component for draggable frame positioning
+const DraggableFrame = ({
+  children,
+  baseStyle,
+  fixedWidth,
+  frameX,
+  frameY
+}: {
+  children: React.ReactNode;
+  baseStyle?: React.CSSProperties;
+  fixedWidth?: boolean;
+  frameX: number;
+  frameY: number;
+}) => {
+  return (
+    <Box
+      style={{
+        ...baseStyle,
+        willChange: 'transform',
+        transform: `${baseStyle?.transform || ''} translate(${frameX}px, ${frameY}px)`.trim(),
+        // For side-by-side layouts, use fixed width to prevent shifting
+        ...(fixedWidth ? {
+          minWidth: 300,
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+        } : {}),
+      }}
+    >
+      {children}
+    </Box>
+  );
+};
+
 export function CompositionRenderer({
   settings,
   screen,
@@ -91,7 +125,7 @@ export function CompositionRenderer({
     // We use a threshold of -100 pixels to trigger bottom handle
     const handlePosition = frameY < -100 ? 0 : 50;
     return {
-      deviceType: settings.deviceFrame,
+      deviceType: images[index]?.deviceFrame || 'iphone-14-pro',
       image: images[index]?.image,
       mediaId: images[index]?.mediaId,
       scale: scale * scaleMultiplier,
@@ -112,30 +146,15 @@ export function CompositionRenderer({
     };
   };
 
-  // Wrapper for draggable frame positioning
-  const DraggableFrame = ({ index, children, baseStyle }: {
-    index: number;
-    children: React.ReactNode;
-    baseStyle?: React.CSSProperties;
-  }) => {
-    const { frameX, frameY } = getFrameOffset(index);
-    return (
-      <Box
-        style={{
-          ...baseStyle,
-          transform: `${baseStyle?.transform || ''} translate(${frameX}px, ${frameY}px)`.trim(),
-        }}
-      >
-        {children}
-      </Box>
-    );
-  };
-
   switch (settings.composition) {
     case 'single':
+      const offset0 = getFrameOffset(0);
       return (
         <Center style={{ height: '100%' }}>
-          <DraggableFrame index={0}>
+          <DraggableFrame
+            frameX={offset0.frameX}
+            frameY={offset0.frameY}
+          >
             <DeviceFrame
               {...getFrameProps(0, 1)}
               showInstructions={images.length === 0 || (!images[0]?.image && !images[0]?.mediaId)}
@@ -145,29 +164,35 @@ export function CompositionRenderer({
       );
 
     case 'dual':
+      const dualOffset0 = getFrameOffset(0);
+      const dualOffset1 = getFrameOffset(1);
       return (
         <Center style={{ height: '100%', gap: 20 }}>
-          <DraggableFrame index={0}>
+          <DraggableFrame frameX={dualOffset0.frameX} frameY={dualOffset0.frameY} fixedWidth>
             <DeviceFrame {...getFrameProps(0, 0.9)} />
           </DraggableFrame>
-          <DraggableFrame index={1}>
+          <DraggableFrame frameX={dualOffset1.frameX} frameY={dualOffset1.frameY} fixedWidth>
             <DeviceFrame {...getFrameProps(1, 0.9)} />
           </DraggableFrame>
         </Center>
       );
 
     case 'stack':
+      const stackOffset0 = getFrameOffset(0);
+      const stackOffset1 = getFrameOffset(1);
       return (
         <Center style={{ height: '100%', position: 'relative' }}>
           <Box style={{ position: 'relative' }}>
             <DraggableFrame
-              index={0}
+              frameX={stackOffset0.frameX}
+              frameY={stackOffset0.frameY}
               baseStyle={{ position: 'absolute', top: -20, left: -20, zIndex: 1 }}
             >
               <DeviceFrame {...getFrameProps(0, 0.85)} />
             </DraggableFrame>
             <DraggableFrame
-              index={1}
+              frameX={stackOffset1.frameX}
+              frameY={stackOffset1.frameY}
               baseStyle={{ position: 'relative', zIndex: 2 }}
             >
               <DeviceFrame {...getFrameProps(1, 0.85)} />
@@ -177,26 +202,33 @@ export function CompositionRenderer({
       );
 
     case 'triple':
+      const tripleOffset0 = getFrameOffset(0);
+      const tripleOffset1 = getFrameOffset(1);
+      const tripleOffset2 = getFrameOffset(2);
       return (
         <Center style={{ height: '100%', gap: 15 }}>
-          <DraggableFrame index={0}>
+          <DraggableFrame frameX={tripleOffset0.frameX} frameY={tripleOffset0.frameY} fixedWidth>
             <DeviceFrame {...getFrameProps(0, 0.75)} />
           </DraggableFrame>
-          <DraggableFrame index={1}>
+          <DraggableFrame frameX={tripleOffset1.frameX} frameY={tripleOffset1.frameY} fixedWidth>
             <DeviceFrame {...getFrameProps(1, 0.75)} />
           </DraggableFrame>
-          <DraggableFrame index={2}>
+          <DraggableFrame frameX={tripleOffset2.frameX} frameY={tripleOffset2.frameY} fixedWidth>
             <DeviceFrame {...getFrameProps(2, 0.75)} />
           </DraggableFrame>
         </Center>
       );
 
     case 'fan':
+      const fanOffset0 = getFrameOffset(0);
+      const fanOffset1 = getFrameOffset(1);
+      const fanOffset2 = getFrameOffset(2);
       return (
         <Center style={{ height: '100%', position: 'relative' }}>
           <Box style={{ position: 'relative', width: 600, height: 500 }}>
             <DraggableFrame
-              index={0}
+              frameX={fanOffset0.frameX}
+              frameY={fanOffset0.frameY}
               baseStyle={{
                 position: 'absolute',
                 top: '50%',
@@ -208,7 +240,8 @@ export function CompositionRenderer({
               <DeviceFrame {...getFrameProps(0, 0.7)} />
             </DraggableFrame>
             <DraggableFrame
-              index={1}
+              frameX={fanOffset1.frameX}
+              frameY={fanOffset1.frameY}
               baseStyle={{
                 position: 'absolute',
                 top: '50%',
@@ -220,7 +253,8 @@ export function CompositionRenderer({
               <DeviceFrame {...getFrameProps(1, 0.7)} />
             </DraggableFrame>
             <DraggableFrame
-              index={2}
+              frameX={fanOffset2.frameX}
+              frameY={fanOffset2.frameY}
               baseStyle={{
                 position: 'absolute',
                 top: '50%',

@@ -78,14 +78,26 @@ const ScreenThumbnail = memo(function ScreenThumbnail({
   }
 
   // Only re-render if THIS screen's data or settings changed
+  // For images, only check image/mediaId changes, not deviceFrame (which doesn't affect thumbnail)
+  const imagesChanged = () => {
+    const prevImages = prevProps.screen.images || [];
+    const nextImages = nextProps.screen.images || [];
+    
+    if (prevImages.length !== nextImages.length) return true;
+    
+    return prevImages.some((prevImg, idx) => {
+      const nextImg = nextImages[idx];
+      return prevImg?.image !== nextImg?.image || prevImg?.mediaId !== nextImg?.mediaId;
+    });
+  };
+  
   const screenChanged =
     prevProps.screen.id !== nextProps.screen.id ||
-    JSON.stringify(prevProps.screen.images) !== JSON.stringify(nextProps.screen.images);
+    imagesChanged();
 
   // Check if this screen's settings changed
   const settingsChanged =
     prevProps.screen.settings.composition !== nextProps.screen.settings.composition ||
-    prevProps.screen.settings.deviceFrame !== nextProps.screen.settings.deviceFrame ||
     prevProps.screen.settings.compositionScale !== nextProps.screen.settings.compositionScale ||
     prevProps.screen.settings.backgroundColor !== nextProps.screen.settings.backgroundColor ||
     prevProps.screen.settings.screenScale !== nextProps.screen.settings.screenScale ||

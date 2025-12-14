@@ -25,6 +25,8 @@ interface DeviceFrameProps {
   onMediaSelect?: (mediaId: number) => void;
   onPexelsSelect?: (url: string) => void;
   onFramePositionChange?: (frameX: number, frameY: number) => void;
+  onFrameMove?: (deltaX: number, deltaY: number) => void;
+  onFrameMoveEnd?: () => void;
   frameY?: number; // The frame's Y position percentage (0-100)
 }
 
@@ -162,6 +164,8 @@ export function DeviceFrame({
   onMediaSelect,
   onPexelsSelect,
   onFramePositionChange,
+  onFrameMove,
+  onFrameMoveEnd,
   frameY = 50
 }: DeviceFrameProps) {
   const { imageUrl } = useMediaImage(mediaId);
@@ -188,6 +192,9 @@ export function DeviceFrame({
       const startPanY = panY;
       const rect = screenRef.current.getBoundingClientRect();
 
+      let rafId: number | null = null;
+      let pendingUpdate: { x: number; y: number } | null = null;
+
       const handleMove = (moveEvent: MouseEvent) => {
         const deltaX = ((moveEvent.clientX - startX) / rect.width) * 100;
         const deltaY = ((moveEvent.clientY - startY) / rect.height) * 100;
@@ -195,11 +202,36 @@ export function DeviceFrame({
         const newPanX = Math.max(0, Math.min(100, startPanX + deltaX));
         const newPanY = Math.max(0, Math.min(100, startPanY + deltaY));
 
-        onPanChange(newPanX, newPanY);
+        // Store the pending update
+        pendingUpdate = { x: newPanX, y: newPanY };
+
+        // Use requestAnimationFrame to throttle updates
+        if (rafId === null) {
+          rafId = requestAnimationFrame(() => {
+            if (pendingUpdate) {
+              onPanChange(pendingUpdate.x, pendingUpdate.y);
+              pendingUpdate = null;
+            }
+            rafId = null;
+          });
+        }
       };
 
       const handleEnd = () => {
         setIsDragging(false);
+
+        // Cancel any pending animation frame
+        if (rafId !== null) {
+          cancelAnimationFrame(rafId);
+          rafId = null;
+        }
+
+        // Apply final update if there's a pending one
+        if (pendingUpdate) {
+          onPanChange(pendingUpdate.x, pendingUpdate.y);
+          pendingUpdate = null;
+        }
+
         document.removeEventListener('mousemove', handleMove);
         document.removeEventListener('mouseup', handleEnd);
       };
@@ -216,13 +248,17 @@ export function DeviceFrame({
   const handleFrameDragStart = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    if (onFramePositionChange) {
+
+    if (onFramePositionChange || onFrameMove) {
       setIsFrameDragging(true);
       setIsHovered(false); // Hide icons immediately when drag starts
       const startX = e.clientX;
       const startY = e.clientY;
       let lastDeltaX = 0;
       let lastDeltaY = 0;
+
+      let rafId: number | null = null;
+      let pendingUpdate: { x: number; y: number } | null = null;
 
       const handleMove = (moveEvent: MouseEvent) => {
         const totalDeltaX = moveEvent.clientX - startX;
@@ -232,11 +268,54 @@ export function DeviceFrame({
         const incrementalDeltaY = totalDeltaY - lastDeltaY;
         lastDeltaX = totalDeltaX;
         lastDeltaY = totalDeltaY;
-        onFramePositionChange(incrementalDeltaX, incrementalDeltaY);
+
+        // Store the pending update - Accumulate deltas to prevent loss
+        if (pendingUpdate) {
+          pendingUpdate.x += incrementalDeltaX;
+          pendingUpdate.y += incrementalDeltaY;
+        } else {
+          pendingUpdate = { x: incrementalDeltaX, y: incrementalDeltaY };
+        }
+
+        // Use requestAnimationFrame to throttle updates
+        if (rafId === null) {
+          rafId = requestAnimationFrame(() => {
+            if (pendingUpdate) {
+              if (onFrameMove) {
+                onFrameMove(pendingUpdate.x, pendingUpdate.y);
+              } else if (onFramePositionChange) {
+                onFramePositionChange(pendingUpdate.x, pendingUpdate.y);
+              }
+              pendingUpdate = null;
+            }
+            rafId = null;
+          });
+        }
       };
 
       const handleEnd = () => {
         setIsFrameDragging(false);
+
+        // Cancel any pending animation frame
+        if (rafId !== null) {
+          cancelAnimationFrame(rafId);
+          rafId = null;
+        }
+
+        // Apply final update if there's a pending one
+        if (pendingUpdate) {
+          if (onFrameMove) {
+            onFrameMove(pendingUpdate.x, pendingUpdate.y);
+          } else if (onFramePositionChange) {
+            onFramePositionChange(pendingUpdate.x, pendingUpdate.y);
+          }
+          pendingUpdate = null;
+        }
+
+        if (onFrameMoveEnd) {
+          onFrameMoveEnd();
+        }
+
         document.removeEventListener('mousemove', handleMove);
         document.removeEventListener('mouseup', handleEnd);
       };
@@ -418,227 +497,227 @@ export function DeviceFrame({
           />
         </Box>
       )
-      }
+    }
     return null;
-    };
+  };
 
-    return (
+  return (
+    <Box
+      style={{ position: 'relative' }}
+      onMouseEnter={() => !isDragging && !isFrameDragging && setIsHovered(true)}
+      onMouseLeave={() => !isDragging && !isFrameDragging && setIsHovered(false)}
+      onDragOver={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        onDragOver?.();
+      }}
+      onDragLeave={(e) => {
+        // Only trigger if actually leaving the frame (not entering a child)
+        if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+          onDragLeave?.();
+        }
+      }}
+    >
       <Box
-        style={{ position: 'relative' }}
-        onMouseEnter={() => !isDragging && !isFrameDragging && setIsHovered(true)}
-        onMouseLeave={() => !isDragging && !isFrameDragging && setIsHovered(false)}
-        onDragOver={(e) => {
-          e.preventDefault();
+        style={{
+          width,
+          height: height + imacChin, // Add chin height if iMac
+          borderRadius: config.radius * scale,
+          background: `linear-gradient(145deg, ${config.frameColor}, ${config.frameColor})`,
+          paddingTop: topPadding,
+          paddingBottom: bottomPadding + imacChin,
+          paddingLeft: sidePadding,
+          paddingRight: sidePadding,
+          boxShadow: isHighlighted
+            ? '0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 0 3px rgba(102, 126, 234, 0.8), 0 0 20px rgba(102, 126, 234, 0.5)'
+            : isSelected
+              ? '0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 0 3px #667eea'
+              : '0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.1) inset',
+          position: 'relative',
+          display: 'flex',
+          flexDirection: 'column',
+          transition: 'box-shadow 0.2s ease',
+          cursor: onClick ? 'pointer' : undefined,
+        }}
+        onClick={onClick ? (e) => {
           e.stopPropagation();
-          onDragOver?.();
-        }}
-        onDragLeave={(e) => {
-          // Only trigger if actually leaving the frame (not entering a child)
-          if (!e.currentTarget.contains(e.relatedTarget as Node)) {
-            onDragLeave?.();
-          }
-        }}
+          onClick();
+        } : undefined}
       >
+        {renderDecorations()}
+
+        {/* Screen */}
         <Box
+          ref={screenRef}
           style={{
-            width,
-            height: height + imacChin, // Add chin height if iMac
-            borderRadius: config.radius * scale,
-            background: `linear-gradient(145deg, ${config.frameColor}, ${config.frameColor})`,
-            paddingTop: topPadding,
-            paddingBottom: bottomPadding + imacChin,
-            paddingLeft: sidePadding,
-            paddingRight: sidePadding,
-            boxShadow: isHighlighted
-              ? '0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 0 3px rgba(102, 126, 234, 0.8), 0 0 20px rgba(102, 126, 234, 0.5)'
-              : isSelected
-                ? '0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 0 3px #667eea'
-                : '0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.1) inset',
+            flex: 1,
+            width: '100%',
+            borderRadius: config.screenRadius * scale,
+            backgroundColor: '#000',
+            overflow: 'hidden',
             position: 'relative',
-            display: 'flex',
-            flexDirection: 'column',
-            transition: 'box-shadow 0.2s ease',
-            cursor: onClick ? 'pointer' : undefined,
+            boxShadow: '0 0 0 1px rgba(255, 255, 255, 0.05) inset',
+            cursor: displayImage && onPanChange ? (isDragging ? 'grabbing' : 'grab') : 'pointer',
           }}
-          onClick={onClick ? (e) => {
-            e.stopPropagation();
-            onClick();
-          } : undefined}
+          onMouseDown={handleMouseDown}
         >
-          {renderDecorations()}
-
-          {/* Screen */}
-          <Box
-            ref={screenRef}
-            style={{
-              flex: 1,
-              width: '100%',
-              borderRadius: config.screenRadius * scale,
-              backgroundColor: '#000',
-              overflow: 'hidden',
-              position: 'relative',
-              boxShadow: '0 0 0 1px rgba(255, 255, 255, 0.05) inset',
-              cursor: displayImage && onPanChange ? (isDragging ? 'grabbing' : 'grab') : 'pointer',
-            }}
-            onMouseDown={handleMouseDown}
-          >
-            {displayImage ? (
-              <Box
-                style={{
-                  width: '100%',
-                  height: '100%',
-                  backgroundImage: `url(${displayImage})`,
-                  backgroundSize: `${screenScale}%`,
-                  backgroundPosition: `${panX}% ${panY}%`,
-                  backgroundRepeat: 'no-repeat',
-                  pointerEvents: 'none',
-                }}
-              />
-            ) : showInstructions ? (
-              <Box
-                style={{
-                  width: '100%',
-                  height: '100%',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  flexDirection: 'column',
-                  gap: 12 * scale,
-                  padding: 20 * scale,
-                }}
-              >
-                <IconUpload size={32 * scale} color={isSelected ? "#667eea" : "#4a5568"} />
-                <Text
-                  size="sm"
-                  c="dimmed"
-                  style={{
-                    fontSize: 12 * scale,
-                    textAlign: 'center',
-                    lineHeight: 1.4,
-                    color: isSelected ? "#667eea" : undefined
-                  }}
-                >
-                  {isSelected ? "Selected" : "Drop screenshot"}
-                </Text>
-              </Box>
-            ) : (
-              <Box
-                style={{
-                  width: '100%',
-                  height: '100%',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  flexDirection: 'column',
-                  gap: 8 * scale,
-                }}
-              >
-                {/* Empty State Minimal */}
-              </Box>
-            )}
-          </Box>
-
-          {/* Buttons (only for phones/tablets) */}
-          {['notch', 'punch-hole', 'tablet', 'home-button', 'dynamic-island'].includes(config.type) && (
-            <>
-              <Box
-                style={{
-                  position: 'absolute',
-                  right: -2 * scale,
-                  top: '25%',
-                  width: 3 * scale,
-                  height: 50 * scale,
-                  backgroundColor: config.frameColor,
-                  borderRadius: `0 ${2 * scale}px ${2 * scale}px 0`,
-                  opacity: 0.8,
-                }}
-              />
-              <Box
-                style={{
-                  position: 'absolute',
-                  left: -2 * scale,
-                  top: '20%',
-                  width: 3 * scale,
-                  height: 30 * scale,
-                  backgroundColor: config.frameColor,
-                  borderRadius: `${2 * scale}px 0 0 ${2 * scale}px`,
-                  opacity: 0.8,
-                }}
-              />
-            </>
-          )}
-
-          {/* Frame Drag Handle - hide during any drag operation */}
-          {/* When frame is near the top (frameY < 20%), show handle at bottom instead */}
-          {onFramePositionChange && (isHovered || isFrameDragging) && !isDragging && (
+          {displayImage ? (
             <Box
-              onMouseDown={handleFrameDragStart}
               style={{
-                position: 'absolute',
-                ...(frameY < 20
-                  ? { bottom: bottomPadding + 8 * scale }
-                  : { top: topPadding + 8 * scale }),
-                left: '50%',
-                transform: 'translateX(-50%)',
-                zIndex: 20,
-                cursor: isFrameDragging ? 'grabbing' : 'grab',
-                padding: 4,
-                borderRadius: 4,
-                backgroundColor: 'rgba(102, 126, 234, 0.9)',
+                width: '100%',
+                height: '100%',
+                backgroundImage: `url(${displayImage})`,
+                backgroundSize: `${screenScale}%`,
+                backgroundPosition: `${panX}% ${panY}%`,
+                backgroundRepeat: 'no-repeat',
+                pointerEvents: 'none',
+              }}
+            />
+          ) : showInstructions ? (
+            <Box
+              style={{
+                width: '100%',
+                height: '100%',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                opacity: isFrameDragging ? 1 : 0.8,
-                transition: 'opacity 0.15s',
+                flexDirection: 'column',
+                gap: 12 * scale,
+                padding: 20 * scale,
               }}
             >
-              <IconGripVertical size={14} color="white" />
+              <IconUpload size={32 * scale} color={isSelected ? "#667eea" : "#4a5568"} />
+              <Text
+                size="sm"
+                c="dimmed"
+                style={{
+                  fontSize: 12 * scale,
+                  textAlign: 'center',
+                  lineHeight: 1.4,
+                  color: isSelected ? "#667eea" : undefined
+                }}
+              >
+                {isSelected ? "Selected" : "Drop screenshot"}
+              </Text>
+            </Box>
+          ) : (
+            <Box
+              style={{
+                width: '100%',
+                height: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexDirection: 'column',
+                gap: 8 * scale,
+              }}
+            >
+              {/* Empty State Minimal */}
             </Box>
           )}
-
-          {/* Quick Media Picker Button - hide during any drag operation */}
-          {(onMediaSelect || onPexelsSelect) && (isHovered || pickerOpen) && !isDragging && !isFrameDragging && (
-            <Popover
-              opened={pickerOpen}
-              onChange={setPickerOpen}
-              position="bottom"
-              withArrow
-              shadow="lg"
-              withinPortal
-            >
-              <Popover.Target>
-                <ActionIcon
-                  size="md"
-                  variant="filled"
-                  color="violet"
-                  style={{
-                    position: 'absolute',
-                    bottom: bottomPadding + 8 * scale,
-                    right: sidePadding + 8 * scale,
-                    zIndex: 20,
-                    opacity: pickerOpen ? 1 : 0.9,
-                    transition: 'opacity 0.15s',
-                  }}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setPickerOpen(!pickerOpen);
-                  }}
-                >
-                  <IconPhoto size={16} />
-                </ActionIcon>
-              </Popover.Target>
-              <Popover.Dropdown p={0}>
-                <QuickMediaPicker
-                  onSelectMedia={(id) => onMediaSelect?.(id)}
-                  onSelectPexels={(url) => onPexelsSelect?.(url)}
-                  onClose={() => setPickerOpen(false)}
-                />
-              </Popover.Dropdown>
-            </Popover>
-          )}
-
         </Box>
-        {renderBase()}
+
+        {/* Buttons (only for phones/tablets) */}
+        {['notch', 'punch-hole', 'tablet', 'home-button', 'dynamic-island'].includes(config.type) && (
+          <>
+            <Box
+              style={{
+                position: 'absolute',
+                right: -2 * scale,
+                top: '25%',
+                width: 3 * scale,
+                height: 50 * scale,
+                backgroundColor: config.frameColor,
+                borderRadius: `0 ${2 * scale}px ${2 * scale}px 0`,
+                opacity: 0.8,
+              }}
+            />
+            <Box
+              style={{
+                position: 'absolute',
+                left: -2 * scale,
+                top: '20%',
+                width: 3 * scale,
+                height: 30 * scale,
+                backgroundColor: config.frameColor,
+                borderRadius: `${2 * scale}px 0 0 ${2 * scale}px`,
+                opacity: 0.8,
+              }}
+            />
+          </>
+        )}
+
+        {/* Frame Drag Handle - hide during any drag operation */}
+        {/* When frame is near the top (frameY < 20%), show handle at bottom instead */}
+        {onFramePositionChange && (isHovered || isFrameDragging) && !isDragging && (
+          <Box
+            onMouseDown={handleFrameDragStart}
+            style={{
+              position: 'absolute',
+              ...(frameY < 20
+                ? { bottom: bottomPadding + 8 * scale }
+                : { top: topPadding + 8 * scale }),
+              left: '50%',
+              transform: 'translateX(-50%)',
+              zIndex: 20,
+              cursor: isFrameDragging ? 'grabbing' : 'grab',
+              padding: 4,
+              borderRadius: 4,
+              backgroundColor: 'rgba(102, 126, 234, 0.9)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              opacity: isFrameDragging ? 1 : 0.8,
+              transition: 'opacity 0.15s',
+            }}
+          >
+            <IconGripVertical size={14} color="white" />
+          </Box>
+        )}
+
+        {/* Quick Media Picker Button - hide during any drag operation */}
+        {(onMediaSelect || onPexelsSelect) && (isHovered || pickerOpen) && !isDragging && !isFrameDragging && (
+          <Popover
+            opened={pickerOpen}
+            onChange={setPickerOpen}
+            position="bottom"
+            withArrow
+            shadow="lg"
+            withinPortal
+          >
+            <Popover.Target>
+              <ActionIcon
+                size="md"
+                variant="filled"
+                color="violet"
+                style={{
+                  position: 'absolute',
+                  bottom: bottomPadding + 8 * scale,
+                  right: sidePadding + 8 * scale,
+                  zIndex: 20,
+                  opacity: pickerOpen ? 1 : 0.9,
+                  transition: 'opacity 0.15s',
+                }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setPickerOpen(!pickerOpen);
+                }}
+              >
+                <IconPhoto size={16} />
+              </ActionIcon>
+            </Popover.Target>
+            <Popover.Dropdown p={0}>
+              <QuickMediaPicker
+                onSelectMedia={(id) => onMediaSelect?.(id)}
+                onSelectPexels={(url) => onPexelsSelect?.(url)}
+                onClose={() => setPickerOpen(false)}
+              />
+            </Popover.Dropdown>
+          </Popover>
+        )}
+
       </Box>
-    );
-  }
+      {renderBase()}
+    </Box>
+  );
+}

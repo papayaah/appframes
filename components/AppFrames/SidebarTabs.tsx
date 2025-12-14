@@ -14,11 +14,21 @@ interface SidebarTabsProps {
   settings: CanvasSettings;
   setSettings: (settings: CanvasSettings) => void;
   screens: Screen[];
+  selectedFrameIndex?: number;
+  onFrameDeviceChange?: (frameIndex: number, deviceFrame: string) => void;
   onMediaSelect?: (mediaId: number) => void;
   onPanelToggle?: (isOpen: boolean) => void;
 }
 
-export function SidebarTabs({ settings, setSettings, screens, onMediaSelect, onPanelToggle }: SidebarTabsProps) {
+export function SidebarTabs({ 
+  settings, 
+  setSettings, 
+  screens, 
+  selectedFrameIndex = 0,
+  onFrameDeviceChange,
+  onMediaSelect, 
+  onPanelToggle 
+}: SidebarTabsProps) {
   const router = useRouter();
   const pathname = usePathname();
   const [isPanelOpen, setIsPanelOpen] = useState(true);
@@ -149,7 +159,13 @@ export function SidebarTabs({ settings, setSettings, screens, onMediaSelect, onP
             </Tabs.Panel>
 
             <Tabs.Panel value="device" style={{ height: '100%' }}>
-              <DeviceTab settings={settings} setSettings={setSettings} />
+              <DeviceTab 
+                settings={settings} 
+                setSettings={setSettings}
+                selectedFrameIndex={selectedFrameIndex}
+                onFrameDeviceChange={onFrameDeviceChange}
+                screens={screens}
+              />
             </Tabs.Panel>
 
             <Tabs.Panel value="text" style={{ height: '100%' }}>

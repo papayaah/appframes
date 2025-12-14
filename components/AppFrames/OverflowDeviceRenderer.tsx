@@ -42,7 +42,7 @@ export function OverflowDeviceRenderer({
       }}
     >
       <DeviceFrame
-        deviceType={settings.deviceFrame}
+        deviceType={image?.deviceFrame || 'iphone-14-pro'}
         image={image?.image}
         mediaId={image?.mediaId}
         scale={scale}

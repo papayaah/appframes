@@ -2,9 +2,9 @@
 
 ## Overview
 
-This feature adds 3D tilt and 2D rotation capabilities to device frames in AppFrames, enabling users to create more dynamic and visually engaging app screenshot compositions. The implementation leverages CSS 3D transforms (rotateX, rotateY, rotateZ) to achieve perspective tilting and rotation effects while maintaining export quality and existing functionality.
+This feature adds 3D tilt, 2D rotation, and interactive resizing capabilities to device frames in AppFrames, enabling users to create more dynamic and visually engaging app screenshot compositions. The implementation leverages CSS 3D transforms (rotateX, rotateY, rotateZ) and scale transforms to achieve perspective tilting, rotation, and resizing effects while maintaining export quality and existing functionality.
 
-The design extends the current per-frame positioning system (frameX, frameY) to include rotation transforms (tiltX, tiltY, rotateZ), stored in the ScreenImage interface and applied via CSS transforms in the DeviceFrame component.
+The design extends the current per-frame positioning system (frameX, frameY) to include rotation transforms (tiltX, tiltY, rotateZ) and per-frame scaling (frameScale), all stored in the ScreenImage interface. This replaces the global compositionScale setting with individual frame control. Interactive resize handles are added to each frame, allowing users to drag edges and corners to adjust frame size.
 
 ## Architecture
 
@@ -49,8 +49,66 @@ export interface ScreenImage {
   tiltX?: number; // -60 to 60 degrees, default 0
   tiltY?: number; // -60 to 60 degrees, default 0
   rotateZ?: number; // -180 to 180 degrees, default 0
+  frameScale?: number; // 20 to 200 percent, default 100
 }
 ```
+
+#### Updated CanvasSettings Interface
+
+```typescript
+export interface CanvasSettings {
+  canvasSize: string;
+  deviceFrame: string;
+  composition: 'single' | 'dual' | 'stack' | 'triple' | 'fan';
+  // REMOVED: compositionScale - replaced by per-frame frameScale in ScreenImage
+  captionVertical: number;
+  captionHorizontal: number;
+  selectedScreenIndex: number;
+  screenScale: number;
+  screenPanX: number;
+  screenPanY: number;
+  orientation: string;
+  backgroundColor: string;
+  captionText: string;
+  showCaption: boolean;
+}
+```
+
+### New Components
+
+#### ResizeHandles Component
+
+**Purpose:** Render interactive resize handles on device frames for drag-based resizing
+
+**Structure:**
+```typescript
+interface ResizeHandlesProps {
+  frameIndex: number;
+  onResizeStart: (handle: ResizeHandle) => void;
+  onResize: (deltaX: number, deltaY: number, handle: ResizeHandle) => void;
+  onResizeEnd: () => void;
+  isActive: boolean; // Show handles only when frame is hovered/selected
+}
+
+type ResizeHandle = 
+  | 'top' | 'right' | 'bottom' | 'left'  // Edge handles
+  | 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right'; // Corner handles
+```
+
+**Behavior:**
+- Renders 8 handles: 4 corners + 4 edges
+- Corner handles: proportional resize (maintain aspect ratio)
+- Edge handles: single-dimension resize
+- Handles appear on hover over the frame
+- Visual feedback during drag (cursor changes, handle highlight)
+- Handles positioned absolutely relative to frame bounds
+
+**Implementation Notes:**
+- Use `onMouseDown` to initiate drag
+- Track mouse movement with `onMouseMove` on document
+- Calculate delta from initial position
+- Apply constraints (20-200%) during drag
+- Finalize on `onMouseUp`
 
 ### Component Updates
 
@@ -82,8 +140,10 @@ interface DeviceFrameProps {
 
 **Changes:**
 - Extract transform values from `images[index]` in `getFrameProps`
-- Pass tiltX, tiltY, rotateZ to DraggableFrame wrapper
+- Pass tiltX, tiltY, rotateZ, frameScale to DraggableFrame wrapper
 - Update DraggableFrame to accept and apply transform props
+- Remove usage of compositionScale from CanvasSettings
+- Use per-frame frameScale instead of global compositionScale
 
 **Updated DraggableFrame:**
 ```typescript
@@ -93,7 +153,8 @@ const DraggableFrame = ({
   baseStyle,
   tiltX = 0,
   tiltY = 0,
-  rotateZ = 0
+  rotateZ = 0,
+  frameScale = 100
 }: {
   index: number;
   children: React.ReactNode;
@@ -101,26 +162,42 @@ const DraggableFrame = ({
   tiltX?: number;
   tiltY?: number;
   rotateZ?: number;
+  frameScale?: number;
 }) => {
   const { frameX, frameY } = getFrameOffset(index);
+  const [isHovered, setIsHovered] = useState(false);
   
   // Build transform string with correct order:
   // 1. Base composition transform (from baseStyle)
   // 2. Position offset (translate)
-  // 3. Rotation transforms (rotateX, rotateY, rotateZ)
+  // 3. Scale (applied before rotation for correct behavior)
+  // 4. Rotation transforms (rotateX, rotateY, rotateZ)
   const baseTransform = baseStyle?.transform || '';
   const positionTransform = `translate(${frameX}px, ${frameY}px)`;
+  const scaleTransform = `scale(${frameScale / 100})`;
   const rotationTransform = `rotateX(${tiltX}deg) rotateY(${tiltY}deg) rotateZ(${rotateZ}deg)`;
   
   return (
     <Box
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
       style={{
         ...baseStyle,
-        transform: `${baseTransform} ${positionTransform} ${rotationTransform}`.trim(),
+        transform: `${baseTransform} ${positionTransform} ${scaleTransform} ${rotationTransform}`.trim(),
         transformStyle: 'preserve-3d', // Enable 3D transforms
+        position: 'relative',
       }}
     >
       {children}
+      {isHovered && (
+        <ResizeHandles
+          frameIndex={index}
+          onResizeStart={handleResizeStart}
+          onResize={handleResize}
+          onResizeEnd={handleResizeEnd}
+          isActive={isHovered}
+        />
+      )}
     </Box>
   );
 };
@@ -202,12 +279,12 @@ const DraggableFrame = ({
 
 **New Responsibility:** Handle transform changes via new callback
 
-**New Handler:**
+**New Handlers:**
 ```typescript
 const handleTransformChange = (
   screenIndex: number,
   frameIndex: number,
-  property: 'tiltX' | 'tiltY' | 'rotateZ',
+  property: 'tiltX' | 'tiltY' | 'rotateZ' | 'frameScale',
   value: number
 ) => {
   setScreens(prevScreens => {
@@ -234,6 +311,37 @@ const handleTransformChange = (
     return updated;
   });
 };
+
+const handleResize = (
+  screenIndex: number,
+  frameIndex: number,
+  deltaX: number,
+  deltaY: number,
+  handle: ResizeHandle
+) => {
+  const currentFrame = screens[screenIndex]?.images?.[frameIndex];
+  const currentScale = currentFrame?.frameScale ?? 100;
+  
+  // Calculate new scale based on handle type and delta
+  let newScale = currentScale;
+  
+  if (handle.includes('corner')) {
+    // Corner handles: proportional resize
+    // Use the larger delta for uniform scaling
+    const delta = Math.max(Math.abs(deltaX), Math.abs(deltaY));
+    const direction = deltaX > 0 || deltaY > 0 ? 1 : -1;
+    newScale = currentScale + (delta * direction * 0.1); // Adjust sensitivity
+  } else {
+    // Edge handles: single dimension
+    const delta = handle === 'left' || handle === 'right' ? deltaX : deltaY;
+    newScale = currentScale + (delta * 0.1);
+  }
+  
+  // Clamp to valid range
+  newScale = Math.max(20, Math.min(200, newScale));
+  
+  handleTransformChange(screenIndex, frameIndex, 'frameScale', newScale);
+};
 ```
 
 ### Transform Order and Perspective
@@ -241,7 +349,8 @@ const handleTransformChange = (
 **CSS Transform Order:**
 1. Base composition transform (e.g., `rotate(-8deg)` for fan layout)
 2. Position offset (`translate(frameX, frameY)`)
-3. Rotation transforms (`rotateX(tiltX) rotateY(tiltY) rotateZ(rotateZ)`)
+3. Scale (`scale(frameScale / 100)`) - Applied before rotation for correct behavior
+4. Rotation transforms (`rotateX(tiltX) rotateY(tiltY) rotateZ(rotateZ)`)
 
 **Perspective Setup:**
 The parent container of DraggableFrame should have perspective applied to enable 3D depth:
@@ -256,6 +365,24 @@ The parent container of DraggableFrame should have perspective applied to enable
 </Box>
 ```
 
+## Migration Strategy
+
+### Removing compositionScale
+
+**Files to Update:**
+1. `components/AppFrames/types.ts` - Remove compositionScale from CanvasSettings
+2. `components/AppFrames/FramesContext.tsx` - Remove from default settings
+3. `components/AppFrames/Sidebar.tsx` - Remove composition scale slider
+4. `components/AppFrames/CompositionRenderer.tsx` - Remove scale calculation from compositionScale
+5. `components/AppFrames/OverflowDeviceRenderer.tsx` - Remove scale calculation from compositionScale
+6. `lib/PersistenceDB.ts` - Remove compositionScale validation and defaults
+7. `lib/PersistenceDB.test.ts` - Remove compositionScale from test fixtures
+
+**Migration Handling:**
+- When loading existing compositions with compositionScale, ignore the value
+- All frames default to frameScale: 100 if not specified
+- No data migration needed - old compositionScale values are simply not used
+
 ## Error Handling
 
 ### Value Constraints
@@ -264,12 +391,16 @@ The parent container of DraggableFrame should have perspective applied to enable
 - Clamp tiltX: -60° to 60°
 - Clamp tiltY: -60° to 60°
 - Clamp rotateZ: -180° to 180°
+- Clamp frameScale: 20% to 200%
 
 **Implementation:**
 ```typescript
-const clampTransform = (value: number, property: 'tiltX' | 'tiltY' | 'rotateZ'): number => {
+const clampTransform = (value: number, property: 'tiltX' | 'tiltY' | 'rotateZ' | 'frameScale'): number => {
   if (property === 'rotateZ') {
     return Math.max(-180, Math.min(180, value));
+  }
+  if (property === 'frameScale') {
+    return Math.max(20, Math.min(200, value));
   }
   return Math.max(-60, Math.min(60, value));
 };
@@ -381,6 +512,48 @@ const clampTransform = (value: number, property: 'tiltX' | 'tiltY' | 'rotateZ'):
 
 **Validates: Requirements 6.3**
 
+### Property 11: Frame scale transform application
+
+*For any* valid frameScale value between 20 and 200 percent, when applied to a device frame, the resulting CSS transform string should contain `scale(${frameScale / 100})`
+
+**Validates: Requirements 7.4**
+
+### Property 12: Frame scale independence across frames
+
+*For any* screen with multiple frames in a composition, when frameScale is set on one frame, the frameScale values of other frames in the same screen should remain unchanged
+
+**Validates: Requirements 7.6**
+
+### Property 13: Scale transform order before rotation
+
+*For any* combination of frameScale and rotation values (tiltX, tiltY, rotateZ), when all are applied to a device frame, the transform string should contain scale before any rotation transforms
+
+**Validates: Requirements 8.3**
+
+### Property 14: Complete transform order with scale
+
+*For any* combination of frameScale, tiltX, tiltY, and rotateZ values, when all are applied to a device frame, the transform string should contain all transforms in the order: scale, rotateX, rotateY, rotateZ
+
+**Validates: Requirements 8.4**
+
+### Property 15: Frame scale state persistence per frame
+
+*For any* screen and frame index, when frameScale value is set, that value should be stored in the corresponding ScreenImage object in the images array
+
+**Validates: Requirements 9.1**
+
+### Property 16: Frame scale state isolation between screens
+
+*For any* two different screens, when frameScale is set on a frame in one screen, the frameScale values of frames in the other screen should remain unchanged
+
+**Validates: Requirements 9.2**
+
+### Property 17: Frame scale value clamping
+
+*For any* input value for frameScale, the stored value should be clamped to the range [20, 200]
+
+**Validates: Requirements 10.1**
+
 ### Testing Strategy
 
 #### Unit Tests
@@ -404,6 +577,21 @@ const clampTransform = (value: number, property: 'tiltX' | 'tiltY' | 'rotateZ'):
 
 6. **New screen initialization** - When a new screen is created, transform values should be undefined or 0
    - **Validates: Requirements 4.5**
+
+7. **Resize handles appear on hover** - When a device frame is hovered, resize handles should be rendered
+   - **Validates: Requirements 7.1**
+
+8. **New frame scale initialization** - When a new frame is added, frameScale should be 100 or undefined
+   - **Validates: Requirements 9.5**
+
+9. **Composition scale slider removed** - Sidebar should not render a composition-level scale slider
+   - **Validates: Requirements 11.1**
+
+10. **Migration ignores compositionScale** - Loading data with compositionScale should not break and should use frameScale instead
+   - **Validates: Requirements 11.3**
+
+11. **Renderer uses per-frame scale** - CompositionRenderer should use frameScale from ScreenImage, not compositionScale from CanvasSettings
+   - **Validates: Requirements 11.4**
 
 #### Property-Based Tests
 
@@ -472,6 +660,48 @@ const clampTransform = (value: number, property: 'tiltX' | 'tiltY' | 'rotateZ'):
 - Apply clamping function
 - Assert result is within [-180, 180]
 - **Feature: device-frame-rotation, Property 10: Rotation value clamping**
+
+**Property Test 11: Frame scale transform application**
+- Generate random frameScale values in range [20, 200]
+- Apply to DraggableFrame
+- Assert transform string contains `scale(${frameScale / 100})`
+- **Feature: device-frame-rotation, Property 11: Frame scale transform application**
+
+**Property Test 12: Frame scale independence across frames**
+- Generate random screen with multiple frames
+- Set random frameScale on frame 0
+- Assert frames 1 and 2 have unchanged frameScale values
+- **Feature: device-frame-rotation, Property 12: Frame scale independence across frames**
+
+**Property Test 13: Scale transform order before rotation**
+- Generate random combinations of frameScale and rotation values
+- Apply all to DraggableFrame
+- Assert transform string contains scale before any rotation transforms
+- **Feature: device-frame-rotation, Property 13: Scale transform order before rotation**
+
+**Property Test 14: Complete transform order with scale**
+- Generate random combinations of frameScale, tiltX, tiltY, rotateZ
+- Apply all to DraggableFrame
+- Assert transform string contains all in order: scale, rotateX, rotateY, rotateZ
+- **Feature: device-frame-rotation, Property 14: Complete transform order with scale**
+
+**Property Test 15: Frame scale state persistence per frame**
+- Generate random screen index, frame index, and frameScale value
+- Call handleTransformChange with 'frameScale'
+- Assert ScreenImage at that index contains the correct frameScale value
+- **Feature: device-frame-rotation, Property 15: Frame scale state persistence per frame**
+
+**Property Test 16: Frame scale state isolation between screens**
+- Generate random screens array with at least 2 screens
+- Set frameScale on frame in screen 0
+- Assert all frames in screen 1 have unchanged frameScale values
+- **Feature: device-frame-rotation, Property 16: Frame scale state isolation between screens**
+
+**Property Test 17: Frame scale value clamping**
+- Generate random values including values outside [20, 200]
+- Apply clamping function
+- Assert result is within [20, 200]
+- **Feature: device-frame-rotation, Property 17: Frame scale value clamping**
 
 #### Integration Tests
 

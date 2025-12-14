@@ -6,6 +6,9 @@ import { CanvasSettings } from './AppFrames';
 interface DeviceTabProps {
   settings: CanvasSettings;
   setSettings: (settings: CanvasSettings) => void;
+  selectedFrameIndex?: number;
+  onFrameDeviceChange?: (frameIndex: number, deviceFrame: string) => void;
+  screens?: any[]; // To access current screen's images
 }
 
 interface DeviceOption {
@@ -13,35 +16,42 @@ interface DeviceOption {
   name: string;
   dimensions: string;
   category: string;
+  subcategory?: string;
 }
 
 const devices: DeviceOption[] = [
-  // PHONES
-  { id: 'iphone-14-pro', name: 'iPhone 14 Pro', dimensions: 'Notch', category: 'PHONES' },
-  { id: 'iphone-14', name: 'iPhone 14', dimensions: 'Notch', category: 'PHONES' },
-  { id: 'iphone-13', name: 'iPhone 13', dimensions: 'Notch', category: 'PHONES' },
-  { id: 'iphone-se', name: 'iPhone SE', dimensions: 'Home Button', category: 'PHONES' },
-  { id: 'pixel-7', name: 'Pixel 7', dimensions: 'Punch Hole', category: 'PHONES' },
-  { id: 'samsung-s23', name: 'Samsung S23', dimensions: 'Punch Hole', category: 'PHONES' },
-  { id: 'galaxy-z-flip-5', name: 'Galaxy Z Flip 5', dimensions: 'Foldable', category: 'PHONES' },
-  { id: 'galaxy-z-fold-5', name: 'Galaxy Z Fold 5', dimensions: 'Foldable', category: 'PHONES' },
+  // PHONES - iOS
+  { id: 'iphone-14-pro', name: 'iPhone 14 Pro', dimensions: 'Dynamic Island', category: 'PHONES', subcategory: 'iOS' },
+  { id: 'iphone-14', name: 'iPhone 14', dimensions: 'Notch', category: 'PHONES', subcategory: 'iOS' },
+  { id: 'iphone-13', name: 'iPhone 13', dimensions: 'Notch', category: 'PHONES', subcategory: 'iOS' },
+  { id: 'iphone-se', name: 'iPhone SE', dimensions: 'Home Button', category: 'PHONES', subcategory: 'iOS' },
   
-  // TABLETS
-  { id: 'ipad-pro', name: 'iPad Pro', dimensions: 'Rounded', category: 'TABLETS' },
-  { id: 'ipad-air', name: 'iPad Air', dimensions: 'Rounded', category: 'TABLETS' },
-  { id: 'ipad-mini', name: 'iPad Mini', dimensions: 'Rounded', category: 'TABLETS' },
-  { id: 'galaxy-tab-s9', name: 'Galaxy Tab S9', dimensions: 'Rounded', category: 'TABLETS' },
+  // PHONES - Android
+  { id: 'pixel-7', name: 'Pixel 7', dimensions: 'Punch Hole', category: 'PHONES', subcategory: 'Android' },
+  { id: 'samsung-s23', name: 'Samsung S23', dimensions: 'Punch Hole', category: 'PHONES', subcategory: 'Android' },
+  { id: 'galaxy-z-flip-5', name: 'Galaxy Z Flip 5', dimensions: 'Foldable', category: 'PHONES', subcategory: 'Android' },
+  { id: 'galaxy-z-fold-5', name: 'Galaxy Z Fold 5', dimensions: 'Foldable', category: 'PHONES', subcategory: 'Android' },
   
-  // LAPTOPS
-  { id: 'macbook-pro-16', name: 'MacBook Pro 16"', dimensions: 'Notch', category: 'LAPTOPS' },
-  { id: 'macbook-pro-14', name: 'MacBook Pro 14"', dimensions: 'Notch', category: 'LAPTOPS' },
-  { id: 'macbook-air', name: 'MacBook Air', dimensions: 'No Notch', category: 'LAPTOPS' },
-  { id: 'surface-laptop', name: 'Surface Laptop', dimensions: 'Windows', category: 'LAPTOPS' },
+  // TABLETS - iOS
+  { id: 'ipad-pro', name: 'iPad Pro', dimensions: 'Rounded', category: 'TABLETS', subcategory: 'iOS' },
+  { id: 'ipad-air', name: 'iPad Air', dimensions: 'Rounded', category: 'TABLETS', subcategory: 'iOS' },
+  { id: 'ipad-mini', name: 'iPad Mini', dimensions: 'Rounded', category: 'TABLETS', subcategory: 'iOS' },
   
-  // DESKTOPS
-  { id: 'imac-24', name: 'iMac 24"', dimensions: 'All-in-One', category: 'DESKTOPS' },
-  { id: 'studio-display', name: 'Studio Display', dimensions: 'Monitor', category: 'DESKTOPS' },
-  { id: 'pro-display-xdr', name: 'Pro Display XDR', dimensions: 'Monitor', category: 'DESKTOPS' },
+  // TABLETS - Android
+  { id: 'galaxy-tab-s9', name: 'Galaxy Tab S9', dimensions: 'Rounded', category: 'TABLETS', subcategory: 'Android' },
+  
+  // LAPTOPS - macOS
+  { id: 'macbook-pro-16', name: 'MacBook Pro 16"', dimensions: 'Notch', category: 'LAPTOPS', subcategory: 'macOS' },
+  { id: 'macbook-pro-14', name: 'MacBook Pro 14"', dimensions: 'Notch', category: 'LAPTOPS', subcategory: 'macOS' },
+  { id: 'macbook-air', name: 'MacBook Air', dimensions: 'No Notch', category: 'LAPTOPS', subcategory: 'macOS' },
+  
+  // LAPTOPS - Windows
+  { id: 'surface-laptop', name: 'Surface Laptop', dimensions: 'Windows', category: 'LAPTOPS', subcategory: 'Windows' },
+  
+  // DESKTOPS - macOS
+  { id: 'imac-24', name: 'iMac 24"', dimensions: 'All-in-One', category: 'DESKTOPS', subcategory: 'macOS' },
+  { id: 'studio-display', name: 'Studio Display', dimensions: 'Monitor', category: 'DESKTOPS', subcategory: 'macOS' },
+  { id: 'pro-display-xdr', name: 'Pro Display XDR', dimensions: 'Monitor', category: 'DESKTOPS', subcategory: 'macOS' },
 ];
 
 const DeviceButton = ({
@@ -116,30 +126,74 @@ const DeviceButton = ({
   </Box>
 );
 
-export function DeviceTab({ settings, setSettings }: DeviceTabProps) {
-  const categories = ['PHONES', 'TABLETS', 'LAPTOPS', 'DESKTOPS', 'TVS'];
+export function DeviceTab({ 
+  settings, 
+  setSettings, 
+  selectedFrameIndex = 0,
+  onFrameDeviceChange,
+  screens = []
+}: DeviceTabProps) {
+  const categories = ['PHONES', 'TABLETS', 'LAPTOPS', 'DESKTOPS'];
+
+  // Get current screen and its images
+  const currentScreen = screens[settings.selectedScreenIndex];
+  const currentImages = currentScreen?.images || [];
+  
+  // Get the device frame for the selected frame
+  const currentDeviceFrame = currentImages[selectedFrameIndex]?.deviceFrame || 'iphone-14-pro';
+
+  const handleDeviceSelect = (deviceId: string) => {
+    if (onFrameDeviceChange) {
+      onFrameDeviceChange(selectedFrameIndex, deviceId);
+    }
+  };
 
   return (
     <ScrollArea style={{ height: '100%' }}>
-      <Stack gap="lg" p="md">
+      <Stack gap="xl" p="md">
+        {/* Show which frame is being edited */}
+        {onFrameDeviceChange && (
+          <Box p="xs" style={{ backgroundColor: '#f8f9ff', borderRadius: 8 }}>
+            <Text size="xs" c="dimmed" fw={500}>
+              Editing Frame {selectedFrameIndex + 1}
+            </Text>
+          </Box>
+        )}
+        
         {categories.map((category) => {
           const categoryDevices = devices.filter((d) => d.category === category);
           if (categoryDevices.length === 0) return null;
 
+          // Group devices by subcategory
+          const subcategories = Array.from(new Set(categoryDevices.map((d) => d.subcategory).filter(Boolean)));
+
           return (
             <Box key={category}>
-              <Text size="xs" fw={700} c="dimmed" mb="xs" tt="uppercase">
-                {category}
+              <Text size="sm" fw={700} c="dark" mb="md" tt="capitalize">
+                {category.toLowerCase()}
               </Text>
-              <Stack gap="xs">
-                {categoryDevices.map((device) => (
-                  <DeviceButton
-                    key={device.id}
-                    device={device}
-                    selected={settings.deviceFrame === device.id}
-                    onClick={() => setSettings({ ...settings, deviceFrame: device.id })}
-                  />
-                ))}
+              <Stack gap="lg">
+                {subcategories.map((subcategory) => {
+                  const subcategoryDevices = categoryDevices.filter((d) => d.subcategory === subcategory);
+                  
+                  return (
+                    <Box key={subcategory}>
+                      <Text size="xs" fw={600} c="dimmed" mb="xs" pl="xs">
+                        {subcategory}
+                      </Text>
+                      <Stack gap="xs">
+                        {subcategoryDevices.map((device) => (
+                          <DeviceButton
+                            key={device.id}
+                            device={device}
+                            selected={currentDeviceFrame === device.id}
+                            onClick={() => handleDeviceSelect(device.id)}
+                          />
+                        ))}
+                      </Stack>
+                    </Box>
+                  );
+                })}
               </Stack>
             </Box>
           );

@@ -518,10 +518,6 @@ function validateCanvasSettings(settings: any): Omit<Screen['settings'], never> 
       ? settings.canvasSize
       : defaults.canvasSize,
 
-    deviceFrame: typeof settings.deviceFrame === 'string' && settings.deviceFrame.length > 0
-      ? settings.deviceFrame
-      : defaults.deviceFrame,
-
     composition: ['single', 'dual', 'stack', 'triple', 'fan'].includes(settings.composition)
       ? settings.composition
       : defaults.composition,
@@ -665,7 +661,6 @@ function validateTextStyle(style: any): Screen['settings']['captionStyle'] {
 function getDefaultCanvasSettings(): Omit<Screen['settings'], never> {
   return {
     canvasSize: 'iphone-6.5',
-    deviceFrame: 'iphone-14-pro',
     composition: 'single',
     compositionScale: 85,
     captionVertical: 10,
