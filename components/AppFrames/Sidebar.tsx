@@ -149,16 +149,58 @@ export function Sidebar({ settings, setSettings, screens }: SidebarProps) {
           onChange={(value) => setSettings({ ...settings, canvasSize: value || 'iphone-6.9' })}
           data={[
             { 
-              group: 'Apple App Store - iPhone',
+              group: 'iPhone — 6.9" Display',
               items: [
-                { value: 'iphone-6.9', label: '1320 × 2868 (6.9")' },
-                { value: 'iphone-6.5', label: '1284 × 2778 (6.5")' },
-                { value: 'iphone-6.3', label: '1206 × 2622 (6.3")' },
-                { value: 'iphone-6.1', label: '1179 × 2556 (6.1")' },
-                { value: 'iphone-5.5', label: '1242 × 2208 (5.5")' },
-                { value: 'iphone-4.7', label: '750 × 1334 (4.7")' },
-                { value: 'iphone-4.0', label: '640 × 1136 (4.0")' },
-                { value: 'iphone-3.5', label: '640 × 960 (3.5")' },
+                { value: 'iphone-6.9-1260x2736', label: '1260 × 2736' },
+                { value: 'iphone-6.9-1290x2796', label: '1290 × 2796' },
+                { value: 'iphone-6.9', label: '1320 × 2868' },
+              ]
+            },
+            { 
+              group: 'iPhone — 6.5" Display',
+              items: [
+                { value: 'iphone-6.5', label: '1284 × 2778' },
+              ]
+            },
+            { 
+              group: 'iPhone — 6.3" Display',
+              items: [
+                { value: 'iphone-6.3-1179x2556', label: '1179 × 2556' },
+                { value: 'iphone-6.3', label: '1206 × 2622' },
+              ]
+            },
+            { 
+              group: 'iPhone — 6.1" Display',
+              items: [
+                { value: 'iphone-6.1-1170x2532', label: '1170 × 2532' },
+                { value: 'iphone-6.1-1125x2436', label: '1125 × 2436' },
+                { value: 'iphone-6.1-1080x2340', label: '1080 × 2340' },
+              ]
+            },
+            { 
+              group: 'iPhone — 5.5" Display',
+              items: [
+                { value: 'iphone-5.5', label: '1242 × 2208' },
+              ]
+            },
+            { 
+              group: 'iPhone — 4.7" Display',
+              items: [
+                { value: 'iphone-4.7', label: '750 × 1334' },
+              ]
+            },
+            { 
+              group: 'iPhone — 4.0" Display',
+              items: [
+                { value: 'iphone-4.0-640x1096', label: '640 × 1096 (without status bar)' },
+                { value: 'iphone-4.0', label: '640 × 1136 (with status bar)' },
+              ]
+            },
+            { 
+              group: 'iPhone — 3.5" Display',
+              items: [
+                { value: 'iphone-3.5-640x920', label: '640 × 920 (without status bar)' },
+                { value: 'iphone-3.5', label: '640 × 960 (with status bar)' },
               ]
             },
             { 

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { AppShell, Box } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { Header } from './Header';
@@ -61,7 +61,38 @@ export function AppFrames() {
     initPersistence();
   }, []);
 
-  const handleMediaUpload = async (file: File): Promise<number | null> => {
+  const createThumbnail = useCallback((file: File): Promise<string> => {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const maxSize = 200;
+          let width = img.width;
+          let height = img.height;
+
+          if (width > height && width > maxSize) {
+            height = (height * maxSize) / width;
+            width = maxSize;
+          } else if (height >= width && height > maxSize) {
+            width = (width * maxSize) / height;
+            height = maxSize;
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx?.drawImage(img, 0, 0, width, height);
+          resolve(canvas.toDataURL('image/jpeg', 0.8));
+        };
+        img.src = e.target?.result as string;
+      };
+      reader.readAsDataURL(file);
+    });
+  }, []);
+
+  const handleMediaUpload = useCallback(async (file: File): Promise<number | null> => {
     try {
       const { persistenceDB } = await import('../../lib/PersistenceDB');
       const { OPFSManager } = await import('../../lib/opfs');
@@ -96,38 +127,68 @@ export function AppFrames() {
       console.error('Error uploading media:', error);
       return null;
     }
-  };
+  }, [createThumbnail]);
 
-  const createThumbnail = (file: File): Promise<string> => {
-    return new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const img = new Image();
-        img.onload = () => {
-          const canvas = document.createElement('canvas');
-          const maxSize = 200;
-          let width = img.width;
-          let height = img.height;
+  // Paste clipboard screenshots/images into the currently selected frame
+  useEffect(() => {
+    const isEditableTarget = (target: EventTarget | null): boolean => {
+      if (!target || !(target instanceof HTMLElement)) return false;
+      if (target.isContentEditable) return true;
+      return !!target.closest('input, textarea, [contenteditable="true"], [role="textbox"]');
+    };
 
-          if (width > height && width > maxSize) {
-            height = (height * maxSize) / width;
-            width = maxSize;
-          } else if (height >= width && height > maxSize) {
-            width = (width * maxSize) / height;
-            height = maxSize;
-          }
+    const onPaste = async (e: ClipboardEvent) => {
+      try {
+        // Don't hijack paste when user is typing into an input/textarea/contenteditable
+        if (isEditableTarget(e.target)) return;
 
-          canvas.width = width;
-          canvas.height = height;
-          const ctx = canvas.getContext('2d');
-          ctx?.drawImage(img, 0, 0, width, height);
-          resolve(canvas.toDataURL('image/jpeg', 0.8));
-        };
-        img.src = e.target?.result as string;
-      };
-      reader.readAsDataURL(file);
-    });
-  };
+        const clipboard = e.clipboardData;
+        if (!clipboard?.items?.length) return;
+
+        const items = Array.from(clipboard.items);
+        const imageItem = items.find(item => item.type?.startsWith('image/'));
+        if (!imageItem) return;
+
+        const pastedFile = imageItem.getAsFile();
+        if (!pastedFile) return;
+
+        // We are handling the paste ourselves (avoid browser default behavior)
+        e.preventDefault();
+
+        const normalizedFile = pastedFile.name && pastedFile.name.trim().length > 0
+          ? pastedFile
+          : new File([pastedFile], `clipboard-${Date.now()}.png`, { type: pastedFile.type || 'image/png' });
+
+        const mediaId = await handleMediaUpload(normalizedFile);
+        if (!mediaId) {
+          notifications.show({
+            title: 'Paste failed',
+            message: 'Could not import the image from your clipboard.',
+            color: 'red',
+          });
+          return;
+        }
+
+        // If no screens exist, create one with the pasted media
+        if (screens.length === 0) {
+          addScreen(mediaId);
+          return;
+        }
+
+        // Paste into the currently selected frame slot of the primary selected screen
+        const targetScreen = screens[primarySelectedIndex];
+        const frameCount = targetScreen ? getCompositionFrameCount(targetScreen.settings.composition) : 1;
+        const safeFrameIndex = Math.max(0, Math.min(selectedFrameIndex, frameCount - 1));
+        replaceScreen(primarySelectedIndex, mediaId, safeFrameIndex);
+      } catch (error) {
+        // eslint-disable-next-line no-console
+        console.error('Error handling paste:', error);
+      }
+    };
+
+    window.addEventListener('paste', onPaste);
+    return () => window.removeEventListener('paste', onPaste);
+  }, [addScreen, handleMediaUpload, primarySelectedIndex, replaceScreen, screens, selectedFrameIndex]);
 
   // Handle device frame change for a specific frame
   const handleFrameDeviceChange = (frameIndex: number, deviceFrame: string) => {

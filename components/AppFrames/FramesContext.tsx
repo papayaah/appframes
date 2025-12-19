@@ -10,13 +10,21 @@ export const getCanvasDimensions = (canvasSize: string, _orientation: string) =>
   const dimensions: Record<string, { width: number; height: number }> = {
     // Apple App Store - iPhone (Portrait only)
     'iphone-6.9': { width: 1320, height: 2868 },
+    'iphone-6.9-1290x2796': { width: 1290, height: 2796 },
+    'iphone-6.9-1260x2736': { width: 1260, height: 2736 },
     'iphone-6.5': { width: 1284, height: 2778 },
     'iphone-6.3': { width: 1206, height: 2622 },
-    'iphone-6.1': { width: 1179, height: 2556 },
+    'iphone-6.3-1179x2556': { width: 1179, height: 2556 },
+    // Apple App Store - iPhone 6.1" display (additional accepted sizes)
+    'iphone-6.1-1170x2532': { width: 1170, height: 2532 },
+    'iphone-6.1-1125x2436': { width: 1125, height: 2436 },
+    'iphone-6.1-1080x2340': { width: 1080, height: 2340 },
     'iphone-5.5': { width: 1242, height: 2208 },
     'iphone-4.7': { width: 750, height: 1334 },
     'iphone-4.0': { width: 640, height: 1136 },
+    'iphone-4.0-640x1096': { width: 640, height: 1096 },
     'iphone-3.5': { width: 640, height: 960 },
+    'iphone-3.5-640x920': { width: 640, height: 920 },
     // Apple App Store - iPad (Portrait only)
     'ipad-13': { width: 2064, height: 2752 },
     'ipad-11': { width: 1668, height: 2388 },
@@ -48,14 +56,21 @@ export const getCanvasDimensions = (canvasSize: string, _orientation: string) =>
 export const getCanvasSizeLabel = (canvasSize: string): string => {
   const labels: Record<string, string> = {
     // Apple App Store - iPhone
-    'iphone-6.9': 'iPhone 6.9"',
-    'iphone-6.5': 'iPhone 6.5"',
-    'iphone-6.3': 'iPhone 6.3"',
-    'iphone-6.1': 'iPhone 6.1"',
-    'iphone-5.5': 'iPhone 5.5"',
-    'iphone-4.7': 'iPhone 4.7"',
-    'iphone-4.0': 'iPhone 4.0"',
-    'iphone-3.5': 'iPhone 3.5"',
+    'iphone-6.9': 'iPhone 6.9" (1320×2868)',
+    'iphone-6.9-1290x2796': 'iPhone 6.9" (1290×2796)',
+    'iphone-6.9-1260x2736': 'iPhone 6.9" (1260×2736)',
+    'iphone-6.5': 'iPhone 6.5" (1284×2778)',
+    'iphone-6.3': 'iPhone 6.3" (1206×2622)',
+    'iphone-6.3-1179x2556': 'iPhone 6.3" (1179×2556)',
+    'iphone-6.1-1170x2532': 'iPhone 6.1" (1170×2532)',
+    'iphone-6.1-1125x2436': 'iPhone 6.1" (1125×2436)',
+    'iphone-6.1-1080x2340': 'iPhone 6.1" (1080×2340)',
+    'iphone-5.5': 'iPhone 5.5" (1242×2208)',
+    'iphone-4.7': 'iPhone 4.7" (750×1334)',
+    'iphone-4.0': 'iPhone 4.0" (640×1136)',
+    'iphone-4.0-640x1096': 'iPhone 4.0" (640×1096)',
+    'iphone-3.5': 'iPhone 3.5" (640×960)',
+    'iphone-3.5-640x920': 'iPhone 3.5" (640×920)',
     // Apple App Store - iPad
     'ipad-13': 'iPad 13"',
     'ipad-11': 'iPad 11"',
