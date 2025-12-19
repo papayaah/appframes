@@ -432,8 +432,33 @@ export function AppFrames() {
                 const uploadPromises = files.map(file => handleMediaUpload(file));
                 const mediaIds = await Promise.all(uploadPromises);
 
+                const validMediaIds = mediaIds.filter((id): id is number => typeof id === 'number');
+
+                // Dropped outside any device frame -> set full canvas background
+                if (targetFrameIndex === undefined) {
+                  const backgroundMediaId = validMediaIds[0];
+                  if (!backgroundMediaId) return;
+
+                  setScreens(prevScreens => {
+                    const updated = [...prevScreens];
+                    if (!updated[screenIndex]) return prevScreens;
+
+                    const screen = updated[screenIndex];
+                    updated[screenIndex] = {
+                      ...screen,
+                      settings: {
+                        ...screen.settings,
+                        canvasBackgroundMediaId: backgroundMediaId,
+                      },
+                    };
+                    return updated;
+                  });
+
+                  return;
+                }
+
                 // Limit to number of frames in composition
-                const filesToProcess = Math.min(mediaIds.length, layoutFrameCount);
+                const filesToProcess = Math.min(validMediaIds.length, layoutFrameCount);
 
                 // Update the target screen's images array
                 setScreens(prevScreens => {
@@ -451,8 +476,7 @@ export function AppFrames() {
 
                   // Add images to the current screen's images array
                   for (let i = 0; i < filesToProcess; i++) {
-                    const mediaId = mediaIds[i];
-                    if (!mediaId) continue;
+                    const mediaId = validMediaIds[i];
 
                     let targetImageIndex = -1;
 

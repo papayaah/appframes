@@ -120,6 +120,7 @@ export const getDefaultScreenSettings = (): Omit<CanvasSettings, 'selectedScreen
     screenPanY: 50,
     orientation: 'portrait',
     backgroundColor: '#E5E7EB',
+    canvasBackgroundMediaId: undefined,
     captionText: 'Powerful tools for your workflow',
     showCaption: true,
     captionStyle: { ...DEFAULT_TEXT_STYLE },

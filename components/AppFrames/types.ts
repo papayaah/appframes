@@ -66,6 +66,7 @@ export interface CanvasSettings {
   screenPanY: number;
   orientation: 'portrait' | 'landscape';
   backgroundColor: string;
+  canvasBackgroundMediaId?: number; // Full-canvas background image (optional)
   captionText: string;
   showCaption: boolean;
   captionStyle: TextStyle;

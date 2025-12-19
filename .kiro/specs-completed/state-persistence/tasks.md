@@ -4,7 +4,7 @@
   - Install idb package via npm (npm install idb)
   - Create lib/PersistenceDB.ts file
   - Define AppFramesDBSchema interface with projects, appState, and mediaFiles stores
-  - Implement database initialization with version 1
+  - Implement database initialization with version 2 (with upgrade path from existing version 1)
   - Create projects object store with updatedAt, lastAccessedAt, and name indexes
   - Create appState object store (tracks currentProjectId and UI preferences)
   - Create mediaFiles object store with name and createdAt indexes
@@ -76,6 +76,18 @@
   - Handle errors with console logging and fallback to defaults
   - _Requirements: 1.1, 1.2, 1.4, 3.1, 3.2, 3.3, 3.4, 4.1, 4.2, 5.1, 10.1, 10.2, 10.3_
 
+- [ ] 4.4 Complete appState persistence + defaults
+  - Persist `sidebarPanelOpen` (open/closed)
+  - Persist `navWidth` (sidebar width)
+  - On load, apply defaults when no saved state exists (Layout tab + panel open)
+  - Add validation/sanitization for appState (e.g., clamp navWidth to min/max)
+  - _Requirements: 3.3, 3.4, 3.5_
+
+- [ ] 4.5 Flush pending writes on reload / tab close (not just unmount)
+  - Flush debounced saves on `pagehide` / `visibilitychange` (and/or `beforeunload` as best-effort)
+  - Ensure “reload the page” restores latest changes even if React components never unmount cleanly
+  - _Requirements: 8.5_
+
 - [ ]* 4.1 Write property test for selection persistence
   - **Property 4: Selection persistence**
   - **Validates: Requirements 4.1, 4.2, 4.3**
@@ -98,6 +110,12 @@
   - Add getCurrentScreens() helper that returns screensByCanvasSize[currentCanvasSize]
   - Update all screen operations to use getCurrentScreens()
   - _Requirements: 2.5_
+
+- [ ] 5.3 Preserve per-canvas selection state (aligns with Property 17)
+  - Store/restore last selection per canvas size (e.g., `selectedScreenIndicesByCanvasSize` + `primarySelectedIndexByCanvasSize`)
+  - When switching canvas sizes, restore that canvas size’s last selection (fallback to first screen / none)
+  - Persist this per-canvas selection state inside the project
+  - _Requirements: 4.1, 4.4, 2.5, 1.4_
 
 - [ ]* 5.1 Write property test for canvas size isolation
   - **Property 16: Canvas size isolation**
@@ -180,6 +198,13 @@
   - Continue operation without crashing on errors
   - _Requirements: 10.1, 10.2, 10.3, 10.4, 10.5_
 
+- [ ] 10.3 Implement “database corruption detected” recovery flow
+  - Detect corruption / open failures consistently (e.g., exceptions on init/read/write)
+  - Attempt to delete + recreate the IndexedDB database (or recreate stores) safely
+  - Notify user clearly when recovery implies potential local data loss
+  - Ensure the app continues in-memory if recovery fails
+  - _Requirements: 10.5, 10.2_
+
 - [ ]* 10.1 Write property test for error resilience
   - **Property 12: Error resilience**
   - **Validates: Requirements 10.1, 10.2, 10.3**
@@ -208,6 +233,11 @@
   - Add lazy database initialization (init on first access)
   - Implement lazy canvas size array creation (only create when first accessed)
   - _Requirements: 8.1, 8.2, 8.3_
+
+- [ ] 12.1 Confirm “immediate save” semantics for discrete actions
+  - Ensure discrete events (add/remove screen, project switch) trigger a save immediately (or flush debounce)
+  - Keep debouncing for high-frequency interactions (sliders/pan/drag)
+  - _Requirements: 1.1, 1.3, 8.1, 8.2_
 
 - [x] 13. Add persistence status indicators
   - Add "Saving..." indicator to UI when save is in progress

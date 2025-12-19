@@ -8,6 +8,7 @@ import { DraggableText } from './DraggableText';
 import { useCrossCanvasDrag } from './CrossCanvasDragContext';
 import { OverflowDeviceRenderer } from './OverflowDeviceRenderer';
 import { getCanvasDimensions } from './FramesContext';
+import { useMediaImage } from '../../hooks/useMediaImage';
 
 interface CanvasProps {
   settings: CanvasSettings;
@@ -25,6 +26,25 @@ interface CanvasProps {
   onCaptionTextChange?: (screenIndex: number, text: string) => void;
   zoom?: number;
   onZoomChange?: (zoom: number) => void;
+}
+
+function CanvasBackground({ mediaId }: { mediaId?: number }) {
+  const { imageUrl } = useMediaImage(mediaId);
+  if (!imageUrl) return null;
+  return (
+    <Box
+      style={{
+        position: 'absolute',
+        inset: 0,
+        backgroundImage: `url(${imageUrl})`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat',
+        pointerEvents: 'none',
+        zIndex: 0,
+      }}
+    />
+  );
 }
 
 export function Canvas({
@@ -378,21 +398,24 @@ export function Canvas({
                   overflow: 'hidden',
                 }}
               >
-                <CompositionRenderer
-                  settings={screenSettings}
-                  screen={screen}
-                  screenIndex={screenIndex}
-                  viewportScale={zoom / 100}
-                  onPanChange={(frameIndex, x, y) => onPanChange?.(screenIndex, frameIndex, x, y)}
-                  onFramePositionChange={(frameIndex, x, y) => onFramePositionChange?.(screenIndex, frameIndex, x, y)}
-                  hoveredFrameIndex={hoveredScreenIndex === screenIndex ? hoveredFrameIndex : null}
-                  onFrameHover={setHoveredFrameIndex}
-                  dragFileCount={dragFileCount}
-                  selectedFrameIndex={isPrimaryScreen ? selectedFrameIndex : undefined}
-                  onSelectFrame={isPrimaryScreen ? onSelectFrame : undefined}
-                  onMediaSelect={(frameIndex, mediaId) => onMediaSelect?.(screenIndex, frameIndex, mediaId)}
-                  onPexelsSelect={(frameIndex, url) => onPexelsSelect?.(screenIndex, frameIndex, url)}
-                />
+                <CanvasBackground mediaId={screenSettings.canvasBackgroundMediaId} />
+                <Box style={{ position: 'relative', zIndex: 1, width: '100%', height: '100%' }}>
+                  <CompositionRenderer
+                    settings={screenSettings}
+                    screen={screen}
+                    screenIndex={screenIndex}
+                    viewportScale={zoom / 100}
+                    onPanChange={(frameIndex, x, y) => onPanChange?.(screenIndex, frameIndex, x, y)}
+                    onFramePositionChange={(frameIndex, x, y) => onFramePositionChange?.(screenIndex, frameIndex, x, y)}
+                    hoveredFrameIndex={hoveredScreenIndex === screenIndex ? hoveredFrameIndex : null}
+                    onFrameHover={setHoveredFrameIndex}
+                    dragFileCount={dragFileCount}
+                    selectedFrameIndex={isPrimaryScreen ? selectedFrameIndex : undefined}
+                    onSelectFrame={isPrimaryScreen ? onSelectFrame : undefined}
+                    onMediaSelect={(frameIndex, mediaId) => onMediaSelect?.(screenIndex, frameIndex, mediaId)}
+                    onPexelsSelect={(frameIndex, url) => onPexelsSelect?.(screenIndex, frameIndex, url)}
+                  />
+                </Box>
                 {screenSettings.showCaption && screenSettings.captionText && (
                   <DraggableText
                     text={screenSettings.captionText}

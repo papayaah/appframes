@@ -554,6 +554,10 @@ function validateCanvasSettings(settings: any): Omit<Screen['settings'], never> 
       ? settings.backgroundColor
       : defaults.backgroundColor,
 
+    canvasBackgroundMediaId: typeof settings.canvasBackgroundMediaId === 'number' && !isNaN(settings.canvasBackgroundMediaId)
+      ? settings.canvasBackgroundMediaId
+      : defaults.canvasBackgroundMediaId,
+
     captionText: typeof settings.captionText === 'string'
       ? settings.captionText
       : defaults.captionText,
@@ -670,6 +674,7 @@ function getDefaultCanvasSettings(): Omit<Screen['settings'], never> {
     screenPanY: 50,
     orientation: 'portrait',
     backgroundColor: '#E5E7EB',
+    canvasBackgroundMediaId: undefined,
     captionText: 'Powerful tools for your workflow',
     showCaption: true,
     captionStyle: getDefaultTextStyle(),
