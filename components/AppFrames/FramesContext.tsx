@@ -1,7 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useRef, ReactNode, useCallback, useEffect } from 'react';
-import { Screen, ScreenImage, CanvasSettings, DEFAULT_TEXT_STYLE } from './types';
+import { Screen, ScreenImage, CanvasSettings, DEFAULT_TEXT_STYLE, TextElement, TextStyle } from './types';
 import { persistenceDB, Project } from '@/lib/PersistenceDB';
 import { usePersistence } from '@/hooks/usePersistence';
 
@@ -107,23 +107,55 @@ export const getCompositionFrameCount = (composition: string): number => {
   }
 };
 
+const createId = (prefix: string) =>
+  `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+
+const clamp01 = (v: number) => Math.max(0, Math.min(100, v));
+
+const normalizeRotation = (deg: number) => {
+  const n = ((deg % 360) + 360) % 360;
+  return n;
+};
+
+const getNextTextName = (existing: TextElement[]) => {
+  const used = new Set(existing.map(t => t.name));
+  let i = existing.length + 1;
+  while (used.has(`Text ${i}`)) i += 1;
+  return `Text ${i}`;
+};
+
+const getMaxZIndex = (existing: TextElement[]) =>
+  existing.reduce((max, t) => Math.max(max, t.zIndex ?? 0), 0);
+
+const createDefaultTextElement = (existing: TextElement[], overrides?: Partial<TextElement>): TextElement => {
+  const z = getMaxZIndex(existing) + 1;
+  return {
+    id: createId('text'),
+    content: 'Double-click to edit',
+    x: 50,
+    y: 50,
+    rotation: 0,
+    style: { ...DEFAULT_TEXT_STYLE },
+    visible: true,
+    name: getNextTextName(existing),
+    zIndex: z,
+    ...overrides,
+  };
+};
+
 // Helper function to get default settings for a new screen
 export const getDefaultScreenSettings = (): Omit<CanvasSettings, 'selectedScreenIndex'> => {
   return {
     canvasSize: 'iphone-6.9',
     composition: 'single',
     compositionScale: 85,
-    captionVertical: 10,
-    captionHorizontal: 50,
+    selectedTextId: undefined,
     screenScale: 100,
     screenPanX: 50,
     screenPanY: 50,
     orientation: 'portrait',
     backgroundColor: '#E5E7EB',
     canvasBackgroundMediaId: undefined,
-    captionText: 'Powerful tools for your workflow',
-    showCaption: true,
-    captionStyle: { ...DEFAULT_TEXT_STYLE },
   };
 };
 
@@ -169,9 +201,21 @@ interface FramesContextType {
   deleteProject: (projectId: string) => Promise<void>;
   renameProject: (newName: string) => Promise<void>;
   getAllProjects: () => Promise<Project[]>;
+  // Text elements
+  addTextElement: (screenId: string) => void;
+  updateTextElement: (screenId: string, textId: string, updates: Partial<TextElement> & { style?: Partial<TextStyle> }) => void;
+  deleteTextElement: (screenId: string, textId: string) => void;
+  reorderTextElements: (screenId: string, fromIndex: number, toIndex: number) => void;
+  selectTextElement: (textId: string | null) => void;
+  duplicateTextElement: (screenId: string, textId: string) => void;
 }
 
 const FramesContext = createContext<FramesContextType | undefined>(undefined);
+
+// Internal export to allow hooks (e.g. `useMediaImage`) to function in contexts where the
+// FramesProvider isn't mounted (like off-screen export rendering). Prefer `useFrames()`
+// for app code.
+export const FramesContextInternal = FramesContext;
 
 export function FramesProvider({ children }: { children: ReactNode }) {
   // Use a counter for screen IDs to avoid hydration issues
@@ -196,12 +240,14 @@ export function FramesProvider({ children }: { children: ReactNode }) {
   const [navWidth, setNavWidth] = useState<number>(300);
 
   // Initialize with one empty screen with default settings
+  const defaultTextElements: TextElement[] = [createDefaultTextElement([])];
   const [screens, setScreens] = useState<Screen[]>([
     {
       id: `screen-0`,
       name: 'Screen 1',
       images: [{ deviceFrame: 'iphone-14-pro' }], // Single composition by default
       settings: getDefaultScreenSettings(),
+      textElements: defaultTextElements,
     },
   ]);
   const [zoom, setZoom] = useState<number>(100);
@@ -308,11 +354,13 @@ export function FramesProvider({ children }: { children: ReactNode }) {
     }
 
     screenIdCounter.current += 1;
+    const textElements: TextElement[] = [createDefaultTextElement([])];
     const newScreen: Screen = {
       id: `screen-${screenIdCounter.current}`,
       images,
       name: `Screen ${screens.length + 1}`,
       settings: defaultSettings, // Each screen gets its own default settings
+      textElements,
     };
     setScreens((prevScreens) => [...prevScreens, newScreen]);
     // Select the newly added screen (exclusive selection)
@@ -450,6 +498,100 @@ export function FramesProvider({ children }: { children: ReactNode }) {
       return updatedScreens;
     });
   };
+
+  const addTextElement = useCallback((screenId: string) => {
+    setScreens(prev => prev.map(screen => {
+      if (screen.id !== screenId) return screen;
+      const existing = screen.textElements ?? [];
+      const newEl = createDefaultTextElement(existing);
+      return {
+        ...screen,
+        settings: {
+          ...screen.settings,
+          selectedTextId: newEl.id,
+        },
+        textElements: [...existing, newEl],
+      };
+    }));
+  }, []);
+
+  const updateTextElement = useCallback((screenId: string, textId: string, updates: Partial<TextElement> & { style?: Partial<TextStyle> }) => {
+    setScreens(prev => prev.map(screen => {
+      if (screen.id !== screenId) return screen;
+      const textElements = (screen.textElements ?? []).map(t => {
+        if (t.id !== textId) return t;
+        return {
+          ...t,
+          ...updates,
+          x: typeof updates.x === 'number' ? clamp01(updates.x) : t.x,
+          y: typeof updates.y === 'number' ? clamp01(updates.y) : t.y,
+          rotation: typeof updates.rotation === 'number' ? normalizeRotation(updates.rotation) : t.rotation,
+          style: updates.style ? { ...t.style, ...updates.style } : t.style,
+        };
+      });
+      return { ...screen, textElements };
+    }));
+  }, []);
+
+  const deleteTextElement = useCallback((screenId: string, textId: string) => {
+    setScreens(prev => prev.map(screen => {
+      if (screen.id !== screenId) return screen;
+      const remaining = (screen.textElements ?? []).filter(t => t.id !== textId);
+      const nextSelected =
+        screen.settings.selectedTextId === textId
+          ? (remaining[remaining.length - 1]?.id ?? undefined)
+          : screen.settings.selectedTextId;
+      return {
+        ...screen,
+        settings: {
+          ...screen.settings,
+          selectedTextId: nextSelected,
+        },
+        textElements: remaining,
+      };
+    }));
+  }, []);
+
+  const reorderTextElements = useCallback((screenId: string, fromIndex: number, toIndex: number) => {
+    setScreens(prev => prev.map(screen => {
+      if (screen.id !== screenId) return screen;
+      const list = [...(screen.textElements ?? [])].sort((a, b) => (a.zIndex ?? 0) - (b.zIndex ?? 0));
+      if (fromIndex < 0 || fromIndex >= list.length) return screen;
+      const clampedTo = Math.max(0, Math.min(list.length - 1, toIndex));
+      const [moved] = list.splice(fromIndex, 1);
+      list.splice(clampedTo, 0, moved);
+      const withZ = list.map((t, i) => ({ ...t, zIndex: i + 1 }));
+      return { ...screen, textElements: withZ };
+    }));
+  }, []);
+
+  const selectTextElement = useCallback((textId: string | null) => {
+    updateSelectedScreenSettings({ selectedTextId: textId ?? undefined });
+  }, [updateSelectedScreenSettings]);
+
+  const duplicateTextElement = useCallback((screenId: string, textId: string) => {
+    setScreens(prev => prev.map(screen => {
+      if (screen.id !== screenId) return screen;
+      const existing = [...(screen.textElements ?? [])].sort((a, b) => (a.zIndex ?? 0) - (b.zIndex ?? 0));
+      const idx = existing.findIndex(t => t.id === textId);
+      if (idx === -1) return screen;
+      const source = existing[idx];
+      const copy: TextElement = {
+        ...source,
+        id: createId('text'),
+        name: `${source.name} Copy`,
+        x: clamp01(source.x + 2),
+        y: clamp01(source.y + 2),
+      };
+      existing.splice(idx + 1, 0, copy);
+      const withZ = existing.map((t, i) => ({ ...t, zIndex: i + 1 }));
+      return {
+        ...screen,
+        settings: { ...screen.settings, selectedTextId: copy.id },
+        textElements: withZ,
+      };
+    }));
+  }, []);
 
   // Get screens for current canvas size
   const getCurrentScreens = useCallback((): Screen[] => {
@@ -883,6 +1025,12 @@ export function FramesProvider({ children }: { children: ReactNode }) {
         deleteProject,
         renameProject,
         getAllProjects,
+        addTextElement,
+        updateTextElement,
+        deleteTextElement,
+        reorderTextElements,
+        selectTextElement,
+        duplicateTextElement,
       }}
     >
       {children}

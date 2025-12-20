@@ -4,11 +4,11 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { Box } from '@mantine/core';
 import { CanvasSettings, Screen } from './AppFrames';
 import { CompositionRenderer } from './CompositionRenderer';
-import { DraggableText } from './DraggableText';
 import { useCrossCanvasDrag } from './CrossCanvasDragContext';
 import { OverflowDeviceRenderer } from './OverflowDeviceRenderer';
 import { getCanvasDimensions } from './FramesContext';
 import { useMediaImage } from '../../hooks/useMediaImage';
+import { TextElement as CanvasTextElement } from './TextElement';
 
 interface CanvasProps {
   settings: CanvasSettings;
@@ -22,8 +22,9 @@ interface CanvasProps {
   onFramePositionChange?: (screenIndex: number, frameIndex: number, frameX: number, frameY: number) => void;
   onMediaSelect?: (screenIndex: number, frameIndex: number, mediaId: number) => void;
   onPexelsSelect?: (screenIndex: number, frameIndex: number, url: string) => void;
-  onCaptionPositionChange?: (screenIndex: number, x: number, y: number) => void;
-  onCaptionTextChange?: (screenIndex: number, text: string) => void;
+  onSelectTextElement?: (screenIndex: number, textId: string | null) => void;
+  onUpdateTextElement?: (screenIndex: number, textId: string, updates: any) => void;
+  onDeleteTextElement?: (screenIndex: number, textId: string) => void;
   zoom?: number;
   onZoomChange?: (zoom: number) => void;
 }
@@ -59,8 +60,9 @@ export function Canvas({
   onFramePositionChange,
   onMediaSelect,
   onPexelsSelect,
-  onCaptionPositionChange,
-  onCaptionTextChange,
+  onSelectTextElement,
+  onUpdateTextElement,
+  onDeleteTextElement,
   zoom = 100,
   onZoomChange,
 }: CanvasProps) {
@@ -397,6 +399,10 @@ export function Canvas({
                   // The overflow will be rendered in adjacent canvases via OverflowDeviceRenderer
                   overflow: 'hidden',
                 }}
+                onMouseDown={() => {
+                  if (!isPrimaryScreen) return;
+                  onSelectTextElement?.(screenIndex, null);
+                }}
               >
                 <CanvasBackground mediaId={screenSettings.canvasBackgroundMediaId} />
                 <Box style={{ position: 'relative', zIndex: 1, width: '100%', height: '100%' }}>
@@ -416,16 +422,20 @@ export function Canvas({
                     onPexelsSelect={(frameIndex, url) => onPexelsSelect?.(screenIndex, frameIndex, url)}
                   />
                 </Box>
-                {screenSettings.showCaption && screenSettings.captionText && (
-                  <DraggableText
-                    text={screenSettings.captionText}
-                    positionX={screenSettings.captionHorizontal}
-                    positionY={screenSettings.captionVertical}
-                    onPositionChange={(x, y) => onCaptionPositionChange?.(screenIndex, x, y)}
-                    onTextChange={(text) => onCaptionTextChange?.(screenIndex, text)}
-                    style={screenSettings.captionStyle}
-                  />
-                )}
+                {(screen.textElements || [])
+                  .filter(t => t.visible)
+                  .sort((a, b) => (a.zIndex ?? 0) - (b.zIndex ?? 0))
+                  .map((t) => (
+                    <CanvasTextElement
+                      key={t.id}
+                      element={t}
+                      selected={!!isPrimaryScreen && screenSettings.selectedTextId === t.id}
+                      disabled={!isPrimaryScreen}
+                      onSelect={() => onSelectTextElement?.(screenIndex, t.id)}
+                      onUpdate={(updates) => onUpdateTextElement?.(screenIndex, t.id, updates)}
+                      onDelete={() => onDeleteTextElement?.(screenIndex, t.id)}
+                    />
+                  ))}
               </Box>
               {/* Render overflow from devices dragged from other canvases (or persisted shared devices) */}
               {(() => {

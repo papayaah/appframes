@@ -169,7 +169,7 @@ export function SidebarTabs({
             </Tabs.Panel>
 
             <Tabs.Panel value="text" style={{ height: '100%' }}>
-              <TextTab settings={settings} setSettings={setSettings} />
+              <TextTab />
             </Tabs.Panel>
 
             <Tabs.Panel value="media" style={{ height: '100%' }}>

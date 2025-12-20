@@ -1,5 +1,5 @@
 import { openDB, DBSchema, IDBPDatabase } from 'idb';
-import type { Screen } from '@/components/AppFrames/types';
+import type { Screen, TextElement } from '@/components/AppFrames/types';
 
 // Project interface - represents a complete project with all its screens
 export interface Project {
@@ -439,6 +439,52 @@ function validateScreensByCanvasSize(screensByCanvasSize: any): Record<string, S
  * Validate a single Screen object
  */
 function validateScreen(screen: any): Screen {
+  const legacySettings = screen?.settings && typeof screen.settings === 'object' ? screen.settings : {};
+  const legacyCaption = {
+    showCaption: legacySettings.showCaption,
+    captionText: legacySettings.captionText,
+    captionHorizontal: legacySettings.captionHorizontal,
+    captionVertical: legacySettings.captionVertical,
+    captionStyle: legacySettings.captionStyle,
+  };
+
+  const settings = validateCanvasSettings(screen.settings);
+
+  // Text elements: validate current format, or migrate from legacy caption settings
+  const migratedFromCaption =
+    legacyCaption.showCaption === true &&
+    typeof legacyCaption.captionText === 'string' &&
+    legacyCaption.captionText.trim().length > 0
+      ? [
+          validateTextElement(
+            {
+              content: legacyCaption.captionText,
+              x: legacyCaption.captionHorizontal,
+              y: legacyCaption.captionVertical,
+              rotation: 0,
+              style: legacyCaption.captionStyle,
+              visible: true,
+              name: 'Text 1',
+              zIndex: 1,
+            },
+            0
+          ),
+        ]
+      : [];
+
+  const rawTextElements = Array.isArray(screen.textElements)
+    ? screen.textElements
+    : migratedFromCaption;
+
+  const validatedTextElements = validateTextElements(rawTextElements);
+
+  // Ensure selectedTextId is valid (else clear it)
+  const selectedTextId =
+    typeof settings.selectedTextId === 'string' &&
+    validatedTextElements.some(t => t.id === settings.selectedTextId)
+      ? settings.selectedTextId
+      : undefined;
+
   return {
     // ID: must be a non-empty string
     id: typeof screen.id === 'string' && screen.id.length > 0 
@@ -456,7 +502,13 @@ function validateScreen(screen: any): Screen {
       : [],
 
     // Settings: validate canvas settings
-    settings: validateCanvasSettings(screen.settings),
+    settings: {
+      ...settings,
+      selectedTextId,
+    },
+
+    // Text elements
+    textElements: validatedTextElements,
   };
 }
 
@@ -526,14 +578,6 @@ function validateCanvasSettings(settings: any): Omit<Screen['settings'], never> 
       ? Math.max(50, Math.min(100, settings.compositionScale))
       : defaults.compositionScale,
 
-    captionVertical: typeof settings.captionVertical === 'number'
-      ? Math.max(0, Math.min(100, settings.captionVertical))
-      : defaults.captionVertical,
-
-    captionHorizontal: typeof settings.captionHorizontal === 'number'
-      ? Math.max(0, Math.min(100, settings.captionHorizontal))
-      : defaults.captionHorizontal,
-
     screenScale: typeof settings.screenScale === 'number'
       ? Math.max(0, Math.min(100, settings.screenScale))
       : defaults.screenScale,
@@ -558,22 +602,16 @@ function validateCanvasSettings(settings: any): Omit<Screen['settings'], never> 
       ? settings.canvasBackgroundMediaId
       : defaults.canvasBackgroundMediaId,
 
-    captionText: typeof settings.captionText === 'string'
-      ? settings.captionText
-      : defaults.captionText,
-
-    showCaption: typeof settings.showCaption === 'boolean'
-      ? settings.showCaption
-      : defaults.showCaption,
-
-    captionStyle: validateTextStyle(settings.captionStyle),
+    selectedTextId: typeof settings.selectedTextId === 'string' && settings.selectedTextId.length > 0
+      ? settings.selectedTextId
+      : defaults.selectedTextId,
   };
 }
 
 /**
  * Validate TextStyle object
  */
-function validateTextStyle(style: any): Screen['settings']['captionStyle'] {
+function validateTextStyle(style: any): TextElement['style'] {
   if (!style || typeof style !== 'object') {
     return getDefaultTextStyle();
   }
@@ -667,24 +705,20 @@ function getDefaultCanvasSettings(): Omit<Screen['settings'], never> {
     canvasSize: 'iphone-6.5',
     composition: 'single',
     compositionScale: 85,
-    captionVertical: 10,
-    captionHorizontal: 50,
     screenScale: 100,
     screenPanX: 50,
     screenPanY: 50,
     orientation: 'portrait',
     backgroundColor: '#E5E7EB',
     canvasBackgroundMediaId: undefined,
-    captionText: 'Powerful tools for your workflow',
-    showCaption: true,
-    captionStyle: getDefaultTextStyle(),
+    selectedTextId: undefined,
   };
 }
 
 /**
  * Get default text style
  */
-function getDefaultTextStyle(): Screen['settings']['captionStyle'] {
+function getDefaultTextStyle(): TextElement['style'] {
   return {
     fontFamily: 'Inter',
     fontSize: 32,
@@ -706,6 +740,44 @@ function getDefaultTextStyle(): Screen['settings']['captionStyle'] {
     uppercase: false,
     maxWidth: 80,
   };
+}
+
+const clamp01 = (v: number) => Math.max(0, Math.min(100, v));
+const normalizeRotation = (deg: number) => ((deg % 360) + 360) % 360;
+
+function validateTextElement(text: any, index: number): TextElement {
+  const defaults = getDefaultTextStyle();
+  const safeId =
+    typeof text?.id === 'string' && text.id.length > 0
+      ? text.id
+      : `text-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+
+  const safeName =
+    typeof text?.name === 'string' && text.name.trim().length > 0
+      ? text.name
+      : `Text ${index + 1}`;
+
+  return {
+    id: safeId,
+    content: typeof text?.content === 'string' ? text.content : 'Double-click to edit',
+    x: typeof text?.x === 'number' ? clamp01(text.x) : 50,
+    y: typeof text?.y === 'number' ? clamp01(text.y) : 50,
+    rotation: typeof text?.rotation === 'number' ? normalizeRotation(text.rotation) : 0,
+    style: validateTextStyle(text?.style ?? defaults),
+    visible: typeof text?.visible === 'boolean' ? text.visible : true,
+    name: safeName,
+    zIndex: typeof text?.zIndex === 'number' && isFinite(text.zIndex) ? text.zIndex : index + 1,
+  };
+}
+
+function validateTextElements(textElements: any[]): TextElement[] {
+  const validated = (textElements || [])
+    .filter(t => t && typeof t === 'object')
+    .map((t, idx) => validateTextElement(t, idx));
+
+  // Normalize zIndex ordering to avoid duplicates/gaps and ensure deterministic render order
+  const sorted = [...validated].sort((a, b) => (a.zIndex ?? 0) - (b.zIndex ?? 0));
+  return sorted.map((t, i) => ({ ...t, zIndex: i + 1 }));
 }
 
 /**

@@ -1,7 +1,7 @@
 export interface ScreenImage {
   image?: string; // Base64 image (legacy support)
   mediaId?: number; // Reference to media library
-  deviceFrame: string; // Device frame type for this specific frame
+  deviceFrame?: string; // Device frame type for this specific frame
   // Per-frame image pan (position of image inside the frame)
   panX?: number; // 0-100, default 50 (centered)
   panY?: number; // 0-100, default 50 (centered)
@@ -54,22 +54,30 @@ export const DEFAULT_TEXT_STYLE: TextStyle = {
   maxWidth: 80,
 };
 
+export interface TextElement {
+  id: string; // Unique identifier
+  content: string; // Markdown-supported text content
+  x: number; // 0-100 percentage
+  y: number; // 0-100 percentage
+  rotation: number; // degrees
+  style: TextStyle;
+  visible: boolean;
+  name: string;
+  zIndex: number; // higher renders above
+}
+
 export interface CanvasSettings {
   canvasSize: string; // Export dimensions (App Store requirements)
   composition: 'single' | 'dual' | 'stack' | 'triple' | 'fan';
   compositionScale: number;
-  captionVertical: number;
-  captionHorizontal: number;
   selectedScreenIndex: number;
+  selectedTextId?: string; // Currently selected text element (per screen)
   screenScale: number;
   screenPanX: number;
   screenPanY: number;
   orientation: 'portrait' | 'landscape';
   backgroundColor: string;
   canvasBackgroundMediaId?: number; // Full-canvas background image (optional)
-  captionText: string;
-  showCaption: boolean;
-  captionStyle: TextStyle;
 }
 
 export interface Screen {
@@ -77,6 +85,7 @@ export interface Screen {
   images: ScreenImage[]; // Array of images for this screen's composition (1 for single, 2 for dual/stack, 3 for triple/fan)
   name: string;
   settings: Omit<CanvasSettings, 'selectedScreenIndex'>; // Each screen has its own settings
+  textElements: TextElement[]; // New multi-text system
 }
 
 export interface AppFramesActions {

@@ -14,6 +14,12 @@ import { CrossCanvasDragProvider } from './CrossCanvasDragContext';
 // Re-export types for compatibility
 export type { Screen, CanvasSettings, ScreenImage, AppFramesActions };
 
+const isEditableTarget = (target: EventTarget | null): boolean => {
+  if (!target || !(target instanceof HTMLElement)) return false;
+  if (target.isContentEditable) return true;
+  return !!target.closest('input, textarea, [contenteditable="true"], [role="textbox"]');
+};
+
 export function AppFrames() {
   const {
     screens,
@@ -37,6 +43,9 @@ export function AppFrames() {
     renameProject,
     getAllProjects,
     saveStatus,
+    updateTextElement,
+    deleteTextElement,
+    selectTextElement,
   } = useFrames();
 
   const [navWidth, setNavWidth] = useState(360); // Rail (80) + Panel (~280)
@@ -131,12 +140,6 @@ export function AppFrames() {
 
   // Paste clipboard screenshots/images into the currently selected frame
   useEffect(() => {
-    const isEditableTarget = (target: EventTarget | null): boolean => {
-      if (!target || !(target instanceof HTMLElement)) return false;
-      if (target.isContentEditable) return true;
-      return !!target.closest('input, textarea, [contenteditable="true"], [role="textbox"]');
-    };
-
     const onPaste = async (e: ClipboardEvent) => {
       try {
         // Don't hijack paste when user is typing into an input/textarea/contenteditable
@@ -190,6 +193,24 @@ export function AppFrames() {
     return () => window.removeEventListener('paste', onPaste);
   }, [addScreen, handleMediaUpload, primarySelectedIndex, replaceScreen, screens, selectedFrameIndex]);
 
+  // Delete selected text element (Delete/Backspace) when not editing
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Delete' && e.key !== 'Backspace') return;
+      if (isEditableTarget(e.target)) return;
+
+      const screen = screens[primarySelectedIndex];
+      const selectedTextId = screen?.settings?.selectedTextId;
+      if (!screen || !selectedTextId) return;
+
+      e.preventDefault();
+      deleteTextElement(screen.id, selectedTextId);
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [deleteTextElement, primarySelectedIndex, screens]);
+
   // Handle device frame change for a specific frame
   const handleFrameDeviceChange = (frameIndex: number, deviceFrame: string) => {
     setScreens((prevScreens) => {
@@ -224,16 +245,6 @@ export function AppFrames() {
   };
 
   // Helper to convert canvas element to PNG blob
-  const canvasToBlob = async (element: HTMLElement): Promise<Blob> => {
-    const { toPng } = await import('html-to-image');
-    const dataUrl = await toPng(element, {
-      quality: 1.0,
-      pixelRatio: 2,
-    });
-    const response = await fetch(dataUrl);
-    return response.blob();
-  };
-
   // Download currently visible/selected screens individually
   const handleDownload = async () => {
     try {
@@ -274,89 +285,6 @@ export function AppFrames() {
     }
   };
 
-  // Export all screens from the panel (zip if multiple, single file if one)
-  const handleExport = async () => {
-    try {
-      if (screens.length === 0) {
-        // eslint-disable-next-line no-alert
-        alert('No screens to export');
-        return;
-      }
-
-      if (screens.length === 1) {
-        // Single screen - just download directly
-        const screen = screens[0];
-        const canvasElement = document.getElementById(`canvas-${screen.id}`);
-        if (!canvasElement) {
-          // eslint-disable-next-line no-alert
-          alert('Canvas not found');
-          return;
-        }
-
-        const { toPng } = await import('html-to-image');
-        const dataUrl = await toPng(canvasElement, {
-          quality: 1.0,
-          pixelRatio: 2,
-        });
-
-        const link = document.createElement('a');
-        link.download = `${screen.name || 'screen'}-${Date.now()}.png`;
-        link.href = dataUrl;
-        link.click();
-      } else {
-        // Multiple screens - create a zip file
-        const JSZip = (await import('jszip')).default;
-        const zip = new JSZip();
-
-        // We need to render each screen to capture it
-        // For screens not currently visible, we'll need to temporarily select them
-        for (let i = 0; i < screens.length; i++) {
-          const screen = screens[i];
-
-          // Check if canvas is already rendered
-          const canvasElement = document.getElementById(`canvas-${screen.id}`);
-
-          if (!canvasElement) {
-            // Screen not currently rendered - we need to skip it or handle differently
-            // For now, we'll only export screens that are currently visible
-            // In a future enhancement, we could temporarily render each screen
-            continue;
-          }
-
-          try {
-            const blob = await canvasToBlob(canvasElement);
-            const fileName = `${String(i + 1).padStart(2, '0')}-${screen.name || `screen-${i + 1}`}.png`;
-            zip.file(fileName, blob);
-          } catch (err) {
-            // eslint-disable-next-line no-console
-            console.error(`Failed to capture screen ${i}:`, err);
-          }
-        }
-
-        // Check if we captured any screens
-        const fileCount = Object.keys(zip.files).length;
-        if (fileCount === 0) {
-          // eslint-disable-next-line no-alert
-          alert('No screens could be captured. Make sure at least one screen is visible.');
-          return;
-        }
-
-        // Generate and download the zip file
-        const zipBlob = await zip.generateAsync({ type: 'blob' });
-        const link = document.createElement('a');
-        link.download = `appframes-export-${Date.now()}.zip`;
-        link.href = URL.createObjectURL(zipBlob);
-        link.click();
-        URL.revokeObjectURL(link.href);
-      }
-    } catch (error) {
-      // eslint-disable-next-line no-console
-      console.error('Export failed:', error);
-      // eslint-disable-next-line no-alert
-      alert('Export failed. Please try again.');
-    }
-  };
-
   return (
     <CrossCanvasDragProvider>
     <AppShell
@@ -371,7 +299,6 @@ export function AppFrames() {
       <AppShell.Header>
         <Header
           onDownload={handleDownload}
-          onExport={handleExport}
           outputDimensions={`${getCanvasDimensions(settings.canvasSize, settings.orientation).width} × ${getCanvasDimensions(settings.canvasSize, settings.orientation).height}px`}
           zoom={zoom}
           onZoomChange={setZoom}
@@ -418,6 +345,21 @@ export function AppFrames() {
             onSelectScreen={handleScreenSelect}
             zoom={zoom}
             onZoomChange={setZoom}
+            onSelectTextElement={(screenIndex, textId) => {
+              // Only allow text selection on primary selected screen
+              if (screenIndex !== primarySelectedIndex) return;
+              selectTextElement(textId);
+            }}
+            onUpdateTextElement={(screenIndex, textId, updates) => {
+              const screen = screens[screenIndex];
+              if (!screen) return;
+              updateTextElement(screen.id, textId, updates);
+            }}
+            onDeleteTextElement={(screenIndex, textId) => {
+              const screen = screens[screenIndex];
+              if (!screen) return;
+              deleteTextElement(screen.id, textId);
+            }}
             onReplaceScreen={async (files, targetFrameIndex, targetScreenIndex) => {
               try {
                 // Use targetScreenIndex if provided, otherwise primarySelectedIndex
@@ -585,37 +527,6 @@ export function AppFrames() {
               } catch (error) {
                 console.error('Error importing pexels image:', error);
               }
-            }}
-            onCaptionPositionChange={(screenIndex, x, y) => {
-              setScreens(prevScreens => {
-                const updated = [...prevScreens];
-                if (updated[screenIndex]) {
-                  updated[screenIndex] = {
-                    ...updated[screenIndex],
-                    settings: {
-                      ...updated[screenIndex].settings,
-                      captionHorizontal: x,
-                      captionVertical: y,
-                    },
-                  };
-                }
-                return updated;
-              });
-            }}
-            onCaptionTextChange={(screenIndex, text) => {
-              setScreens(prevScreens => {
-                const updated = [...prevScreens];
-                if (updated[screenIndex]) {
-                  updated[screenIndex] = {
-                    ...updated[screenIndex],
-                    settings: {
-                      ...updated[screenIndex].settings,
-                      captionText: text,
-                    },
-                  };
-                }
-                return updated;
-              });
             }}
           />
           <ScreensPanel

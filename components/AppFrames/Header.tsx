@@ -1,14 +1,14 @@
 'use client';
 
 import Image from 'next/image';
+import Link from 'next/link';
 import { Group, Text, ActionIcon, Box, Slider, Tooltip, Menu, Button, Modal, TextInput, Stack, Badge } from '@mantine/core';
-import { IconDownload, IconFileZip, IconChevronDown, IconPlus, IconEdit, IconTrash, IconFolder, IconCheck, IconAlertCircle } from '@tabler/icons-react';
+import { IconDownload, IconChevronDown, IconPlus, IconEdit, IconTrash, IconFolder, IconCheck, IconAlertCircle } from '@tabler/icons-react';
 import { useState, useEffect } from 'react';
 import type { Project } from '@/lib/PersistenceDB';
 
 interface HeaderProps {
   onDownload?: () => void; // Download currently visible screens individually
-  onExport?: () => void; // Export all screens (zip if multiple)
   outputDimensions?: string; // Display dimensions (e.g., "1242 × 2688px")
   zoom?: number;
   onZoomChange?: (zoom: number) => void;
@@ -27,7 +27,6 @@ interface HeaderProps {
 
 export function Header({
   onDownload,
-  onExport,
   outputDimensions,
   zoom = 100,
   onZoomChange,
@@ -237,7 +236,7 @@ export function Header({
             </Badge>
           )}
           
-          <Tooltip label={`Download${selectedCount > 1 ? ` (${selectedCount} screens)` : ''}`}>
+          <Tooltip label={`Download${selectedCount > 1 ? ` (${selectedCount} screens)` : ''} • For full export, use Preview`}>
             <ActionIcon
               size="lg"
               variant="light"
@@ -247,15 +246,14 @@ export function Header({
               <IconDownload size={18} />
             </ActionIcon>
           </Tooltip>
-          <Tooltip label={`Export${totalCount > 1 ? ` All (${totalCount} screens)` : ''}`}>
-            <ActionIcon
-              size="lg"
-              onClick={onExport}
-              aria-label="Export"
-            >
-              <IconFileZip size={18} />
-            </ActionIcon>
-          </Tooltip>
+          <Button
+            component={Link}
+            href="/preview"
+            size="sm"
+            variant="light"
+          >
+            Go to Preview
+          </Button>
         </Group>
       </Box>
 

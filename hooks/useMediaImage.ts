@@ -1,10 +1,18 @@
-import { useState, useEffect } from 'react';
+import { useContext, useEffect, useState } from 'react';
 import { persistenceDB } from '../lib/PersistenceDB';
 import { OPFSManager } from '../lib/opfs';
-import { useFrames } from '../components/AppFrames/FramesContext';
+import { FramesContextInternal } from '../components/AppFrames/FramesContext';
+
+// Fallback cache used when `FramesProvider` is not present (e.g. off-screen export rendering).
+// This is intentionally simple; it mainly prevents repeated OPFS reads during a single export.
+const fallbackMediaCache: Record<number, string> = {};
 
 export function useMediaImage(mediaId: number | undefined) {
-  const { mediaCache, setCachedMedia } = useFrames();
+  const frames = useContext(FramesContextInternal);
+  const mediaCache = frames?.mediaCache ?? fallbackMediaCache;
+  const setCachedMedia = frames?.setCachedMedia ?? ((id: number, url: string) => {
+    fallbackMediaCache[id] = url;
+  });
   // Initialize local URL from cache synchronously to prevent flash
   const [imageUrl, setImageUrl] = useState<string | undefined>(
     mediaId ? mediaCache[mediaId] : undefined
