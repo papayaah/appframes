@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { Box, Text, ActionIcon, Popover } from '@mantine/core';
 import { IconUpload, IconPhoto, IconGripVertical } from '@tabler/icons-react';
 import { useMediaImage } from '../../hooks/useMediaImage';
@@ -11,6 +11,8 @@ interface DeviceFrameProps {
   image?: string;
   mediaId?: number;
   scale: number;
+  // Scale applied by the outer canvas (e.g. zoom). Used to normalize drag deltas.
+  viewportScale?: number;
   screenScale: number;
   panX: number;
   panY: number;
@@ -150,6 +152,7 @@ export function DeviceFrame({
   image,
   mediaId,
   scale,
+  viewportScale = 1,
   screenScale,
   panX,
   panY,
@@ -175,8 +178,65 @@ export function DeviceFrame({
   const [isHovered, setIsHovered] = useState(false);
   const [isFrameDragging, setIsFrameDragging] = useState(false);
   const screenRef = useRef<HTMLDivElement>(null);
+  const imageLayerRef = useRef<HTMLDivElement>(null);
+  const panRafRef = useRef<number | null>(null);
+  const pendingPanRef = useRef<{ x: number; y: number } | null>(null);
+  const isPanningRef = useRef(false);
+
+  // Local frame-drag visual transform (avoid rerendering whole canvas during drag)
+  const frameWrapperRef = useRef<HTMLDivElement>(null);
+  const frameDragRafRef = useRef<number | null>(null);
+  const pendingFrameOffsetRef = useRef<{ x: number; y: number } | null>(null);
+  const isFrameDraggingRef = useRef(false);
 
   const config = getDeviceConfig(deviceType);
+
+  const applyPanVisual = useCallback((x: number, y: number) => {
+    const el = imageLayerRef.current;
+    if (!el) return;
+    el.style.backgroundPosition = `${x}% ${y}%`;
+  }, []);
+
+  const schedulePanVisual = useCallback(() => {
+    if (panRafRef.current != null) return;
+    panRafRef.current = requestAnimationFrame(() => {
+      panRafRef.current = null;
+      const pending = pendingPanRef.current;
+      if (!pending) return;
+      applyPanVisual(pending.x, pending.y);
+    });
+  }, [applyPanVisual]);
+
+  const applyFrameDragVisual = useCallback((x: number, y: number) => {
+    const el = frameWrapperRef.current;
+    if (!el) return;
+    el.style.transform = `translate3d(${x}px, ${y}px, 0)`;
+  }, []);
+
+  const scheduleFrameDragVisual = useCallback(() => {
+    if (frameDragRafRef.current != null) return;
+    frameDragRafRef.current = requestAnimationFrame(() => {
+      frameDragRafRef.current = null;
+      const pending = pendingFrameOffsetRef.current;
+      if (!pending) return;
+      applyFrameDragVisual(pending.x, pending.y);
+    });
+  }, [applyFrameDragVisual]);
+
+  // Keep visual pan in sync when props change (but don't fight the user mid-drag)
+  useEffect(() => {
+    if (isPanningRef.current) return;
+    if (!displayImage) return;
+    applyPanVisual(panX, panY);
+  }, [panX, panY, displayImage, applyPanVisual]);
+
+  // Cleanup any pending RAFs on unmount
+  useEffect(() => {
+    return () => {
+      if (panRafRef.current != null) cancelAnimationFrame(panRafRef.current);
+      if (frameDragRafRef.current != null) cancelAnimationFrame(frameDragRafRef.current);
+    };
+  }, []);
 
   const handleMouseDown = (e: React.MouseEvent) => {
     // If we have an image and pan handler, handle panning
@@ -184,6 +244,7 @@ export function DeviceFrame({
       e.preventDefault();
       e.stopPropagation();
       setIsDragging(true);
+      isPanningRef.current = true;
       setIsHovered(false); // Hide icons immediately when drag starts
 
       const startX = e.clientX;
@@ -192,9 +253,6 @@ export function DeviceFrame({
       const startPanY = panY;
       const rect = screenRef.current.getBoundingClientRect();
 
-      let rafId: number | null = null;
-      let pendingUpdate: { x: number; y: number } | null = null;
-
       const handleMove = (moveEvent: MouseEvent) => {
         const deltaX = ((moveEvent.clientX - startX) / rect.width) * 100;
         const deltaY = ((moveEvent.clientY - startY) / rect.height) * 100;
@@ -202,35 +260,21 @@ export function DeviceFrame({
         const newPanX = Math.max(0, Math.min(100, startPanX + deltaX));
         const newPanY = Math.max(0, Math.min(100, startPanY + deltaY));
 
-        // Store the pending update
-        pendingUpdate = { x: newPanX, y: newPanY };
-
-        // Use requestAnimationFrame to throttle updates
-        if (rafId === null) {
-          rafId = requestAnimationFrame(() => {
-            if (pendingUpdate) {
-              onPanChange(pendingUpdate.x, pendingUpdate.y);
-              pendingUpdate = null;
-            }
-            rafId = null;
-          });
-        }
+        // Update visuals locally to avoid rerendering parents during drag
+        pendingPanRef.current = { x: newPanX, y: newPanY };
+        schedulePanVisual();
       };
 
       const handleEnd = () => {
         setIsDragging(false);
+        isPanningRef.current = false;
 
-        // Cancel any pending animation frame
-        if (rafId !== null) {
-          cancelAnimationFrame(rafId);
-          rafId = null;
+        // Commit final pan to React state once (reduces flicker)
+        const pending = pendingPanRef.current;
+        if (pending) {
+          onPanChange(pending.x, pending.y);
         }
-
-        // Apply final update if there's a pending one
-        if (pendingUpdate) {
-          onPanChange(pendingUpdate.x, pendingUpdate.y);
-          pendingUpdate = null;
-        }
+        pendingPanRef.current = null;
 
         document.removeEventListener('mousemove', handleMove);
         document.removeEventListener('mouseup', handleEnd);
@@ -251,66 +295,36 @@ export function DeviceFrame({
 
     if (onFramePositionChange || onFrameMove) {
       setIsFrameDragging(true);
+      isFrameDraggingRef.current = true;
       setIsHovered(false); // Hide icons immediately when drag starts
       const startX = e.clientX;
       const startY = e.clientY;
-      let lastDeltaX = 0;
-      let lastDeltaY = 0;
-
-      let rafId: number | null = null;
-      let pendingUpdate: { x: number; y: number } | null = null;
+      let totalDeltaX = 0;
+      let totalDeltaY = 0;
 
       const handleMove = (moveEvent: MouseEvent) => {
-        const totalDeltaX = moveEvent.clientX - startX;
-        const totalDeltaY = moveEvent.clientY - startY;
-        // Calculate incremental delta since last move
-        const incrementalDeltaX = totalDeltaX - lastDeltaX;
-        const incrementalDeltaY = totalDeltaY - lastDeltaY;
-        lastDeltaX = totalDeltaX;
-        lastDeltaY = totalDeltaY;
-
-        // Store the pending update - Accumulate deltas to prevent loss
-        if (pendingUpdate) {
-          pendingUpdate.x += incrementalDeltaX;
-          pendingUpdate.y += incrementalDeltaY;
-        } else {
-          pendingUpdate = { x: incrementalDeltaX, y: incrementalDeltaY };
-        }
-
-        // Use requestAnimationFrame to throttle updates
-        if (rafId === null) {
-          rafId = requestAnimationFrame(() => {
-            if (pendingUpdate) {
-              if (onFrameMove) {
-                onFrameMove(pendingUpdate.x, pendingUpdate.y);
-              } else if (onFramePositionChange) {
-                onFramePositionChange(pendingUpdate.x, pendingUpdate.y);
-              }
-              pendingUpdate = null;
-            }
-            rafId = null;
-          });
-        }
+        // Normalize by viewportScale so drag feels 1:1 regardless of zoom
+        totalDeltaX = (moveEvent.clientX - startX) / viewportScale;
+        totalDeltaY = (moveEvent.clientY - startY) / viewportScale;
+        pendingFrameOffsetRef.current = { x: totalDeltaX, y: totalDeltaY };
+        scheduleFrameDragVisual();
       };
 
       const handleEnd = () => {
         setIsFrameDragging(false);
+        isFrameDraggingRef.current = false;
 
-        // Cancel any pending animation frame
-        if (rafId !== null) {
-          cancelAnimationFrame(rafId);
-          rafId = null;
-        }
-
-        // Apply final update if there's a pending one
-        if (pendingUpdate) {
+        // Commit final delta once to React state, then reset local transform
+        const pending = pendingFrameOffsetRef.current;
+        if (pending) {
           if (onFrameMove) {
-            onFrameMove(pendingUpdate.x, pendingUpdate.y);
+            onFrameMove(pending.x, pending.y);
           } else if (onFramePositionChange) {
-            onFramePositionChange(pendingUpdate.x, pendingUpdate.y);
+            onFramePositionChange(pending.x, pending.y);
           }
-          pendingUpdate = null;
         }
+        pendingFrameOffsetRef.current = null;
+        applyFrameDragVisual(0, 0);
 
         if (onFrameMoveEnd) {
           onFrameMoveEnd();
@@ -519,6 +533,7 @@ export function DeviceFrame({
       }}
     >
       <Box
+        ref={frameWrapperRef}
         style={{
           width,
           height: height + imacChin, // Add chin height if iMac
@@ -536,8 +551,9 @@ export function DeviceFrame({
           position: 'relative',
           display: 'flex',
           flexDirection: 'column',
-          transition: 'box-shadow 0.2s ease',
+          transition: (isDragging || isFrameDragging) ? 'none' : 'box-shadow 0.2s ease',
           cursor: onClick ? 'pointer' : undefined,
+          willChange: isFrameDragging ? 'transform' : undefined,
         }}
         onClick={onClick ? (e) => {
           e.stopPropagation();
@@ -563,6 +579,7 @@ export function DeviceFrame({
         >
           {displayImage ? (
             <Box
+              ref={imageLayerRef}
               style={{
                 width: '100%',
                 height: '100%',
@@ -571,6 +588,7 @@ export function DeviceFrame({
                 backgroundPosition: `${panX}% ${panY}%`,
                 backgroundRepeat: 'no-repeat',
                 pointerEvents: 'none',
+                willChange: isDragging ? 'background-position' : undefined,
               }}
             />
           ) : showInstructions ? (

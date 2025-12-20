@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useState, useRef, useCallback, ReactNode } from 'react';
+import { createContext, useContext, useState, useRef, useCallback, ReactNode, useEffect } from 'react';
 
 interface CanvasBounds {
   screenIndex: number;
@@ -75,6 +75,17 @@ export function CrossCanvasDragProvider({ children }: { children: ReactNode }) {
   const canvasBoundsRef = useRef<Map<number, CanvasBounds>>(new Map());
   const draggedDeviceRef = useRef<DraggedDevice | null>(null);
   const [, forceUpdate] = useState({});
+  const pendingDeltaRef = useRef<{ dx: number; dy: number }>({ dx: 0, dy: 0 });
+  const dragRafRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (dragRafRef.current != null) {
+        cancelAnimationFrame(dragRafRef.current);
+        dragRafRef.current = null;
+      }
+    };
+  }, []);
 
   // Keep ref in sync with state
   draggedDeviceRef.current = draggedDevice;
@@ -122,15 +133,28 @@ export function CrossCanvasDragProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const updateDrag = useCallback((deltaX: number, deltaY: number) => {
-    setDraggedDevice(prev => {
-      if (!prev) return null;
-      return {
-        ...prev,
-        offsetX: prev.offsetX + deltaX,
-        offsetY: prev.offsetY + deltaY,
-      };
+    // Batch high-frequency pointer updates to once per animation frame
+    pendingDeltaRef.current.dx += deltaX;
+    pendingDeltaRef.current.dy += deltaY;
+
+    if (dragRafRef.current != null) return;
+    dragRafRef.current = window.requestAnimationFrame(() => {
+      dragRafRef.current = null;
+      const { dx, dy } = pendingDeltaRef.current;
+      pendingDeltaRef.current = { dx: 0, dy: 0 };
+
+      if (dx === 0 && dy === 0) return;
+      setDraggedDevice(prev => {
+        if (!prev) return null;
+        return {
+          ...prev,
+          offsetX: prev.offsetX + dx,
+          offsetY: prev.offsetY + dy,
+        };
+      });
+      // Some consumers rely on forced renders while dragging
+      forceUpdate({});
     });
-    forceUpdate({});
   }, []);
 
   const endDrag = useCallback(() => {

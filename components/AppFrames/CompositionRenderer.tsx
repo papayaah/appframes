@@ -8,6 +8,8 @@ interface CompositionRendererProps {
   settings: CanvasSettings;
   screen: Screen;
   screenIndex?: number;
+  // Scale applied by the outer canvas (e.g. zoom). Used to normalize drag deltas.
+  viewportScale?: number;
   disableCrossCanvasDrag?: boolean;
   onPanChange?: (frameIndex: number, panX: number, panY: number) => void;
   onFramePositionChange?: (frameIndex: number, frameX: number, frameY: number) => void;
@@ -69,6 +71,7 @@ export function CompositionRenderer({
   settings,
   screen,
   screenIndex,
+  viewportScale = 1,
   disableCrossCanvasDrag = false,
   onPanChange,
   onFramePositionChange,
@@ -129,6 +132,7 @@ export function CompositionRenderer({
       image: images[index]?.image,
       mediaId: images[index]?.mediaId,
       scale: scale * scaleMultiplier,
+      viewportScale,
       screenScale: settings.screenScale,
       panX,
       panY,

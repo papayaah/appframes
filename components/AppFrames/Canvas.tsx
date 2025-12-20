@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { Box } from '@mantine/core';
 import { CanvasSettings, Screen } from './AppFrames';
 import { CompositionRenderer } from './CompositionRenderer';
@@ -86,14 +86,52 @@ export function Canvas({
   const [hoveredScreenIndex, setHoveredScreenIndex] = useState<number | null>(null);
   const [dragFileCount, setDragFileCount] = useState<number>(0);
   const [isPanning, setIsPanning] = useState(false);
-  const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
 
   const containerRef = useRef<HTMLDivElement>(null);
+  const innerRef = useRef<HTMLDivElement>(null);
   const lastScrollTime = useRef<number>(0);
   const canvasRefs = useRef<Map<number, HTMLElement>>(new Map());
+  const canvasSizes = useRef<Map<number, { width: number; height: number }>>(new Map());
+  const canvasResizeObservers = useRef<Map<number, ResizeObserver>>(new Map());
+
+  // Pan + zoom hot path: keep in refs, apply transform in rAF (avoid React renders per mousemove)
+  const panOffsetRef = useRef({ x: 0, y: 0 });
+  const zoomRef = useRef(zoom);
+  const transformRafRef = useRef<number | null>(null);
+  zoomRef.current = zoom;
   
   // Get cross-canvas drag context
   const crossCanvasDrag = useCrossCanvasDrag();
+
+  const refreshCanvasBounds = useCallback(() => {
+    canvasRefs.current.forEach((el, screenIndex) => {
+      crossCanvasDrag.registerCanvas(screenIndex, el);
+    });
+  }, [crossCanvasDrag]);
+
+  const applyInnerTransform = useCallback(() => {
+    const el = innerRef.current;
+    if (!el) return;
+    const { x, y } = panOffsetRef.current;
+    const s = zoomRef.current / 100;
+    el.style.transform = `translate3d(${x}px, ${y}px, 0) scale(${s})`;
+    el.style.transformOrigin = 'center center';
+  }, []);
+
+  const scheduleTransform = useCallback(() => {
+    if (transformRafRef.current != null) return;
+    transformRafRef.current = window.requestAnimationFrame(() => {
+      transformRafRef.current = null;
+      applyInnerTransform();
+    });
+  }, [applyInnerTransform]);
+
+  // Keep transform in sync when zoom changes (no need to rerender panning transform)
+  useEffect(() => {
+    applyInnerTransform();
+    // Zoom changes affect canvas DOM bounds used by cross-canvas drag
+    refreshCanvasBounds();
+  }, [zoom, applyInnerTransform, refreshCanvasBounds]);
 
   // Wheel handler: Cmd+Scroll = zoom, regular scroll = navigate screens
   useEffect(() => {
@@ -168,21 +206,24 @@ export function Canvas({
 
         const startX = e.clientX;
         const startY = e.clientY;
-        const startPanX = panOffset.x;
-        const startPanY = panOffset.y;
+        const startPanX = panOffsetRef.current.x;
+        const startPanY = panOffsetRef.current.y;
 
         const handleMouseMove = (moveEvent: MouseEvent) => {
           const deltaX = moveEvent.clientX - startX;
           const deltaY = moveEvent.clientY - startY;
-          setPanOffset({
+          panOffsetRef.current = {
             x: startPanX + deltaX,
             y: startPanY + deltaY,
-          });
+          };
+          scheduleTransform();
         };
 
         const handleMouseUp = () => {
           setIsPanning(false);
           container.style.cursor = '';
+          // Pan changes affect canvas DOM bounds used by cross-canvas drag
+          refreshCanvasBounds();
           document.removeEventListener('mousemove', handleMouseMove);
           document.removeEventListener('mouseup', handleMouseUp);
         };
@@ -206,7 +247,7 @@ export function Canvas({
       container.removeEventListener('mousedown', handleMouseDown);
       container.removeEventListener('auxclick', handleAuxClick);
     };
-  }, [panOffset]);
+  }, [scheduleTransform]);
 
   const handleDrop = (files: File[], targetFrameIndex?: number, screenIndex?: number) => {
     if (!onReplaceScreen || files.length === 0) {
@@ -217,6 +258,59 @@ export function Canvas({
     setDragFileCount(0);
     onReplaceScreen(files, targetFrameIndex, screenIndex);
   };
+
+  const setCanvasRef = useCallback((screenIndex: number, el: HTMLElement | null) => {
+    // Clean up old observer/ref
+    const prev = canvasRefs.current.get(screenIndex);
+    if (prev && prev !== el) {
+      const ro = canvasResizeObservers.current.get(screenIndex);
+      ro?.disconnect();
+      canvasResizeObservers.current.delete(screenIndex);
+      canvasSizes.current.delete(screenIndex);
+      canvasRefs.current.delete(screenIndex);
+      crossCanvasDrag.unregisterCanvas(screenIndex);
+    }
+
+    if (!el) {
+      const ro = canvasResizeObservers.current.get(screenIndex);
+      ro?.disconnect();
+      canvasResizeObservers.current.delete(screenIndex);
+      canvasSizes.current.delete(screenIndex);
+      canvasRefs.current.delete(screenIndex);
+      crossCanvasDrag.unregisterCanvas(screenIndex);
+      return;
+    }
+
+    canvasRefs.current.set(screenIndex, el);
+    // Register bounds for cross-canvas drag logic
+    crossCanvasDrag.registerCanvas(screenIndex, el);
+
+    // Track size without forcing layout reads during render
+    if (typeof ResizeObserver !== 'undefined') {
+      const ro = new ResizeObserver((entries) => {
+        const entry = entries[0];
+        if (!entry) return;
+        const { width, height } = entry.contentRect;
+        canvasSizes.current.set(screenIndex, { width, height });
+        // Keep drag bounds current when layout changes
+        crossCanvasDrag.registerCanvas(screenIndex, el);
+      });
+      ro.observe(el);
+      canvasResizeObservers.current.set(screenIndex, ro);
+    }
+  }, [crossCanvasDrag]);
+
+  // Prevent leaking ResizeObservers on unmount
+  useEffect(() => {
+    return () => {
+      canvasResizeObservers.current.forEach((ro) => ro.disconnect());
+      canvasResizeObservers.current.clear();
+      if (transformRafRef.current != null) {
+        cancelAnimationFrame(transformRafRef.current);
+        transformRafRef.current = null;
+      }
+    };
+  }, []);
 
   return (
     <Box
@@ -237,7 +331,8 @@ export function Canvas({
         // Count files being dragged
         if (e.dataTransfer.types.includes('Files')) {
           const fileCount = e.dataTransfer.items.length;
-          setDragFileCount(fileCount);
+          // Avoid state spam while dragging over
+          if (fileCount !== dragFileCount) setDragFileCount(fileCount);
         }
       }}
       onDragLeave={(e) => {
@@ -250,6 +345,7 @@ export function Canvas({
       }}
     >
       <Box
+        ref={innerRef}
         style={{
           display: 'flex',
           gap: 60, // Fixed gap between canvases
@@ -257,9 +353,8 @@ export function Canvas({
           alignItems: 'center',
           margin: '0 auto', // Center if content is smaller than viewport
           minWidth: 'min-content', // Ensure container grows with content
-          // Apply zoom transform and pan offset to entire container
-          transform: `translate(${panOffset.x}px, ${panOffset.y}px) scale(${zoom / 100})`,
-          transformOrigin: 'center center',
+          // Transform is applied imperatively (rAF-batched) for smooth panning
+          willChange: 'transform',
           // Change cursor when panning
           cursor: isPanning ? 'grabbing' : undefined,
         }}
@@ -307,6 +402,7 @@ export function Canvas({
               <Box
                 id={`canvas-${screen.id}`}
                 data-canvas="true"
+                ref={(el) => setCanvasRef(screenIndex, el)}
                 style={{
                   width: '100%',
                   maxWidth: aspectRatio > 1 ? '90%' : 600,
@@ -324,6 +420,7 @@ export function Canvas({
                   settings={screenSettings}
                   screen={screen}
                   screenIndex={screenIndex}
+                  viewportScale={zoom / 100}
                   onPanChange={(frameIndex, x, y) => onPanChange?.(screenIndex, frameIndex, x, y)}
                   onFramePositionChange={(frameIndex, x, y) => onFramePositionChange?.(screenIndex, frameIndex, x, y)}
                   hoveredFrameIndex={hoveredScreenIndex === screenIndex ? hoveredFrameIndex : null}
@@ -350,10 +447,17 @@ export function Canvas({
                 const overflow = crossCanvasDrag.getOverflowForCanvas(screenIndex);
                 if (overflow && overflow.visible) {
                   const sourceScreen = screens[overflow.sourceScreenIndex];
+                  const size = canvasSizes.current.get(screenIndex);
                   const canvasEl = canvasRefs.current.get(screenIndex);
-                  if (sourceScreen && canvasEl) {
-                    // Get the canvas dimensions to calculate relative positioning
-                    const canvasRect = canvasEl.getBoundingClientRect();
+                  const rect = !size && canvasEl ? canvasEl.getBoundingClientRect() : null;
+                  const width = size?.width ?? rect?.width;
+                  const height = size?.height ?? rect?.height;
+
+                  if (sourceScreen && width && height) {
+                    // If we fell back to a one-off rect read, cache it to avoid repeated reads
+                    if (!size) {
+                      canvasSizes.current.set(screenIndex, { width, height });
+                    }
 
                     return (
                       <Box
@@ -362,8 +466,8 @@ export function Canvas({
                           top: '50%',
                           left: '50%',
                           transform: 'translate(-50%, -50%)',
-                          width: canvasRect.width,
-                          height: canvasRect.height,
+                          width,
+                          height,
                           pointerEvents: 'none',
                           overflow: 'hidden',
                           zIndex: 10,
