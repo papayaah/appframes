@@ -37,16 +37,6 @@ const sanitizeFilenamePart = (input: string) => {
 
 const pad2 = (n: number) => String(n).padStart(2, '0');
 
-const formatTimestamp = (d: Date) => {
-  const yyyy = d.getFullYear();
-  const mm = pad2(d.getMonth() + 1);
-  const dd = pad2(d.getDate());
-  const hh = pad2(d.getHours());
-  const min = pad2(d.getMinutes());
-  const ss = pad2(d.getSeconds());
-  return `${yyyy}${mm}${dd}-${hh}${min}${ss}`;
-};
-
 const getPlatform = (canvasSize: string): 'apple' | 'google' => {
   if (canvasSize.startsWith('google')) return 'google';
   return 'apple';
