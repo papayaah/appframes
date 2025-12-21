@@ -154,7 +154,8 @@ export const getDefaultScreenSettings = (): Omit<CanvasSettings, 'selectedScreen
     screenPanX: 50,
     screenPanY: 50,
     orientation: 'portrait',
-    backgroundColor: '#E5E7EB',
+    // Default to transparent so users can export/download with alpha without extra steps.
+    backgroundColor: 'transparent',
     canvasBackgroundMediaId: undefined,
   };
 };

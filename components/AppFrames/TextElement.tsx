@@ -61,7 +61,7 @@ interface TextElementProps {
   selected: boolean;
   disabled?: boolean;
   onSelect: () => void;
-  onUpdate: (updates: Partial<TextElementModel> & { style?: Partial<TextStyle> }) => void;
+  onUpdate: (updates: Omit<Partial<TextElementModel>, 'style'> & { style?: Partial<TextStyle> }) => void;
   onDelete: () => void;
 }
 
@@ -77,12 +77,16 @@ export function TextElement({
   const [isDragging, setIsDragging] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
   const [isRotating, setIsRotating] = useState(false);
+  const [isResizing, setIsResizing] = useState(false);
   const [rotationPreview, setRotationPreview] = useState<number | null>(null);
   const [editText, setEditText] = useState(element.content);
 
   const rootRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const rotationPreviewRef = useRef<number | null>(null);
+  const lastClickAtRef = useRef<number>(0);
+  const dragPosRef = useRef<{ x: number; y: number } | null>(null);
+  const dragRafRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (!isEditing) {
@@ -96,6 +100,15 @@ export function TextElement({
       textareaRef.current.select();
     }
   }, [isEditing]);
+
+  useEffect(() => {
+    return () => {
+      if (dragRafRef.current != null) {
+        cancelAnimationFrame(dragRafRef.current);
+        dragRafRef.current = null;
+      }
+    };
+  }, []);
 
   const style = element.style;
 
@@ -119,15 +132,21 @@ export function TextElement({
     onSelect();
   };
 
+  const enterEditMode = () => {
+    onSelect();
+    setIsEditing(true);
+    setEditText(element.content);
+  };
+
   const handleMouseDown = (e: React.MouseEvent) => {
     if (disabled) return;
-    if (isEditing || isRotating) return;
+    if (isEditing || isRotating || isResizing) return;
     if (isEditableTarget(e.target)) return;
-    // Don't start a drag on the second click of a double-click (it can prevent dblclick from firing reliably)
-    if (e.detail >= 2) return;
-    e.preventDefault();
+    // Always stop propagation so the canvas doesn't deselect between clicks
     e.stopPropagation();
     onSelect();
+    // Don't start a drag on the 2nd click (we'll treat it as a potential edit)
+    if (e.detail >= 2) return;
 
     const parent = rootRef.current?.parentElement;
     if (!parent) return;
@@ -136,23 +155,58 @@ export function TextElement({
     setIsHovered(false);
 
     const parentRect = parent.getBoundingClientRect();
+    const selfRect = rootRef.current?.getBoundingClientRect();
     const startX = e.clientX;
     const startY = e.clientY;
     const startPosX = element.x;
     const startPosY = element.y;
+    // Keep the element fully within canvas bounds (prevents clipping that can look like re-wrapping)
+    const halfWPercent = selfRect ? (selfRect.width / 2 / parentRect.width) * 100 : 0;
+    const halfHPercent = selfRect ? (selfRect.height / 2 / parentRect.height) * 100 : 0;
+
+    const applyDragPos = () => {
+      dragRafRef.current = null;
+      const pos = dragPosRef.current;
+      const el = rootRef.current;
+      if (!pos || !el) return;
+      // Imperative updates for buttery-smooth dragging (avoid React renders per mousemove)
+      el.style.left = `${pos.x}%`;
+      el.style.top = `${pos.y}%`;
+    };
+
+    const scheduleApply = () => {
+      if (dragRafRef.current != null) return;
+      dragRafRef.current = window.requestAnimationFrame(applyDragPos);
+    };
 
     const handleMove = (moveEvent: MouseEvent) => {
       const deltaX = ((moveEvent.clientX - startX) / parentRect.width) * 100;
       const deltaY = ((moveEvent.clientY - startY) / parentRect.height) * 100;
 
-      const newX = Math.max(0, Math.min(100, startPosX + deltaX));
-      const newY = Math.max(0, Math.min(100, startPosY + deltaY));
+      const minX = Math.max(0, halfWPercent);
+      const maxX = Math.min(100, 100 - halfWPercent);
+      const minY = Math.max(0, halfHPercent);
+      const maxY = Math.min(100, 100 - halfHPercent);
 
-      onUpdate({ x: newX, y: newY });
+      const newX = Math.max(minX, Math.min(maxX, startPosX + deltaX));
+      const newY = Math.max(minY, Math.min(maxY, startPosY + deltaY));
+
+      dragPosRef.current = { x: newX, y: newY };
+      scheduleApply();
     };
 
     const handleEnd = () => {
       setIsDragging(false);
+      // Commit final position to state once (keeps dragging smooth)
+      const finalPos = dragPosRef.current;
+      dragPosRef.current = null;
+      if (dragRafRef.current != null) {
+        cancelAnimationFrame(dragRafRef.current);
+        dragRafRef.current = null;
+      }
+      if (finalPos) {
+        onUpdate({ x: finalPos.x, y: finalPos.y });
+      }
       document.removeEventListener('mousemove', handleMove);
       document.removeEventListener('mouseup', handleEnd);
     };
@@ -161,13 +215,36 @@ export function TextElement({
     document.addEventListener('mouseup', handleEnd);
   };
 
-  const handleDoubleClick = (e: React.MouseEvent) => {
+  const handleResizeMouseDown = (e: React.MouseEvent) => {
     if (disabled) return;
+    if (isEditing || isRotating || isDragging) return;
     e.preventDefault();
     e.stopPropagation();
     onSelect();
-    setIsEditing(true);
-    setEditText(element.content);
+
+    const parent = rootRef.current?.parentElement;
+    if (!parent) return;
+    const parentRect = parent.getBoundingClientRect();
+    const startX = e.clientX;
+    const startMaxWidth = element.style.maxWidth;
+
+    setIsResizing(true);
+
+    const handleMove = (moveEvent: MouseEvent) => {
+      const deltaX = moveEvent.clientX - startX;
+      const deltaPct = (deltaX / parentRect.width) * 100;
+      const next = Math.max(10, Math.min(100, startMaxWidth + deltaPct));
+      onUpdate({ style: { maxWidth: next } });
+    };
+
+    const handleEnd = () => {
+      setIsResizing(false);
+      document.removeEventListener('mousemove', handleMove);
+      document.removeEventListener('mouseup', handleEnd);
+    };
+
+    document.addEventListener('mousemove', handleMove);
+    document.addEventListener('mouseup', handleEnd);
   };
 
   const commitEdit = () => {
@@ -234,6 +311,8 @@ export function TextElement({
           ? 'default'
           : isEditing
             ? 'text'
+            : isResizing
+              ? 'ew-resize'
             : isDragging
               ? 'grabbing'
               : 'grab',
@@ -243,16 +322,27 @@ export function TextElement({
         maxWidth: `${style.maxWidth}%`,
       }}
       onMouseDown={handleMouseDown}
-      onClick={handleSelect}
-      onDoubleClick={handleDoubleClick}
-      onDoubleClickCapture={(e) => {
-        // Ensure dblclick isn't lost to other handlers (e.g. canvas background deselect)
+      onMouseUp={(e) => {
         if (disabled) return;
-        e.preventDefault();
+        if (isDragging || isRotating || isEditing || isResizing) return;
+        if (isEditableTarget(e.target)) return;
+        // Robust double-click detection (some preventDefault/drag paths can swallow native dblclick)
+        const now = Date.now();
+        const delta = now - lastClickAtRef.current;
+        lastClickAtRef.current = now;
+        // Typical dblclick threshold is ~500ms; keep tighter so it doesn't feel accidental
+        if (delta > 0 && delta < 320) {
+          lastClickAtRef.current = 0;
+          e.stopPropagation();
+          enterEditMode();
+        }
+      }}
+      onClick={handleSelect}
+      onDoubleClick={(e) => {
+        // Keep native dblclick too (when it does fire)
+        if (disabled) return;
         e.stopPropagation();
-        onSelect();
-        setIsEditing(true);
-        setEditText(element.content);
+        enterEditMode();
       }}
       onMouseEnter={() => { if (!isDragging && !disabled) setIsHovered(true); }}
       onMouseLeave={() => { if (!isDragging && !disabled) setIsHovered(false); }}
@@ -334,6 +424,26 @@ export function TextElement({
         >
           <IconTrash size={14} />
         </ActionIcon>
+      )}
+
+      {/* Resize handle (adjusts maxWidth to control wrapping) */}
+      {selected && !isEditing && (
+        <Box
+          onMouseDown={handleResizeMouseDown}
+          style={{
+            position: 'absolute',
+            right: -10,
+            top: '50%',
+            transform: 'translateY(-50%)',
+            width: 10,
+            height: 22,
+            borderRadius: 6,
+            backgroundColor: 'rgba(121, 80, 242, 0.95)',
+            boxShadow: '0 2px 10px rgba(0,0,0,0.15)',
+            cursor: 'ew-resize',
+          }}
+          title="Drag to resize text box"
+        />
       )}
 
       {isEditing ? (

@@ -262,10 +262,27 @@ export function AppFrames() {
           continue;
         }
 
+        // Preserve transparency for PNG downloads when background is transparent / not set.
+        // Also remove UI-only styling (shadow/rounded corners) so the alpha is "clean".
+        const prevBoxShadow = (canvasElement as HTMLElement).style.boxShadow;
+        const prevBorderRadius = (canvasElement as HTMLElement).style.borderRadius;
+        const prevOutline = (canvasElement as HTMLElement).style.outline;
+        (canvasElement as HTMLElement).style.boxShadow = 'none';
+        (canvasElement as HTMLElement).style.borderRadius = '0px';
+        (canvasElement as HTMLElement).style.outline = 'none';
+
         const dataUrl = await toPng(canvasElement, {
           quality: 1.0,
           pixelRatio: 2,
+          // If the node background is transparent, keep it transparent.
+          backgroundColor: screen.settings.backgroundColor === 'transparent'
+            ? 'transparent'
+            : undefined,
         });
+
+        (canvasElement as HTMLElement).style.boxShadow = prevBoxShadow;
+        (canvasElement as HTMLElement).style.borderRadius = prevBorderRadius;
+        (canvasElement as HTMLElement).style.outline = prevOutline;
 
         const link = document.createElement('a');
         link.download = `${screen.name || `screen-${screenIndex + 1}`}-${Date.now()}.png`;

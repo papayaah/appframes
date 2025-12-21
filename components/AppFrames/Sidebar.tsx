@@ -391,7 +391,7 @@ export function Sidebar({ settings, setSettings, screens }: SidebarProps) {
           Background Color
         </Text>
         <Group gap="xs">
-          {['#E5E7EB', '#F3F4F6', '#DBEAFE', '#E0E7FF', '#FCE7F3', '#FEF3C7', '#D1FAE5'].map(
+          {(['transparent', '#E5E7EB', '#F3F4F6', '#DBEAFE', '#E0E7FF', '#FCE7F3', '#FEF3C7', '#D1FAE5'] as const).map(
             (color) => (
               <Box
                 key={color}
@@ -400,7 +400,16 @@ export function Sidebar({ settings, setSettings, screens }: SidebarProps) {
                   width: 32,
                   height: 32,
                   borderRadius: 8,
-                  backgroundColor: color,
+                  backgroundColor: color === 'transparent' ? 'transparent' : color,
+                  ...(color === 'transparent'
+                    ? {
+                        // Checkerboard to indicate transparency
+                        backgroundImage:
+                          'linear-gradient(45deg, #e9ecef 25%, transparent 25%), linear-gradient(-45deg, #e9ecef 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #e9ecef 75%), linear-gradient(-45deg, transparent 75%, #e9ecef 75%)',
+                        backgroundSize: '10px 10px',
+                        backgroundPosition: '0 0, 0 5px, 5px -5px, -5px 0px',
+                      }
+                    : {}),
                   cursor: 'pointer',
                   border:
                     settings.backgroundColor === color ? '3px solid #228be6' : '1px solid #dee2e6',
