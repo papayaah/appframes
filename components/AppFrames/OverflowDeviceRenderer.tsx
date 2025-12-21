@@ -4,6 +4,9 @@ import { Box } from '@mantine/core';
 import { DeviceFrame } from './DeviceFrame';
 import { Screen, CanvasSettings } from './AppFrames';
 
+// Must match CompositionRenderer baseline to preserve old default sizing.
+const BASE_COMPOSITION_SCALE = 0.85;
+
 interface OverflowDeviceRendererProps {
   screen: Screen;
   settings: CanvasSettings;
@@ -23,8 +26,8 @@ export function OverflowDeviceRenderer({
   offsetX,
   offsetY,
 }: OverflowDeviceRendererProps) {
-  const scale = settings.compositionScale / 100;
   const image = screen.images?.[frameIndex];
+  const effectiveScale = BASE_COMPOSITION_SCALE * ((image?.frameScale ?? 100) / 100);
 
   // We render even without an image to show the device frame itself
 
@@ -45,7 +48,7 @@ export function OverflowDeviceRenderer({
         deviceType={image?.deviceFrame || 'iphone-14-pro'}
         image={image?.image}
         mediaId={image?.mediaId}
-        scale={scale}
+        scale={effectiveScale}
         screenScale={settings.screenScale}
         panX={image?.panX ?? 50}
         panY={image?.panY ?? 50}

@@ -4,6 +4,8 @@ import { getCanvasDimensions } from '@/components/AppFrames/FramesContext';
 import { CompositionRenderer } from '@/components/AppFrames/CompositionRenderer';
 import { TextElement as CanvasTextElement } from '@/components/AppFrames/TextElement';
 import { useMediaImage } from '@/hooks/useMediaImage';
+import { MantineProvider } from '@mantine/core';
+import { theme } from '@/theme';
 
 export type ExportFormat = 'png' | 'jpg';
 
@@ -24,6 +26,30 @@ export interface CancelToken {
 }
 
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+const dataUrlToBlob = (dataUrl: string): Blob => {
+  // Safari can return 0-byte blobs when using fetch() on data: URLs. Convert manually instead.
+  const [header, data] = dataUrl.split(',', 2);
+  if (!header || data == null) {
+    throw new Error('Export render failed: invalid data URL');
+  }
+  const mimeMatch = header.match(/data:([^;]+)(;base64)?/i);
+  const mime = mimeMatch?.[1] || 'application/octet-stream';
+  const isBase64 = header.toLowerCase().includes(';base64');
+
+  if (isBase64) {
+    const binary = atob(data);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) {
+      bytes[i] = binary.charCodeAt(i);
+    }
+    return new Blob([bytes], { type: mime });
+  }
+
+  // Percent-encoded (rare)
+  const text = decodeURIComponent(data);
+  return new Blob([text], { type: mime });
+};
 
 const sanitizeFilenamePart = (input: string) => {
   const s = (input || '').trim();
@@ -190,8 +216,12 @@ export class ExportService {
     const link = document.createElement('a');
     link.href = url;
     link.download = filename;
+    // Some browsers (notably Safari) can produce empty/corrupt downloads if we revoke immediately.
+    // Append to DOM to maximize compatibility, click, then revoke on a delay.
+    document.body.appendChild(link);
     link.click();
-    URL.revokeObjectURL(url);
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 15_000);
   }
 
   async exportScreen(
@@ -218,6 +248,7 @@ export class ExportService {
     const total = canvasSizes.reduce((sum, cs) => sum + ((screensByCanvasSize[cs] || []).length), 0);
 
     let current = 0;
+    let successCount = 0;
     for (const canvasSize of canvasSizes) {
       if (cancelToken?.cancelled) {
         throw new Error('EXPORT_CANCELLED');
@@ -240,6 +271,7 @@ export class ExportService {
         try {
           const blob = await this.exportScreen(screen, canvasSize, format, quality);
           folder.file(this.generateFilename(screen, i, format), blob);
+          successCount += 1;
         } catch (err) {
           // Skip individual failures; keep going.
           // eslint-disable-next-line no-console
@@ -254,7 +286,14 @@ export class ExportService {
       }
     }
 
-    return zip.generateAsync({ type: 'blob' });
+    if (cancelToken?.cancelled) {
+      throw new Error('EXPORT_CANCELLED');
+    }
+    if (successCount === 0) {
+      throw new Error('All screens failed to export.');
+    }
+
+    return zip.generateAsync({ type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 6 } });
   }
 
   private async renderScreenToImage(
@@ -282,13 +321,17 @@ export class ExportService {
     const root = createRoot(container);
     try {
       root.render(
-        <ExportSurface
-          screen={screen}
-          canvasSize={canvasSize}
-          width={width}
-          height={height}
-          isPro={isPro}
-        />
+        // IMPORTANT: This is a separate React root; Mantine context does not cross roots.
+        // Wrap with MantineProvider to avoid "MantineProvider was not found" crashes during export.
+        <MantineProvider theme={theme}>
+          <ExportSurface
+            screen={screen}
+            canvasSize={canvasSize}
+            width={width}
+            height={height}
+            isPro={isPro}
+          />
+        </MantineProvider>
       );
 
       // Give React + media loading a moment.
@@ -303,11 +346,14 @@ export class ExportService {
       if (!node) throw new Error('Export render failed: no node');
 
       const dataUrl = format === 'png'
-        ? await toPng(node, { pixelRatio: 2, quality: 1 })
-        : await toJpeg(node, { pixelRatio: 2, quality: Math.max(0, Math.min(1, quality / 100)) });
+        ? await toPng(node, { pixelRatio: 2, cacheBust: true })
+        : await toJpeg(node, { pixelRatio: 2, cacheBust: true, quality: Math.max(0, Math.min(1, quality / 100)) });
 
-      const res = await fetch(dataUrl);
-      return await res.blob();
+      const blob = dataUrlToBlob(dataUrl);
+      if (!blob || blob.size === 0) {
+        throw new Error('Export render failed: empty blob');
+      }
+      return blob;
     } finally {
       try { root.unmount(); } catch { /* ignore */ }
       container.remove();

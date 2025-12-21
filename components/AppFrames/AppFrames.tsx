@@ -8,7 +8,7 @@ import { SidebarTabs } from './SidebarTabs';
 import { Canvas } from './Canvas';
 import { ScreensPanel } from './ScreensPanel';
 import { useFrames, getCanvasDimensions, getCompositionFrameCount } from './FramesContext';
-import { Screen, CanvasSettings, ScreenImage, AppFramesActions } from './types';
+import { Screen, CanvasSettings, ScreenImage, AppFramesActions, clampFrameTransform } from './types';
 import { CrossCanvasDragProvider } from './CrossCanvasDragContext';
 
 // Re-export types for compatibility
@@ -524,6 +524,46 @@ export function AppFrames() {
                     images: newImages,
                   };
                 }
+                return updated;
+              });
+            }}
+            onFrameScaleChange={(screenIndex, frameIndex, frameScale) => {
+              setScreens(prevScreens => {
+                const updated = [...prevScreens];
+                if (!updated[screenIndex]) return prevScreens;
+                const screen = updated[screenIndex];
+                const newImages = [...screen.images];
+                while (newImages.length <= frameIndex) newImages.push({});
+
+                newImages[frameIndex] = {
+                  ...newImages[frameIndex],
+                  frameScale: clampFrameTransform(frameScale, 'frameScale'),
+                };
+
+                updated[screenIndex] = {
+                  ...screen,
+                  images: newImages,
+                };
+                return updated;
+              });
+            }}
+            onFrameRotateChange={(screenIndex, frameIndex, rotateZ) => {
+              setScreens(prevScreens => {
+                const updated = [...prevScreens];
+                if (!updated[screenIndex]) return prevScreens;
+                const screen = updated[screenIndex];
+                const newImages = [...screen.images];
+                while (newImages.length <= frameIndex) newImages.push({});
+
+                newImages[frameIndex] = {
+                  ...newImages[frameIndex],
+                  rotateZ: clampFrameTransform(rotateZ, 'rotateZ'),
+                };
+
+                updated[screenIndex] = {
+                  ...screen,
+                  images: newImages,
+                };
                 return updated;
               });
             }}

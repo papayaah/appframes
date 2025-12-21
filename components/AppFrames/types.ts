@@ -8,6 +8,16 @@ export interface ScreenImage {
   // Per-frame position on canvas (offset from default layout position)
   frameX?: number; // Offset in pixels from default position
   frameY?: number; // Offset in pixels from default position
+
+  // Per-frame transforms (applied by CompositionRenderer wrapper)
+  /** -60 to 60 degrees, default 0 */
+  tiltX?: number;
+  /** -60 to 60 degrees, default 0 */
+  tiltY?: number;
+  /** -180 to 180 degrees, default 0 */
+  rotateZ?: number;
+  /** 20 to 200 percent, default 100 */
+  frameScale?: number;
 }
 
 export interface TextStyle {
@@ -69,7 +79,6 @@ export interface TextElement {
 export interface CanvasSettings {
   canvasSize: string; // Export dimensions (App Store requirements)
   composition: 'single' | 'dual' | 'stack' | 'triple' | 'fan';
-  compositionScale: number;
   selectedScreenIndex: number;
   selectedTextId?: string; // Currently selected text element (per screen)
   screenScale: number;
@@ -92,6 +101,23 @@ export interface AppFramesActions {
   addScreen: (image: string) => void;
   replaceScreen: (index: number, image: string) => void;
   removeScreen: (id: string) => void;
+}
+
+export type FrameTransformProperty = 'tiltX' | 'tiltY' | 'rotateZ' | 'frameScale';
+
+export function clampFrameTransform(value: number, property: FrameTransformProperty): number {
+  if (!Number.isFinite(value)) return property === 'frameScale' ? 100 : 0;
+
+  switch (property) {
+    case 'rotateZ':
+      return Math.max(-180, Math.min(180, value));
+    case 'frameScale':
+      return Math.max(20, Math.min(200, value));
+    case 'tiltX':
+    case 'tiltY':
+    default:
+      return Math.max(-60, Math.min(60, value));
+  }
 }
 
 

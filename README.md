@@ -13,9 +13,9 @@ A modern web application for creating beautiful app screenshots and mockups with
   - Image positioning (pan X/Y)
   - Image scale control
   - Background color selection
-  - Caption text with positioning
+  - Multiple text layers (add, drag, rotate, style, reorder, hide/show)
   - Portrait/Landscape orientation
-- **Export Functionality**: Export your mockups as high-quality images
+- **Export Functionality**: Export from the Preview page as high-quality PNG/JPG (single or ZIP)
 
 ## Getting Started
 
@@ -54,8 +54,8 @@ See [QUICKSTART.md](./QUICKSTART.md) for a detailed guide on using the app.
 3. **Choose Device Frame**: Select a device mockup from the Device tab
 4. **Choose Layout**: Select a composition style (Single, Dual, Stack, Triple, or Fan)
 5. **Customize**: Adjust the scale, position, and appearance using the sidebar controls
-6. **Add Caption**: Toggle caption on/off and customize the text and position
-7. **Export**: Click the Export button to download your mockup - ready for App Store submission!
+6. **Add Text**: Add multiple text layers, double-click to edit, drag to position, rotate, and manage layers
+7. **Export**: Go to Preview and export selected canvas sizes (single file or ZIP)
 
 See [APP_STORE_SIZES.md](./APP_STORE_SIZES.md) for complete list of supported dimensions.
 

@@ -78,7 +78,7 @@ const ScreenThumbnail = memo(function ScreenThumbnail({
   }
 
   // Only re-render if THIS screen's data or settings changed
-  // For images, only check image/mediaId changes, not deviceFrame (which doesn't affect thumbnail)
+  // For images, include transform + position fields so thumbnails reflect edits.
   const imagesChanged = () => {
     const prevImages = prevProps.screen.images || [];
     const nextImages = nextProps.screen.images || [];
@@ -87,7 +87,19 @@ const ScreenThumbnail = memo(function ScreenThumbnail({
     
     return prevImages.some((prevImg, idx) => {
       const nextImg = nextImages[idx];
-      return prevImg?.image !== nextImg?.image || prevImg?.mediaId !== nextImg?.mediaId;
+      return (
+        prevImg?.image !== nextImg?.image ||
+        prevImg?.mediaId !== nextImg?.mediaId ||
+        prevImg?.deviceFrame !== nextImg?.deviceFrame ||
+        prevImg?.panX !== nextImg?.panX ||
+        prevImg?.panY !== nextImg?.panY ||
+        prevImg?.frameX !== nextImg?.frameX ||
+        prevImg?.frameY !== nextImg?.frameY ||
+        prevImg?.frameScale !== nextImg?.frameScale ||
+        prevImg?.rotateZ !== nextImg?.rotateZ ||
+        prevImg?.tiltX !== nextImg?.tiltX ||
+        prevImg?.tiltY !== nextImg?.tiltY
+      );
     });
   };
   
@@ -98,7 +110,6 @@ const ScreenThumbnail = memo(function ScreenThumbnail({
   // Check if this screen's settings changed
   const settingsChanged =
     prevProps.screen.settings.composition !== nextProps.screen.settings.composition ||
-    prevProps.screen.settings.compositionScale !== nextProps.screen.settings.compositionScale ||
     prevProps.screen.settings.backgroundColor !== nextProps.screen.settings.backgroundColor ||
     prevProps.screen.settings.screenScale !== nextProps.screen.settings.screenScale ||
     prevProps.screen.settings.screenPanX !== nextProps.screen.settings.screenPanX ||

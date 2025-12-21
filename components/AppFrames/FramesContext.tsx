@@ -148,7 +148,6 @@ export const getDefaultScreenSettings = (): Omit<CanvasSettings, 'selectedScreen
   return {
     canvasSize: 'iphone-6.9',
     composition: 'single',
-    compositionScale: 85,
     selectedTextId: undefined,
     screenScale: 100,
     screenPanX: 50,

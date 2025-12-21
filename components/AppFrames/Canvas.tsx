@@ -20,6 +20,8 @@ interface CanvasProps {
   onReplaceScreen?: (files: File[], targetFrameIndex?: number, screenIndex?: number) => void;
   onPanChange?: (screenIndex: number, frameIndex: number, panX: number, panY: number) => void;
   onFramePositionChange?: (screenIndex: number, frameIndex: number, frameX: number, frameY: number) => void;
+  onFrameScaleChange?: (screenIndex: number, frameIndex: number, frameScale: number) => void;
+  onFrameRotateChange?: (screenIndex: number, frameIndex: number, rotateZ: number) => void;
   onMediaSelect?: (screenIndex: number, frameIndex: number, mediaId: number) => void;
   onPexelsSelect?: (screenIndex: number, frameIndex: number, url: string) => void;
   onSelectTextElement?: (screenIndex: number, textId: string | null) => void;
@@ -58,6 +60,8 @@ export function Canvas({
   onReplaceScreen,
   onPanChange,
   onFramePositionChange,
+  onFrameScaleChange,
+  onFrameRotateChange,
   onMediaSelect,
   onPexelsSelect,
   onSelectTextElement,
@@ -419,6 +423,8 @@ export function Canvas({
                     viewportScale={zoom / 100}
                     onPanChange={(frameIndex, x, y) => onPanChange?.(screenIndex, frameIndex, x, y)}
                     onFramePositionChange={(frameIndex, x, y) => onFramePositionChange?.(screenIndex, frameIndex, x, y)}
+                    onFrameScaleChange={(frameIndex, scale) => onFrameScaleChange?.(screenIndex, frameIndex, scale)}
+                    onFrameRotateChange={(frameIndex, rotateZ) => onFrameRotateChange?.(screenIndex, frameIndex, rotateZ)}
                     hoveredFrameIndex={hoveredScreenIndex === screenIndex ? hoveredFrameIndex : null}
                     onFrameHover={setHoveredFrameIndex}
                     dragFileCount={dragFileCount}

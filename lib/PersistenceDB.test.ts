@@ -50,7 +50,6 @@ describe('validateProject', () => {
             settings: {
               canvasSize: 'iphone-6.5',
               composition: 'single',
-              compositionScale: 85,
               captionVertical: 10,
               captionHorizontal: 50,
               screenScale: 100,
@@ -151,7 +150,6 @@ describe('validateProject', () => {
             settings: {
               canvasSize: 'iphone-6.5',
               composition: 'single',
-              compositionScale: 85,
               captionVertical: 10,
               captionHorizontal: 50,
               screenScale: 100,

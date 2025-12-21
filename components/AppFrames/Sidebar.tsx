@@ -281,23 +281,6 @@ export function Sidebar({ settings, setSettings, screens }: SidebarProps) {
         </Box>
       </Box>
 
-      <Box>
-        <Text size="xs" c="dimmed" mb="xs">
-          COMPOSITION SCALE
-        </Text>
-        <Slider
-          value={settings.compositionScale}
-          onChange={(value) => setSettings({ ...settings, compositionScale: value })}
-          min={50}
-          max={100}
-          label={(value) => `${value}%`}
-          marks={[
-            { value: 50, label: '50%' },
-            { value: 100, label: '100%' },
-          ]}
-        />
-      </Box>
-
       {screens.length > 0 && (
         <Box>
           <Text size="sm" fw={700} mb="xs">

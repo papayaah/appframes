@@ -448,6 +448,18 @@ function validateScreen(screen: any): Screen {
     captionStyle: legacySettings.captionStyle,
   };
 
+  // Legacy: compositionScale (50-100) used to exist at the screen settings level.
+  // New: per-frame `frameScale` where 100 corresponds to the old default compositionScale (85).
+  // We migrate only when a frame doesn't already define `frameScale`.
+  const legacyCompositionScale =
+    typeof legacySettings.compositionScale === 'number'
+      ? Math.max(50, Math.min(100, legacySettings.compositionScale))
+      : undefined;
+  const legacyFrameScale =
+    typeof legacyCompositionScale === 'number'
+      ? Math.max(20, Math.min(200, Math.round(legacyCompositionScale / 0.85)))
+      : undefined;
+
   const settings = validateCanvasSettings(screen.settings);
 
   // Text elements: validate current format, or migrate from legacy caption settings
@@ -498,7 +510,13 @@ function validateScreen(screen: any): Screen {
 
     // Images: must be an array of ScreenImage objects
     images: Array.isArray(screen.images)
-      ? screen.images.map((img: any) => validateScreenImage(img))
+      ? screen.images.map((img: any) => {
+          const validated = validateScreenImage(img);
+          if (typeof legacyFrameScale === 'number' && typeof validated.frameScale !== 'number') {
+            validated.frameScale = legacyFrameScale;
+          }
+          return validated;
+        })
       : [],
 
     // Settings: validate canvas settings
@@ -552,6 +570,26 @@ function validateScreenImage(image: any): Screen['images'][0] {
     validated.frameY = image.frameY;
   }
 
+  // tiltX: optional number (-60 to 60)
+  if (typeof image.tiltX === 'number') {
+    validated.tiltX = Math.max(-60, Math.min(60, image.tiltX));
+  }
+
+  // tiltY: optional number (-60 to 60)
+  if (typeof image.tiltY === 'number') {
+    validated.tiltY = Math.max(-60, Math.min(60, image.tiltY));
+  }
+
+  // rotateZ: optional number (-180 to 180)
+  if (typeof image.rotateZ === 'number') {
+    validated.rotateZ = Math.max(-180, Math.min(180, image.rotateZ));
+  }
+
+  // frameScale: optional number (20 to 200)
+  if (typeof image.frameScale === 'number') {
+    validated.frameScale = Math.max(20, Math.min(200, image.frameScale));
+  }
+
   return validated;
 }
 
@@ -573,10 +611,6 @@ function validateCanvasSettings(settings: any): Omit<Screen['settings'], never> 
     composition: ['single', 'dual', 'stack', 'triple', 'fan'].includes(settings.composition)
       ? settings.composition
       : defaults.composition,
-
-    compositionScale: typeof settings.compositionScale === 'number'
-      ? Math.max(50, Math.min(100, settings.compositionScale))
-      : defaults.compositionScale,
 
     screenScale: typeof settings.screenScale === 'number'
       ? Math.max(0, Math.min(100, settings.screenScale))
@@ -704,7 +738,6 @@ function getDefaultCanvasSettings(): Omit<Screen['settings'], never> {
   return {
     canvasSize: 'iphone-6.5',
     composition: 'single',
-    compositionScale: 85,
     screenScale: 100,
     screenPanX: 50,
     screenPanY: 50,

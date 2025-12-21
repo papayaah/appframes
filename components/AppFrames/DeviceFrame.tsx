@@ -13,6 +13,10 @@ interface DeviceFrameProps {
   scale: number;
   // Scale applied by the outer canvas (e.g. zoom). Used to normalize drag deltas.
   viewportScale?: number;
+  /** Rotation around Z (degrees) applied by the parent wrapper. Used to keep drag direction intuitive when rotated. */
+  dragRotateZ?: number;
+  /** Total scale applied by the parent wrapper. Used to keep drag distance 1:1 when scaled. */
+  dragScale?: number;
   screenScale: number;
   panX: number;
   panY: number;
@@ -153,6 +157,8 @@ export function DeviceFrame({
   mediaId,
   scale,
   viewportScale = 1,
+  dragRotateZ = 0,
+  dragScale = 1,
   screenScale,
   panX,
   panY,
@@ -186,7 +192,9 @@ export function DeviceFrame({
   // Local frame-drag visual transform (avoid rerendering whole canvas during drag)
   const frameWrapperRef = useRef<HTMLDivElement>(null);
   const frameDragRafRef = useRef<number | null>(null);
+  // Commit delta (screen-space px) and visual delta (local-space px inside rotated/scaled wrapper)
   const pendingFrameOffsetRef = useRef<{ x: number; y: number } | null>(null);
+  const pendingFrameVisualOffsetRef = useRef<{ x: number; y: number } | null>(null);
   const isFrameDraggingRef = useRef(false);
 
   const config = getDeviceConfig(deviceType);
@@ -217,7 +225,7 @@ export function DeviceFrame({
     if (frameDragRafRef.current != null) return;
     frameDragRafRef.current = requestAnimationFrame(() => {
       frameDragRafRef.current = null;
-      const pending = pendingFrameOffsetRef.current;
+      const pending = pendingFrameVisualOffsetRef.current;
       if (!pending) return;
       applyFrameDragVisual(pending.x, pending.y);
     });
@@ -306,7 +314,20 @@ export function DeviceFrame({
         // Normalize by viewportScale so drag feels 1:1 regardless of zoom
         totalDeltaX = (moveEvent.clientX - startX) / viewportScale;
         totalDeltaY = (moveEvent.clientY - startY) / viewportScale;
+        // Commit delta in screen-space
         pendingFrameOffsetRef.current = { x: totalDeltaX, y: totalDeltaY };
+
+        // Visual delta is applied inside a rotated/scaled wrapper, so compensate to keep cursor motion intuitive.
+        const scaleFactor = typeof dragScale === 'number' && isFinite(dragScale) && dragScale !== 0 ? dragScale : 1;
+        const theta = (typeof dragRotateZ === 'number' && isFinite(dragRotateZ) ? dragRotateZ : 0) * (Math.PI / 180);
+        const dx = totalDeltaX / scaleFactor;
+        const dy = totalDeltaY / scaleFactor;
+        const cos = Math.cos(theta);
+        const sin = Math.sin(theta);
+        // local = R^-1 * screen, where R is rotate(theta)
+        const localX = dx * cos + dy * sin;
+        const localY = -dx * sin + dy * cos;
+        pendingFrameVisualOffsetRef.current = { x: localX, y: localY };
         scheduleFrameDragVisual();
       };
 
@@ -324,6 +345,7 @@ export function DeviceFrame({
           }
         }
         pendingFrameOffsetRef.current = null;
+        pendingFrameVisualOffsetRef.current = null;
         applyFrameDragVisual(0, 0);
 
         if (onFrameMoveEnd) {
