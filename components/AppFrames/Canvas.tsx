@@ -138,6 +138,12 @@ export function Canvas({
 
         onZoomChange(Math.round(newZoom));
       } else if (onSelectScreen && screens.length > 0) {
+        // If multiple screens are selected, don't use the mouse wheel to navigate screens.
+        // Navigating screens collapses multi-selection, which feels like an accidental deselect.
+        if (selectedScreenIndices.length > 1) {
+          return;
+        }
+
         // Regular scroll = navigate between screens
         // Debounce to prevent too rapid navigation
         const now = Date.now();
