@@ -5,6 +5,7 @@ import { Box, Text, ActionIcon, Popover } from '@mantine/core';
 import { IconUpload, IconPhoto, IconGripVertical } from '@tabler/icons-react';
 import { useMediaImage } from '../../hooks/useMediaImage';
 import { QuickMediaPicker } from './QuickMediaPicker';
+import { useInteractionLock } from './InteractionLockContext';
 
 interface DeviceFrameProps {
   deviceType?: string;
@@ -17,6 +18,8 @@ interface DeviceFrameProps {
   dragRotateZ?: number;
   /** Total scale applied by the parent wrapper. Used to keep drag distance 1:1 when scaled. */
   dragScale?: number;
+  /** Unique key for global interaction locking (prevents other indicators while manipulating). */
+  gestureOwnerKey?: string;
   screenScale: number;
   panX: number;
   panY: number;
@@ -35,6 +38,12 @@ interface DeviceFrameProps {
   onFrameMoveEnd?: () => void;
   frameY?: number; // The frame's Y position percentage (0-100)
 }
+
+const isInteractiveTarget = (target: EventTarget | null): boolean => {
+  if (!target || !(target instanceof HTMLElement)) return false;
+  if (target.isContentEditable) return true;
+  return !!target.closest('button, [role="button"], a, input, textarea, select, [data-no-frame-drag="true"]');
+};
 
 interface DeviceConfig {
   width: number;
@@ -159,6 +168,7 @@ export function DeviceFrame({
   viewportScale = 1,
   dragRotateZ = 0,
   dragScale = 1,
+  gestureOwnerKey,
   screenScale,
   panX,
   panY,
@@ -177,6 +187,7 @@ export function DeviceFrame({
   onFrameMoveEnd,
   frameY = 50
 }: DeviceFrameProps) {
+  const { isLocked, isOwnerActive, begin, end } = useInteractionLock();
   const { imageUrl } = useMediaImage(mediaId);
   const displayImage = imageUrl || image;
   const [isDragging, setIsDragging] = useState(false);
@@ -196,6 +207,8 @@ export function DeviceFrame({
   const pendingFrameOffsetRef = useRef<{ x: number; y: number } | null>(null);
   const pendingFrameVisualOffsetRef = useRef<{ x: number; y: number } | null>(null);
   const isFrameDraggingRef = useRef(false);
+  const moveModifierPressedRef = useRef(false);
+  const gestureTokenRef = useRef<string | null>(null);
 
   const config = getDeviceConfig(deviceType);
 
@@ -246,7 +259,37 @@ export function DeviceFrame({
     };
   }, []);
 
+  // Hold Space to drag the whole frame (even when starting on the screen).
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.code === 'Space') moveModifierPressedRef.current = true;
+    };
+    const onKeyUp = (e: KeyboardEvent) => {
+      if (e.code === 'Space') moveModifierPressedRef.current = false;
+    };
+    window.addEventListener('keydown', onKeyDown);
+    window.addEventListener('keyup', onKeyUp);
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('keyup', onKeyUp);
+    };
+  }, []);
+
   const handleMouseDown = (e: React.MouseEvent) => {
+    // Space = always move frame (like a “hand tool”).
+    if (moveModifierPressedRef.current) {
+      if (isInteractiveTarget(e.target)) return;
+      if (!(onFramePositionChange || onFrameMove)) return;
+      e.preventDefault();
+      e.stopPropagation();
+      onClick?.();
+      if (gestureOwnerKey && !gestureTokenRef.current) {
+        gestureTokenRef.current = begin(gestureOwnerKey, 'frame-move');
+      }
+      handleFrameDragStart(e);
+      return;
+    }
+
     // If we have an image and pan handler, handle panning
     if (displayImage && onPanChange && screenRef.current) {
       e.preventDefault();
@@ -254,6 +297,9 @@ export function DeviceFrame({
       setIsDragging(true);
       isPanningRef.current = true;
       setIsHovered(false); // Hide icons immediately when drag starts
+      if (gestureOwnerKey && !gestureTokenRef.current) {
+        gestureTokenRef.current = begin(gestureOwnerKey, 'image-pan');
+      }
 
       const startX = e.clientX;
       const startY = e.clientY;
@@ -286,13 +332,34 @@ export function DeviceFrame({
 
         document.removeEventListener('mousemove', handleMove);
         document.removeEventListener('mouseup', handleEnd);
+
+        if (gestureTokenRef.current) {
+          end(gestureTokenRef.current);
+          gestureTokenRef.current = null;
+        }
       };
 
       document.addEventListener('mousemove', handleMove);
       document.addEventListener('mouseup', handleEnd);
+      // Also trigger selection
+      onClick?.();
+      return;
     }
 
-    // Also trigger selection
+    // No pan available -> dragging the screen should move the frame (easier UX).
+    if (onFramePositionChange || onFrameMove) {
+      if (isInteractiveTarget(e.target)) return;
+      e.preventDefault();
+      e.stopPropagation();
+      onClick?.();
+      if (gestureOwnerKey && !gestureTokenRef.current) {
+        gestureTokenRef.current = begin(gestureOwnerKey, 'frame-move');
+      }
+      handleFrameDragStart(e);
+      return;
+    }
+
+    // Fallback selection
     onClick?.();
   };
 
@@ -302,6 +369,14 @@ export function DeviceFrame({
     e.stopPropagation();
 
     if (onFramePositionChange || onFrameMove) {
+      // Notify parent wrapper (CompositionRenderer) to hide resize/rotate handles during frame drag.
+      // This avoids “ghost” handles while the DOM is being moved imperatively.
+      frameWrapperRef.current?.dispatchEvent(new CustomEvent('appframes:framedragstart', { bubbles: true }));
+
+      if (gestureOwnerKey && !gestureTokenRef.current) {
+        gestureTokenRef.current = begin(gestureOwnerKey, 'frame-move');
+      }
+
       setIsFrameDragging(true);
       isFrameDraggingRef.current = true;
       setIsHovered(false); // Hide icons immediately when drag starts
@@ -350,6 +425,13 @@ export function DeviceFrame({
 
         if (onFrameMoveEnd) {
           onFrameMoveEnd();
+        }
+
+        frameWrapperRef.current?.dispatchEvent(new CustomEvent('appframes:framedragend', { bubbles: true }));
+
+        if (gestureTokenRef.current) {
+          end(gestureTokenRef.current);
+          gestureTokenRef.current = null;
         }
 
         document.removeEventListener('mousemove', handleMove);
@@ -540,7 +622,10 @@ export function DeviceFrame({
   return (
     <Box
       style={{ position: 'relative' }}
-      onMouseEnter={() => !isDragging && !isFrameDragging && setIsHovered(true)}
+      onMouseEnter={() => {
+        if (isLocked && gestureOwnerKey && !isOwnerActive(gestureOwnerKey)) return;
+        if (!isDragging && !isFrameDragging) setIsHovered(true);
+      }}
       onMouseLeave={() => !isDragging && !isFrameDragging && setIsHovered(false)}
       onDragOver={(e) => {
         e.preventDefault();
@@ -576,6 +661,19 @@ export function DeviceFrame({
           transition: (isDragging || isFrameDragging) ? 'none' : 'box-shadow 0.2s ease',
           cursor: onClick ? 'pointer' : undefined,
           willChange: isFrameDragging ? 'transform' : undefined,
+        }}
+        onMouseDown={(e) => {
+          // Dragging the bezel/background moves the frame (like dragging a text element).
+          // If the user started inside the screen, let the screen handler decide (pan vs move),
+          // unless Space is held (Space always moves frame).
+          if (!moveModifierPressedRef.current && screenRef.current?.contains(e.target as Node)) return;
+          if (isDragging || isFrameDragging) return;
+          if (isInteractiveTarget(e.target)) return;
+          if (!(onFramePositionChange || onFrameMove)) return;
+          e.preventDefault();
+          e.stopPropagation();
+          onClick?.();
+          handleFrameDragStart(e);
         }}
         onClick={onClick ? (e) => {
           e.stopPropagation();
@@ -692,6 +790,7 @@ export function DeviceFrame({
         {onFramePositionChange && (isHovered || isFrameDragging) && !isDragging && (
           <Box
             onMouseDown={handleFrameDragStart}
+            data-no-frame-drag="true"
             style={{
               position: 'absolute',
               ...(frameY < 20

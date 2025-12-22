@@ -5,6 +5,7 @@ import { ActionIcon, Box, Textarea } from '@mantine/core';
 import { IconRotate, IconTrash } from '@tabler/icons-react';
 import ReactMarkdown from 'react-markdown';
 import type { TextElement as TextElementModel, TextStyle } from './types';
+import { useInteractionLock } from './InteractionLockContext';
 
 // Decode HTML entities like &gt; &lt; &amp; etc.
 const decodeHtmlEntities = (text: string): string => {
@@ -73,6 +74,7 @@ export function TextElement({
   onUpdate,
   onDelete,
 }: TextElementProps) {
+  const { isLocked, isOwnerActive, begin, end } = useInteractionLock();
   const [isEditing, setIsEditing] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
@@ -87,6 +89,8 @@ export function TextElement({
   const lastClickAtRef = useRef<number>(0);
   const dragPosRef = useRef<{ x: number; y: number } | null>(null);
   const dragRafRef = useRef<number | null>(null);
+  const gestureTokenRef = useRef<string | null>(null);
+  const ownerKey = `text:${element.id}`;
 
   useEffect(() => {
     if (!isEditing) {
@@ -153,6 +157,9 @@ export function TextElement({
 
     setIsDragging(true);
     setIsHovered(false);
+    if (!gestureTokenRef.current) {
+      gestureTokenRef.current = begin(ownerKey, 'text-drag');
+    }
 
     const parentRect = parent.getBoundingClientRect();
     const selfRect = rootRef.current?.getBoundingClientRect();
@@ -207,6 +214,10 @@ export function TextElement({
       if (finalPos) {
         onUpdate({ x: finalPos.x, y: finalPos.y });
       }
+      if (gestureTokenRef.current) {
+        end(gestureTokenRef.current);
+        gestureTokenRef.current = null;
+      }
       document.removeEventListener('mousemove', handleMove);
       document.removeEventListener('mouseup', handleEnd);
     };
@@ -229,6 +240,9 @@ export function TextElement({
     const startMaxWidth = element.style.maxWidth;
 
     setIsResizing(true);
+    if (!gestureTokenRef.current) {
+      gestureTokenRef.current = begin(ownerKey, 'text-resize');
+    }
 
     const handleMove = (moveEvent: MouseEvent) => {
       const deltaX = moveEvent.clientX - startX;
@@ -239,6 +253,10 @@ export function TextElement({
 
     const handleEnd = () => {
       setIsResizing(false);
+      if (gestureTokenRef.current) {
+        end(gestureTokenRef.current);
+        gestureTokenRef.current = null;
+      }
       document.removeEventListener('mousemove', handleMove);
       document.removeEventListener('mouseup', handleEnd);
     };
@@ -272,6 +290,9 @@ export function TextElement({
     const cy = rect.top + rect.height / 2;
 
     setIsRotating(true);
+    if (!gestureTokenRef.current) {
+      gestureTokenRef.current = begin(ownerKey, 'text-rotate');
+    }
 
     const handleMove = (moveEvent: MouseEvent) => {
       const dx = moveEvent.clientX - cx;
@@ -291,6 +312,10 @@ export function TextElement({
       rotationPreviewRef.current = null;
       setRotationPreview(null);
       onUpdate({ rotation: next });
+      if (gestureTokenRef.current) {
+        end(gestureTokenRef.current);
+        gestureTokenRef.current = null;
+      }
       document.removeEventListener('mousemove', handleMove);
       document.removeEventListener('mouseup', handleEnd);
     };
@@ -344,7 +369,11 @@ export function TextElement({
         e.stopPropagation();
         enterEditMode();
       }}
-      onMouseEnter={() => { if (!isDragging && !disabled) setIsHovered(true); }}
+      onMouseEnter={() => {
+        if (disabled) return;
+        if (isLocked && !isOwnerActive(ownerKey)) return;
+        if (!isDragging) setIsHovered(true);
+      }}
       onMouseLeave={() => { if (!isDragging && !disabled) setIsHovered(false); }}
     >
       {/* Hover/selection border */}

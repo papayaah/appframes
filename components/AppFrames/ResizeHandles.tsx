@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Box } from '@mantine/core';
+import { useInteractionLock } from './InteractionLockContext';
 
 export type ResizeHandle =
   | 'top-left'
@@ -18,6 +19,7 @@ interface ResizeHandlesProps {
   onRotatePreview?: (nextRotateZ: number) => void;
   onRotateCommit?: (nextRotateZ: number) => void;
   frameRef: React.RefObject<HTMLElement | null>;
+  gestureOwnerKey: string;
   min?: number;
   max?: number;
 }
@@ -84,25 +86,32 @@ export function ResizeHandles({
   onRotatePreview,
   onRotateCommit,
   frameRef,
+  gestureOwnerKey,
   min = 20,
   max = 200,
 }: ResizeHandlesProps) {
+  const { begin, end } = useInteractionLock();
   const [active, setActive] = useState<ResizeHandle | null>(null);
   const [isRotating, setIsRotating] = useState(false);
+  const hideHandles = active !== null || isRotating;
 
   const start = useRef<{ x: number; y: number; value: number; handle: ResizeHandle } | null>(null);
   const rotateStart = useRef<{ angle: number; rotateZ: number } | null>(null);
   const lastScale = useRef<number>(value);
   const lastRotate = useRef<number>(rotateZ);
+  const gestureTokenRef = useRef<string | null>(null);
 
   const onMouseDown = useCallback(
     (handle: ResizeHandle) => (e: React.MouseEvent) => {
       e.preventDefault();
       e.stopPropagation();
+      if (!gestureTokenRef.current) {
+        gestureTokenRef.current = begin(gestureOwnerKey, 'frame-scale');
+      }
       start.current = { x: e.clientX, y: e.clientY, value, handle };
       setActive(handle);
     },
-    [value]
+    [begin, gestureOwnerKey, value]
   );
 
   const onRotateMouseDown = useCallback(
@@ -110,6 +119,9 @@ export function ResizeHandles({
       if (!onRotatePreview || !onRotateCommit) return;
       e.preventDefault();
       e.stopPropagation();
+      if (!gestureTokenRef.current) {
+        gestureTokenRef.current = begin(gestureOwnerKey, 'frame-rotate');
+      }
       const el = frameRef.current;
       if (!el) return;
       const rect = el.getBoundingClientRect();
@@ -120,7 +132,7 @@ export function ResizeHandles({
       lastRotate.current = rotateZ;
       setIsRotating(true);
     },
-    [frameRef, onRotateCommit, onRotatePreview, rotateZ]
+    [begin, frameRef, gestureOwnerKey, onRotateCommit, onRotatePreview, rotateZ]
   );
 
   useEffect(() => {
@@ -158,6 +170,10 @@ export function ResizeHandles({
       }
       if (isRotating && onRotateCommit) {
         onRotateCommit(lastRotate.current);
+      }
+      if (gestureTokenRef.current) {
+        end(gestureTokenRef.current);
+        gestureTokenRef.current = null;
       }
       start.current = null;
       setActive(null);
@@ -207,6 +223,7 @@ export function ResizeHandles({
               transform: 'translateX(-50%)',
               background: '#667eea',
               opacity: 0.9,
+              visibility: hideHandles ? 'hidden' : 'visible',
               pointerEvents: 'none',
             }}
           />
@@ -226,6 +243,7 @@ export function ResizeHandles({
               cursor: 'grab',
               pointerEvents: 'auto',
               zIndex: 51,
+              visibility: hideHandles ? 'hidden' : 'visible',
             }}
           />
         </>
@@ -240,6 +258,7 @@ export function ResizeHandles({
             pointerEvents: 'auto',
             background: active === h ? '#667eea' : 'white',
             borderColor: '#667eea',
+            visibility: hideHandles ? 'hidden' : 'visible',
           }}
         />
       ))}

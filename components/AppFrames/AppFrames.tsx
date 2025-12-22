@@ -10,6 +10,7 @@ import { ScreensPanel } from './ScreensPanel';
 import { useFrames, getCanvasDimensions, getCompositionFrameCount } from './FramesContext';
 import { Screen, CanvasSettings, ScreenImage, AppFramesActions, clampFrameTransform } from './types';
 import { CrossCanvasDragProvider } from './CrossCanvasDragContext';
+import { InteractionLockProvider } from './InteractionLockContext';
 
 // Re-export types for compatibility
 export type { Screen, CanvasSettings, ScreenImage, AppFramesActions };
@@ -304,7 +305,8 @@ export function AppFrames() {
 
   return (
     <CrossCanvasDragProvider>
-    <AppShell
+    <InteractionLockProvider>
+      <AppShell
       header={{ height: 45 }}
       navbar={{ width: navWidth, breakpoint: 'sm' }}
       padding={0}
@@ -596,7 +598,8 @@ export function AppFrames() {
           />
         </Box>
       </AppShell.Main>
-    </AppShell>
-    </CrossCanvasDragProvider>
+      </AppShell>
+    </InteractionLockProvider>
+  </CrossCanvasDragProvider>
   );
 }

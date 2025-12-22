@@ -6,6 +6,7 @@ import { CanvasSettings, Screen } from './AppFrames';
 import { DeviceFrame } from './DeviceFrame';
 import { ResizeHandles, ResizeHandle } from './ResizeHandles';
 import { clampFrameTransform } from './types';
+import { useInteractionLock } from './InteractionLockContext';
 
 interface CompositionRendererProps {
   settings: CanvasSettings;
@@ -72,6 +73,7 @@ const DraggableFrame = ({
   isSelected = false,
   onResizeScale,
   onRotate,
+  gestureOwnerKey,
 }: {
   children: React.ReactNode;
   baseStyle?: React.CSSProperties;
@@ -86,8 +88,11 @@ const DraggableFrame = ({
   isSelected?: boolean;
   onResizeScale?: (scale: number, handle: ResizeHandle) => void;
   onRotate?: (rotateZ: number) => void;
+  gestureOwnerKey: string;
 }) => {
+  const { isLocked, isOwnerActive } = useInteractionLock();
   const [isHovered, setIsHovered] = useState(false);
+  const [isChildFrameDragging, setIsChildFrameDragging] = useState(false);
   const frameRef = useRef<HTMLDivElement | null>(null);
   const rafRef = useRef<number | null>(null);
 
@@ -159,10 +164,36 @@ const DraggableFrame = ({
     // Intentionally depends on render-time values via latestRef; this just keeps DOM in sync.
   });
 
+  useEffect(() => {
+    const el = frameRef.current;
+    if (!el) return;
+
+    const onStart = () => setIsChildFrameDragging(true);
+    const onEnd = () => setIsChildFrameDragging(false);
+
+    el.addEventListener('appframes:framedragstart', onStart as EventListener);
+    el.addEventListener('appframes:framedragend', onEnd as EventListener);
+
+    return () => {
+      el.removeEventListener('appframes:framedragstart', onStart as EventListener);
+      el.removeEventListener('appframes:framedragend', onEnd as EventListener);
+    };
+  }, []);
+
+  // If another element is being manipulated, suppress hover state.
+  useEffect(() => {
+    if (isLocked && !isOwnerActive(gestureOwnerKey)) {
+      setIsHovered(false);
+    }
+  }, [gestureOwnerKey, isLocked, isOwnerActive]);
+
   return (
     <Box
       ref={frameRef}
-      onMouseEnter={() => setIsHovered(true)}
+      onMouseEnter={() => {
+        if (isLocked && !isOwnerActive(gestureOwnerKey)) return;
+        setIsHovered(true);
+      }}
       onMouseLeave={() => setIsHovered(false)}
       style={{
         ...baseStyleNoTransform,
@@ -189,7 +220,7 @@ const DraggableFrame = ({
       }}
     >
       {children}
-      {(isHovered || isSelected) && onResizeScale && (
+      {(isHovered || isSelected) && onResizeScale && !isChildFrameDragging && (
         <ResizeHandles
           viewportScale={viewportScale}
           value={frameScale}
@@ -221,6 +252,7 @@ const DraggableFrame = ({
               : undefined
           }
           frameRef={frameRef}
+          gestureOwnerKey={gestureOwnerKey}
         />
       )}
     </Box>
@@ -306,6 +338,7 @@ export function CompositionRenderer({
       viewportScale,
       dragRotateZ: baseRotateZ + rotateZ,
       dragScale: BASE_COMPOSITION_SCALE * (frameScale / 100),
+      gestureOwnerKey: `frame:${screen.id}:${index}`,
       screenScale: settings.screenScale,
       panX,
       panY,
@@ -341,6 +374,7 @@ export function CompositionRenderer({
               isSelected={selectedFrameIndex === 0}
               onResizeScale={(next, _handle) => onFrameScaleChange?.(0, next)}
               onRotate={(next) => onFrameRotateChange?.(0, next)}
+              gestureOwnerKey={`frame:${screen.id}:0`}
             >
               <DeviceFrame
                 {...getFrameProps(0, 1)}
@@ -371,6 +405,7 @@ export function CompositionRenderer({
               isSelected={selectedFrameIndex === 0}
               onResizeScale={(next, _handle) => onFrameScaleChange?.(0, next)}
               onRotate={(next) => onFrameRotateChange?.(0, next)}
+              gestureOwnerKey={`frame:${screen.id}:0`}
             >
               <DeviceFrame {...getFrameProps(0, 0.9)} />
             </DraggableFrame>
@@ -386,6 +421,7 @@ export function CompositionRenderer({
               isSelected={selectedFrameIndex === 1}
               onResizeScale={(next, _handle) => onFrameScaleChange?.(1, next)}
               onRotate={(next) => onFrameRotateChange?.(1, next)}
+              gestureOwnerKey={`frame:${screen.id}:1`}
             >
               <DeviceFrame {...getFrameProps(1, 0.9)} />
             </DraggableFrame>
@@ -419,6 +455,7 @@ export function CompositionRenderer({
                 isSelected={selectedFrameIndex === 0}
                 onResizeScale={(next, _handle) => onFrameScaleChange?.(0, next)}
                 onRotate={(next) => onFrameRotateChange?.(0, next)}
+                gestureOwnerKey={`frame:${screen.id}:0`}
               >
                 <DeviceFrame {...getFrameProps(0, 0.85)} />
               </DraggableFrame>
@@ -437,6 +474,7 @@ export function CompositionRenderer({
                 isSelected={selectedFrameIndex === 1}
                 onResizeScale={(next, _handle) => onFrameScaleChange?.(1, next)}
                 onRotate={(next) => onFrameRotateChange?.(1, next)}
+                gestureOwnerKey={`frame:${screen.id}:1`}
               >
                 <DeviceFrame {...getFrameProps(1, 0.85)} />
               </DraggableFrame>
@@ -467,6 +505,7 @@ export function CompositionRenderer({
               isSelected={selectedFrameIndex === 0}
               onResizeScale={(next, _handle) => onFrameScaleChange?.(0, next)}
               onRotate={(next) => onFrameRotateChange?.(0, next)}
+              gestureOwnerKey={`frame:${screen.id}:0`}
             >
               <DeviceFrame {...getFrameProps(0, 0.75)} />
             </DraggableFrame>
@@ -482,6 +521,7 @@ export function CompositionRenderer({
               isSelected={selectedFrameIndex === 1}
               onResizeScale={(next, _handle) => onFrameScaleChange?.(1, next)}
               onRotate={(next) => onFrameRotateChange?.(1, next)}
+              gestureOwnerKey={`frame:${screen.id}:1`}
             >
               <DeviceFrame {...getFrameProps(1, 0.75)} />
             </DraggableFrame>
@@ -497,6 +537,7 @@ export function CompositionRenderer({
               isSelected={selectedFrameIndex === 2}
               onResizeScale={(next, _handle) => onFrameScaleChange?.(2, next)}
               onRotate={(next) => onFrameRotateChange?.(2, next)}
+              gestureOwnerKey={`frame:${screen.id}:2`}
             >
               <DeviceFrame {...getFrameProps(2, 0.75)} />
             </DraggableFrame>
@@ -533,6 +574,7 @@ export function CompositionRenderer({
               isSelected={selectedFrameIndex === 0}
               onResizeScale={(next, _handle) => onFrameScaleChange?.(0, next)}
               onRotate={(next) => onFrameRotateChange?.(0, next)}
+              gestureOwnerKey={`frame:${screen.id}:0`}
             >
               <DeviceFrame {...getFrameProps(0, 0.7, -8)} />
             </DraggableFrame>
@@ -554,6 +596,7 @@ export function CompositionRenderer({
               isSelected={selectedFrameIndex === 1}
               onResizeScale={(next, _handle) => onFrameScaleChange?.(1, next)}
               onRotate={(next) => onFrameRotateChange?.(1, next)}
+              gestureOwnerKey={`frame:${screen.id}:1`}
             >
               <DeviceFrame {...getFrameProps(1, 0.7, 0)} />
             </DraggableFrame>
@@ -575,6 +618,7 @@ export function CompositionRenderer({
               isSelected={selectedFrameIndex === 2}
               onResizeScale={(next, _handle) => onFrameScaleChange?.(2, next)}
               onRotate={(next) => onFrameRotateChange?.(2, next)}
+              gestureOwnerKey={`frame:${screen.id}:2`}
             >
               <DeviceFrame {...getFrameProps(2, 0.7, 8)} />
             </DraggableFrame>
