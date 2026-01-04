@@ -51,5 +51,6 @@ variable "cloudflare_proxy_enabled" {
 locals {
   domain_parts    = split(".", var.domain)
   cloudflare_zone = join(".", slice(local.domain_parts, length(local.domain_parts) - 2, length(local.domain_parts)))
-  subdomain       = join(".", slice(local.domain_parts, 0, length(local.domain_parts) - 2))
+  # For apex domains like "appframes.dev", Cloudflare expects "@" as the record name.
+  record_name = length(local.domain_parts) > 2 ? join(".", slice(local.domain_parts, 0, length(local.domain_parts) - 2)) : "@"
 }

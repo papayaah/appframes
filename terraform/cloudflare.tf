@@ -9,7 +9,7 @@ data "cloudflare_zone" "main" {
 resource "cloudflare_record" "app" {
   count   = var.enable_cloudflare_dns ? 1 : 0
   zone_id = data.cloudflare_zone.main[0].id
-  name    = local.subdomain
+  name    = local.record_name
   content = var.server_ip
   type    = "A"
   ttl     = var.cloudflare_proxy_enabled ? 1 : 300
