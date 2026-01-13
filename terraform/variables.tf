@@ -47,6 +47,12 @@ variable "cloudflare_proxy_enabled" {
   default     = true
 }
 
+variable "cloudflare_zone_id" {
+  description = "Cloudflare zone ID (optional, if provided, skips zone lookup by name)"
+  type        = string
+  default     = ""
+}
+
 # Computed values
 locals {
   domain_parts    = split(".", var.domain)
