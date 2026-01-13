@@ -145,6 +145,7 @@ REMOTE_HOST="${SSH_USER}@${SERVER_IP}"
 REMOTE_BASE="/srv/${APP_NAME}"
 REMOTE_APP_DIR="${REMOTE_BASE}/app"
 REMOTE_COMPOSE="${REMOTE_BASE}/docker-compose.yml"
+REMOTE_ENV="${REMOTE_BASE}/.env"
 
 ssh_cmd() {
   ssh -i "$SSH_KEY_PATH" -o StrictHostKeyChecking=accept-new "$REMOTE_HOST" "$@"
@@ -182,29 +183,40 @@ run "rsync -az --delete \
   --exclude '.DS_Store' \
   \"$ROOT_DIR/\" \"$REMOTE_HOST:$REMOTE_APP_DIR/\""
 
-echo "Writing docker-compose.yml to ${REMOTE_HOST}:${REMOTE_COMPOSE} ..."
-COMPOSE_CONTENT="$(cat <<EOF
-services:
-  ${APP_NAME}:
-    container_name: ${APP_NAME}
-    build:
-      context: ./app
-    restart: unless-stopped
-    environment:
-      NODE_ENV: production
-      NEXT_TELEMETRY_DISABLED: "1"
-      PORT: "3000"
-      HOSTNAME: "0.0.0.0"
-    ports:
-      - "127.0.0.1:${APP_PORT}:3000"
+LOCAL_COMPOSE="${ROOT_DIR}/docker-compose.yml"
+if [[ ! -f "$LOCAL_COMPOSE" ]]; then
+  echo "Missing required file: $LOCAL_COMPOSE" >&2
+  exit 1
+fi
+
+echo "Uploading docker-compose.yml to ${REMOTE_HOST}:${REMOTE_COMPOSE} ..."
+if [[ "$DRY_RUN" == "true" ]]; then
+  echo "[dry-run] Would upload: $LOCAL_COMPOSE"
+else
+  ssh_cmd "cat > '$REMOTE_COMPOSE'" < "$LOCAL_COMPOSE"
+fi
+
+echo "Writing ${REMOTE_ENV} (compose env) ..."
+#
+# Postgres note:
+# - The repo docker-compose.yml does NOT publish Postgres to the host by default (safer).
+# - If you later decide to publish Postgres to the host, you'll want a unique PG_PORT per app
+#   to avoid collisions (example formula: APP_PORT + 10000).
+ENV_CONTENT="$(cat <<EOF
+APP_NAME=${APP_NAME}
+APP_PORT=${APP_PORT}
+POSTGRES_DB=${APP_NAME}
+POSTGRES_USER=${APP_NAME}
+# Set this on the server (do not commit). Example:
+# POSTGRES_PASSWORD=$(openssl rand -base64 24 | tr -d '\n')
+# POSTGRES_PASSWORD=change-me
 EOF
 )"
-
 if [[ "$DRY_RUN" == "true" ]]; then
-  echo "[dry-run] Would write docker-compose.yml with:"
-  echo "$COMPOSE_CONTENT"
+  echo "[dry-run] Would write .env with:"
+  echo "$ENV_CONTENT"
 else
-  printf '%s\n' "$COMPOSE_CONTENT" | ssh_cmd "cat > '$REMOTE_COMPOSE'"
+  printf '%s\n' "$ENV_CONTENT" | ssh_cmd "cat > '$REMOTE_ENV'"
 fi
 
 echo "Building + starting container on server (docker compose up -d --build) ..."

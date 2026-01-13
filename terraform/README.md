@@ -53,7 +53,8 @@ cd ..
 ## What `./deploy.sh` Does
 
 - **Syncs** this repo to `/srv/{app_name}/app` on the server (via `rsync` over SSH)
-- **Creates** `/srv/{app_name}/docker-compose.yml` binding `127.0.0.1:{app_port} -> 3000`
+- **Uploads** the repo’s `docker-compose.yml` to `/srv/{app_name}/docker-compose.yml` (binding `127.0.0.1:{app_port} -> 3000`)
+- **Writes** `/srv/{app_name}/.env` with `APP_NAME` + `APP_PORT` (and optional Postgres env vars; Postgres is not exposed to the host by default)
 - **Builds + starts** the app via `docker compose up -d --build`
 
 ## Port Allocation

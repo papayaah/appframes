@@ -1,0 +1,29 @@
+services:
+  web:
+    container_name: ${APP_NAME:-appframes}
+    build:
+      context: ./app
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      NEXT_TELEMETRY_DISABLED: "1"
+      PORT: "3000"
+      HOSTNAME: "0.0.0.0"
+    ports:
+      - "127.0.0.1:${APP_PORT:-3000}:3000"
+
+  postgres:
+    image: postgres:16-alpine
+    profiles: ["db"]
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-appframes}
+      POSTGRES_USER: ${POSTGRES_USER:-appframes}
+      # Required. Set in .env (server) or .env.local (dev). Do not commit secrets.
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+volumes:
+  pgdata:
+
