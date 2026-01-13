@@ -203,7 +203,7 @@ interface FramesContextType {
   getAllProjects: () => Promise<Project[]>;
   // Text elements
   addTextElement: (screenId: string) => void;
-  updateTextElement: (screenId: string, textId: string, updates: Partial<TextElement> & { style?: Partial<TextStyle> }) => void;
+  updateTextElement: (screenId: string, textId: string, updates: Omit<Partial<TextElement>, 'style'> & { style?: Partial<TextStyle> }) => void;
   deleteTextElement: (screenId: string, textId: string) => void;
   reorderTextElements: (screenId: string, fromIndex: number, toIndex: number) => void;
   selectTextElement: (textId: string | null) => void;
@@ -515,7 +515,7 @@ export function FramesProvider({ children }: { children: ReactNode }) {
     }));
   }, []);
 
-  const updateTextElement = useCallback((screenId: string, textId: string, updates: Partial<TextElement> & { style?: Partial<TextStyle> }) => {
+  const updateTextElement = useCallback((screenId: string, textId: string, updates: Omit<Partial<TextElement>, 'style'> & { style?: Partial<TextStyle> }) => {
     setScreens(prev => prev.map(screen => {
       if (screen.id !== screenId) return screen;
       const textElements = (screen.textElements ?? []).map(t => {

@@ -9,7 +9,7 @@ domain = ""  # e.g., "myapp.example.com"
 
 # App configuration
 app_name = ""  # e.g., "myapp" (used for nginx config and /srv/{app_name})
-app_port = 0   # e.g., 9002 (internal port Docker exposes to 127.0.0.1:port)
+app_port = 0   # e.g., 9000 (internal port Docker exposes to 127.0.0.1:port)
 
 # Path to your SSH private key
 ssh_private_key_path = "~/.ssh/id_rsa"
@@ -18,3 +18,4 @@ ssh_private_key_path = "~/.ssh/id_rsa"
 enable_cloudflare_dns = true
 cloudflare_api_token  = ""
 cloudflare_proxy_enabled = true
+cloudflare_zone_id = ""
