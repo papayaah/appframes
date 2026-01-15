@@ -2,6 +2,8 @@ export interface ScreenImage {
   image?: string; // Base64 image (legacy support)
   mediaId?: number; // Reference to media library
   deviceFrame?: string; // Device frame type for this specific frame
+  /** If true, this slot is intentionally cleared (render nothing). */
+  cleared?: boolean;
   // Per-frame image pan (position of image inside the frame)
   panX?: number; // 0-100, default 50 (centered)
   panY?: number; // 0-100, default 50 (centered)

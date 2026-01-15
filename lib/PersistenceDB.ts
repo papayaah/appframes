@@ -23,6 +23,8 @@ export interface AppState {
   sidebarTab: string; // Selected tab: 'layout' | 'device' | 'media' | 'text'
   sidebarPanelOpen: boolean; // Panel expanded/collapsed
   navWidth: number; // Sidebar width in pixels
+  downloadFormat?: 'png' | 'jpg';
+  downloadJpegQuality?: number; // 0-100
   updatedAt: Date; // Last modification time
 }
 
@@ -539,6 +541,19 @@ function validateScreenImage(image: any): Screen['images'][0] {
   }
 
   const validated: Screen['images'][0] = {};
+
+  // deviceFrame: optional string (allow empty string to represent "no selection")
+  if (typeof image.deviceFrame === 'string') {
+    validated.deviceFrame = image.deviceFrame;
+  }
+
+  // cleared: optional boolean
+  // Also treat legacy deviceFrame === '' as cleared.
+  if (typeof image.cleared === 'boolean') {
+    validated.cleared = image.cleared;
+  } else if (image.deviceFrame === '') {
+    validated.cleared = true;
+  }
 
   // image: optional string (base64)
   if (typeof image.image === 'string') {

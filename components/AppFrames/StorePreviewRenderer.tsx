@@ -68,7 +68,7 @@ function StaticCanvas({
   canvasSize: string;
   scale: number;
 }) {
-  const { width, height } = getCanvasDimensions(canvasSize, 'portrait');
+  const { width, height } = getCanvasDimensions(canvasSize, screen?.settings?.orientation ?? 'portrait');
   const screenSettings = {
     ...screen.settings,
     selectedScreenIndex: 0,
@@ -227,13 +227,30 @@ export function StorePreviewRenderer() {
 
   const CanvasSizeGroup = ({ canvasSize }: { canvasSize: string }) => {
     const screens = screensByCanvasSize[canvasSize] || [];
-    const dims = getCanvasDimensions(canvasSize, 'portrait');
+    const baseDims = getCanvasDimensions(canvasSize, 'portrait');
     const label = getCanvasSizeLabel(canvasSize);
 
     // Scale previews to fit comfortably.
     const maxW = 240;
     const maxH = 520;
-    const scale = Math.min(maxW / dims.width, maxH / dims.height);
+    const dimsForScreens = screens.map((s) =>
+      getCanvasDimensions(canvasSize, s?.settings?.orientation ?? 'portrait'),
+    );
+    const maxDims = dimsForScreens.reduce(
+      (acc, d) => ({
+        width: Math.max(acc.width, d.width),
+        height: Math.max(acc.height, d.height),
+      }),
+      { width: baseDims.width, height: baseDims.height },
+    );
+    const scale = Math.min(maxW / maxDims.width, maxH / maxDims.height);
+    const orientations = new Set(screens.map((s) => s?.settings?.orientation ?? 'portrait'));
+    const dimsLabel =
+      orientations.size > 1
+        ? `${baseDims.width} × ${baseDims.height}px (P) • ${baseDims.height} × ${baseDims.width}px (L)`
+        : orientations.has('landscape')
+          ? `${baseDims.height} × ${baseDims.width}px`
+          : `${baseDims.width} × ${baseDims.height}px`;
 
     return (
       <Stack gap="xs">
@@ -242,7 +259,7 @@ export function StorePreviewRenderer() {
             <Group gap="sm" align="baseline">
               <Title order={4}>{label}</Title>
               <Text size="sm" c="dimmed">
-                {dims.width} × {dims.height}px
+                {dimsLabel}
               </Text>
               <Text size="sm" c="dimmed">
                 • {screens.length} screen{screens.length === 1 ? '' : 's'}

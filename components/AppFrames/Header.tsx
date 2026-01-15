@@ -3,7 +3,7 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { Group, Text, ActionIcon, Box, Slider, Tooltip, Menu, Button, Modal, TextInput, Stack, Badge } from '@mantine/core';
-import { IconDownload, IconChevronDown, IconPlus, IconEdit, IconTrash, IconFolder, IconCheck, IconAlertCircle } from '@tabler/icons-react';
+import { IconDownload, IconChevronDown, IconPlus, IconEdit, IconTrash, IconFolder, IconCheck, IconAlertCircle, IconUser } from '@tabler/icons-react';
 import { useState, useEffect } from 'react';
 import type { Project } from '@/lib/PersistenceDB';
 
@@ -244,6 +244,17 @@ export function Header({
               aria-label="Download"
             >
               <IconDownload size={18} />
+            </ActionIcon>
+          </Tooltip>
+          <Tooltip label="Account & integrations (optional)">
+            <ActionIcon
+              size="lg"
+              variant="light"
+              component={Link}
+              href="/integrations"
+              aria-label="Integrations"
+            >
+              <IconUser size={18} />
             </ActionIcon>
           </Tooltip>
           <Button

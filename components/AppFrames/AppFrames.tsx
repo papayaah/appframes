@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { AppShell, Box } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { Header } from './Header';
@@ -11,6 +12,7 @@ import { useFrames, getCanvasDimensions, getCompositionFrameCount } from './Fram
 import { Screen, CanvasSettings, ScreenImage, AppFramesActions, clampFrameTransform } from './types';
 import { CrossCanvasDragProvider } from './CrossCanvasDragContext';
 import { InteractionLockProvider } from './InteractionLockContext';
+import { exportService } from '@/lib/ExportService';
 
 // Re-export types for compatibility
 export type { Screen, CanvasSettings, ScreenImage, AppFramesActions };
@@ -22,6 +24,7 @@ const isEditableTarget = (target: EventTarget | null): boolean => {
 };
 
 export function AppFrames() {
+  const router = useRouter();
   const {
     screens,
     setScreens,
@@ -47,6 +50,12 @@ export function AppFrames() {
     updateTextElement,
     deleteTextElement,
     selectTextElement,
+    reorderScreens,
+    mediaCache,
+    downloadFormat,
+    downloadJpegQuality,
+    setDownloadFormat,
+    setDownloadJpegQuality,
   } = useFrames();
 
   const [navWidth, setNavWidth] = useState(360); // Rail (80) + Panel (~280)
@@ -202,15 +211,47 @@ export function AppFrames() {
 
       const screen = screens[primarySelectedIndex];
       const selectedTextId = screen?.settings?.selectedTextId;
-      if (!screen || !selectedTextId) return;
+      if (!screen) return;
 
+      if (selectedTextId) {
+        e.preventDefault();
+        deleteTextElement(screen.id, selectedTextId);
+        return;
+      }
+
+      // No text selected: treat Delete/Backspace as "delete the frame slot" (blank canvas).
+      // This clears the frame choice and removes any image from that slot.
       e.preventDefault();
-      deleteTextElement(screen.id, selectedTextId);
+      setScreens((prev) => {
+        const updated = [...prev];
+        const s = updated[primarySelectedIndex];
+        if (!s) return prev;
+
+        const newImages = [...(s.images || [])];
+        while (newImages.length <= selectedFrameIndex) newImages.push({});
+        newImages[selectedFrameIndex] = {
+          // Explicitly cleared: no frame selected in the Frame tab.
+          deviceFrame: '',
+          cleared: true,
+          image: undefined,
+          mediaId: undefined,
+          panX: undefined,
+          panY: undefined,
+          frameX: 0,
+          frameY: 0,
+          tiltX: 0,
+          tiltY: 0,
+          rotateZ: 0,
+          frameScale: 100,
+        };
+        updated[primarySelectedIndex] = { ...s, images: newImages };
+        return updated;
+      });
     };
 
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [deleteTextElement, primarySelectedIndex, screens]);
+  }, [deleteTextElement, primarySelectedIndex, screens, selectedFrameIndex, setScreens]);
 
   // Handle device frame change for a specific frame
   const handleFrameDeviceChange = (frameIndex: number, deviceFrame: string) => {
@@ -232,6 +273,7 @@ export function AppFrames() {
           newImages[frameIndex] = {
             ...newImages[frameIndex],
             deviceFrame,
+            cleared: false,
           };
         }
         
@@ -249,7 +291,99 @@ export function AppFrames() {
   // Download currently visible/selected screens individually
   const handleDownload = async () => {
     try {
+      const canvasSize = settings.canvasSize;
       const { toPng } = await import('html-to-image');
+      const { persistenceDB } = await import('../../lib/PersistenceDB');
+      const { OPFSManager } = await import('../../lib/opfs');
+
+      const fileToDataUrl = (file: File) =>
+        new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(String(reader.result));
+          reader.onerror = () => reject(reader.error);
+          reader.readAsDataURL(file);
+        });
+
+      const extractCssUrls = (cssValue: string): string[] => {
+        if (!cssValue || cssValue === 'none') return [];
+        const out: string[] = [];
+        const re = /url\(["']?(.*?)["']?\)/g;
+        let m: RegExpExecArray | null;
+        while ((m = re.exec(cssValue)) != null) {
+          const u = (m[1] || '').trim();
+          if (u) out.push(u);
+        }
+        return out;
+      };
+
+      const replaceBlobUrlsWithDataUrls = async (root: HTMLElement) => {
+        const reverse = new Map<string, number>();
+        Object.entries(mediaCache || {}).forEach(([id, url]) => {
+          if (url) reverse.set(url, Number(id));
+        });
+
+        const blobToData = new Map<string, string>();
+        const ensureDataUrl = async (blobUrl: string): Promise<string | null> => {
+          if (blobToData.has(blobUrl)) return blobToData.get(blobUrl)!;
+
+          const mediaId = reverse.get(blobUrl);
+          if (typeof mediaId === 'number' && Number.isFinite(mediaId)) {
+            const media = await persistenceDB.getMediaFile(mediaId);
+            if (media) {
+              const file = await OPFSManager.getFile(media.fileHandle);
+              if (file) {
+                const dataUrl = await fileToDataUrl(file);
+                blobToData.set(blobUrl, dataUrl);
+                return dataUrl;
+              }
+            }
+          }
+
+          // Fallback: try fetch(blob:) → data URL (may fail on some browsers)
+          try {
+            const resp = await fetch(blobUrl);
+            const blob = await resp.blob();
+            const file = new File([blob], 'image', { type: blob.type || 'image/png' });
+            const dataUrl = await fileToDataUrl(file);
+            blobToData.set(blobUrl, dataUrl);
+            return dataUrl;
+          } catch {
+            return null;
+          }
+        };
+
+        const restoreFns: Array<() => void> = [];
+        const nodes: HTMLElement[] = [root, ...Array.from(root.querySelectorAll<HTMLElement>('*'))];
+        for (const el of nodes) {
+          const prevBgImg = el.style.backgroundImage;
+          const prevBg = el.style.background;
+          const urls = [
+            ...extractCssUrls(prevBgImg),
+            ...extractCssUrls(prevBg),
+          ].filter((u) => u.startsWith('blob:'));
+          if (urls.length === 0) continue;
+
+          let nextBgImg = prevBgImg;
+          let nextBg = prevBg;
+          for (const u of urls) {
+            const dataUrl = await ensureDataUrl(u);
+            if (!dataUrl) continue;
+            if (nextBgImg) nextBgImg = nextBgImg.split(u).join(dataUrl);
+            if (nextBg) nextBg = nextBg.split(u).join(dataUrl);
+          }
+
+          if (nextBgImg !== prevBgImg) {
+            restoreFns.push(() => { el.style.backgroundImage = prevBgImg; });
+            el.style.backgroundImage = nextBgImg;
+          }
+          if (nextBg !== prevBg) {
+            restoreFns.push(() => { el.style.background = prevBg; });
+            el.style.background = nextBg;
+          }
+        }
+
+        return () => restoreFns.forEach((fn) => fn());
+      };
 
       // Download each currently visible screen
       for (const screenIndex of selectedScreenIndices) {
@@ -257,38 +391,85 @@ export function AppFrames() {
         if (!screen) {
           continue;
         }
+        const canvasElement = document.getElementById(`canvas-${screen.id}`) as HTMLElement | null;
+        if (!canvasElement) continue;
 
-        const canvasElement = document.getElementById(`canvas-${screen.id}`);
-        if (!canvasElement) {
-          continue;
+        // Export at exact store pixels while preserving the on-screen layout.
+        const dims = getCanvasDimensions(canvasSize, screen.settings.orientation ?? 'portrait');
+        const rect = canvasElement.getBoundingClientRect();
+
+        // Hide interactive UI (handles/buttons) and replace blob: background urls with data: URLs for export.
+        document.body.dataset.appframesExporting = 'true';
+        const restoreBg = await replaceBlobUrlsWithDataUrls(canvasElement);
+        try {
+          // 1) Capture what you see at a higher pixel ratio.
+          const ratioX = rect.width > 0 ? dims.width / rect.width : 1;
+          const ratioY = rect.height > 0 ? dims.height / rect.height : 1;
+          const captureRatio = Math.max(2, Math.min(4, Math.ceil(Math.max(ratioX, ratioY))));
+
+          const dataUrl = await toPng(canvasElement, {
+            cacheBust: true,
+            pixelRatio: captureRatio,
+            backgroundColor: screen.settings.backgroundColor === 'transparent' ? 'transparent' : undefined,
+            filter: (node) => {
+              if (!(node instanceof HTMLElement)) return true;
+              return node.dataset.exportHide !== 'true';
+            },
+          });
+
+          // 2) Resample onto an exact-size output canvas, centered.
+          const img = new Image();
+          img.decoding = 'async';
+          img.src = dataUrl;
+          try {
+            // @ts-ignore
+            await img.decode?.();
+          } catch {
+            await new Promise<void>((resolve, reject) => {
+              img.onload = () => resolve();
+              img.onerror = () => reject(new Error('Failed to load export image'));
+            });
+          }
+
+          const out = document.createElement('canvas');
+          out.width = dims.width;
+          out.height = dims.height;
+          const ctx = out.getContext('2d');
+          if (!ctx) throw new Error('Canvas 2D context unavailable');
+
+          const bg = screen.settings.backgroundColor;
+          // JPG can't have alpha; PNG optionally can. If exporting JPG (or PNG with a solid bg),
+          // ensure we paint a background so the store upload won't reject alpha.
+          if (downloadFormat === 'jpg') {
+            ctx.fillStyle = bg && bg !== 'transparent' ? bg : '#ffffff';
+            ctx.fillRect(0, 0, out.width, out.height);
+          } else if (bg && bg !== 'transparent') {
+            ctx.fillStyle = bg;
+            ctx.fillRect(0, 0, out.width, out.height);
+          }
+
+          // Fit (no crop) and center.
+          const s = Math.min(out.width / img.width, out.height / img.height);
+          const dw = Math.round(img.width * s);
+          const dh = Math.round(img.height * s);
+          const dx = Math.round((out.width - dw) / 2);
+          const dy = Math.round((out.height - dh) / 2);
+          ctx.drawImage(img, dx, dy, dw, dh);
+
+          const outMime = downloadFormat === 'jpg' ? 'image/jpeg' : 'image/png';
+          const outExt = downloadFormat === 'jpg' ? 'jpg' : 'png';
+          const blob = await new Promise<Blob>((resolve, reject) => {
+            out.toBlob(
+              (b) => (b ? resolve(b) : reject(new Error(`Failed to encode ${outExt.toUpperCase()}`))),
+              outMime,
+              downloadFormat === 'jpg' ? Math.max(0, Math.min(1, downloadJpegQuality / 100)) : undefined,
+            );
+          });
+          exportService.downloadBlob(blob, `${screen.name || `screen-${screenIndex + 1}`}-${Date.now()}.${outExt}`);
+        } finally {
+          restoreBg?.();
+          delete document.body.dataset.appframesExporting;
         }
-
-        // Preserve transparency for PNG downloads when background is transparent / not set.
-        // Also remove UI-only styling (shadow/rounded corners) so the alpha is "clean".
-        const prevBoxShadow = (canvasElement as HTMLElement).style.boxShadow;
-        const prevBorderRadius = (canvasElement as HTMLElement).style.borderRadius;
-        const prevOutline = (canvasElement as HTMLElement).style.outline;
-        (canvasElement as HTMLElement).style.boxShadow = 'none';
-        (canvasElement as HTMLElement).style.borderRadius = '0px';
-        (canvasElement as HTMLElement).style.outline = 'none';
-
-        const dataUrl = await toPng(canvasElement, {
-          quality: 1.0,
-          pixelRatio: 2,
-          // If the node background is transparent, keep it transparent.
-          backgroundColor: screen.settings.backgroundColor === 'transparent'
-            ? 'transparent'
-            : undefined,
-        });
-
-        (canvasElement as HTMLElement).style.boxShadow = prevBoxShadow;
-        (canvasElement as HTMLElement).style.borderRadius = prevBorderRadius;
-        (canvasElement as HTMLElement).style.outline = prevOutline;
-
-        const link = document.createElement('a');
-        link.download = `${screen.name || `screen-${screenIndex + 1}`}-${Date.now()}.png`;
-        link.href = dataUrl;
-        link.click();
 
         // Small delay between downloads to prevent browser blocking
         if (selectedScreenIndices.length > 1) {
@@ -298,8 +479,12 @@ export function AppFrames() {
     } catch (error) {
       // eslint-disable-next-line no-console
       console.error('Download failed:', error);
-      // eslint-disable-next-line no-alert
-      alert('Download failed. Please try again.');
+      const msg = error instanceof Error ? error.message : String(error);
+      notifications.show({
+        title: 'Download failed',
+        message: msg || 'Please try again.',
+        color: 'red',
+      });
     }
   };
 
@@ -341,6 +526,10 @@ export function AppFrames() {
           selectedFrameIndex={selectedFrameIndex}
           onFrameDeviceChange={handleFrameDeviceChange}
           onPanelToggle={(isOpen) => setNavWidth(isOpen ? 360 : 80)}
+          downloadFormat={downloadFormat}
+          onDownloadFormatChange={setDownloadFormat}
+          downloadJpegQuality={downloadJpegQuality}
+          onDownloadJpegQualityChange={setDownloadJpegQuality}
           onMediaSelect={(mediaId) => {
             // If no screens exist, create one
             if (screens.length === 0) {
@@ -368,6 +557,9 @@ export function AppFrames() {
               // Only allow text selection on primary selected screen
               if (screenIndex !== primarySelectedIndex) return;
               selectTextElement(textId);
+              if (textId) {
+                router.push('/text', { scroll: false });
+              }
             }}
             onUpdateTextElement={(screenIndex, textId, updates) => {
               const screen = screens[screenIndex];
@@ -594,6 +786,7 @@ export function AppFrames() {
             removeScreen={removeScreen}
             selectedIndices={selectedScreenIndices}
             onSelectScreen={handleScreenSelect}
+            onReorderScreens={reorderScreens}
             onMediaUpload={handleMediaUpload}
           />
         </Box>

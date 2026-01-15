@@ -1,6 +1,6 @@
 'use client';
 
-import { memo, useState } from 'react';
+import { memo, useEffect, useRef, useState } from 'react';
 import { Box, Group, Text, ActionIcon } from '@mantine/core';
 import { IconPlus, IconX, IconCheck } from '@tabler/icons-react';
 import { Screen, CanvasSettings } from './AppFrames';
@@ -13,6 +13,7 @@ interface ScreensPanelProps {
   removeScreen: (id: string) => void;
   selectedIndices: number[];
   onSelectScreen: (index: number, multi: boolean) => void;
+  onReorderScreens?: (fromIndex: number, toIndex: number) => void;
   onMediaUpload?: (file: File) => Promise<number | null>;
 }
 
@@ -91,6 +92,7 @@ const ScreenThumbnail = memo(function ScreenThumbnail({
         prevImg?.image !== nextImg?.image ||
         prevImg?.mediaId !== nextImg?.mediaId ||
         prevImg?.deviceFrame !== nextImg?.deviceFrame ||
+        prevImg?.cleared !== nextImg?.cleared ||
         prevImg?.panX !== nextImg?.panX ||
         prevImg?.panY !== nextImg?.panY ||
         prevImg?.frameX !== nextImg?.frameX ||
@@ -125,9 +127,61 @@ export function ScreensPanel({
   removeScreen,
   selectedIndices,
   onSelectScreen,
+  onReorderScreens,
   onMediaUpload,
 }: ScreensPanelProps) {
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const panelRef = useRef<HTMLDivElement | null>(null);
+  const lastScrollTimeRef = useRef(0);
+  const dragFromIndexRef = useRef<number | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+
+  // Mouse wheel should only switch screens when hovering this panel.
+  // Keep horizontal scrolling for the thumbnail strip (trackpads / shift+wheel).
+  useEffect(() => {
+    const el = panelRef.current;
+    if (!el) return;
+
+    const handleWheel = (e: WheelEvent) => {
+      const absX = Math.abs(e.deltaX);
+      const absY = Math.abs(e.deltaY);
+
+      // If the intent is horizontal scrolling (or shift-scroll), don't hijack it.
+      if (e.shiftKey || absX > absY) return;
+
+      // Don't allow page zoom / canvas zoom when pointer is over the panel.
+      if (e.metaKey || e.ctrlKey) {
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+      }
+
+      if (!onSelectScreen || screens.length === 0) return;
+
+      // Keep multi-selection stable; wheel navigation would collapse it.
+      if (selectedIndices.length > 1) return;
+
+      // Debounce to prevent too rapid navigation.
+      const now = Date.now();
+      if (now - lastScrollTimeRef.current < 200) return;
+      lastScrollTimeRef.current = now;
+
+      e.preventDefault();
+      e.stopPropagation();
+
+      const currentIndex =
+        selectedIndices.length > 0 ? selectedIndices[selectedIndices.length - 1] : 0;
+      const dir = e.deltaY > 0 ? 1 : -1;
+      const nextIndex = Math.max(0, Math.min(screens.length - 1, currentIndex + dir));
+
+      if (nextIndex !== currentIndex) {
+        onSelectScreen(nextIndex, false);
+      }
+    };
+
+    el.addEventListener('wheel', handleWheel, { passive: false });
+    return () => el.removeEventListener('wheel', handleWheel);
+  }, [onSelectScreen, screens.length, selectedIndices]);
 
   const handleDrop = async (files: File[]) => {
     for (const file of files) {
@@ -152,6 +206,7 @@ export function ScreensPanel({
 
   return (
     <Box
+      ref={panelRef}
       style={{
         borderTop: '1px solid #E5E7EB',
         padding: '12px 20px',
@@ -186,8 +241,57 @@ export function ScreensPanel({
                   backgroundColor: '#f8f9fa',
                   transition: 'all 0.2s',
                   boxShadow: isSelected ? '0 4px 12px rgba(102, 126, 234, 0.3)' : 'none',
+                  outline:
+                    dragOverIndex === index
+                      ? '2px dashed rgba(102, 126, 234, 0.9)'
+                      : 'none',
+                  outlineOffset: 2,
                 }}
                 onClick={(e) => onSelectScreen(index, e.metaKey || e.ctrlKey || e.shiftKey)}
+                draggable={true}
+                onDragStart={(e) => {
+                  dragFromIndexRef.current = index;
+                  setDragOverIndex(null);
+                  try {
+                    e.dataTransfer.effectAllowed = 'move';
+                    // Required in Safari to start drag.
+                    e.dataTransfer.setData('text/plain', String(index));
+                  } catch {
+                    // ignore
+                  }
+                }}
+                onDragOver={(e) => {
+                  if (!onReorderScreens) return;
+                  const from = dragFromIndexRef.current;
+                  if (from == null) return;
+                  if (from === index) return;
+                  e.preventDefault();
+                  e.dataTransfer.dropEffect = 'move';
+                  setDragOverIndex(index);
+                }}
+                onDragLeave={() => {
+                  setDragOverIndex((prev) => (prev === index ? null : prev));
+                }}
+                onDrop={(e) => {
+                  if (!onReorderScreens) return;
+                  e.preventDefault();
+                  e.stopPropagation();
+                  const from =
+                    dragFromIndexRef.current ??
+                    (() => {
+                      const v = Number(e.dataTransfer.getData('text/plain'));
+                      return Number.isFinite(v) ? v : null;
+                    })();
+                  const to = index;
+                  dragFromIndexRef.current = null;
+                  setDragOverIndex(null);
+                  if (from == null || from === to) return;
+                  onReorderScreens(from, to);
+                }}
+                onDragEnd={() => {
+                  dragFromIndexRef.current = null;
+                  setDragOverIndex(null);
+                }}
                 onMouseEnter={(e) => {
                   if (deleteConfirmId !== screen.id) {
                     const deleteBtn = e.currentTarget.querySelector('.delete-btn') as HTMLElement;

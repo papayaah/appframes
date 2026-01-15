@@ -30,6 +30,7 @@ export function OverflowDeviceRenderer({
   const effectiveScale = BASE_COMPOSITION_SCALE * ((image?.frameScale ?? 100) / 100);
 
   // We render even without an image to show the device frame itself
+  if (image?.cleared === true || image?.deviceFrame === '') return null;
 
   return (
     <Box

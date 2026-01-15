@@ -6,6 +6,7 @@ import { TextElement as CanvasTextElement } from '@/components/AppFrames/TextEle
 import { useMediaImage } from '@/hooks/useMediaImage';
 import { MantineProvider } from '@mantine/core';
 import { theme } from '@/theme';
+import { InteractionLockProvider } from '@/components/AppFrames/InteractionLockContext';
 
 export type ExportFormat = 'png' | 'jpg';
 
@@ -26,6 +27,44 @@ export interface CancelToken {
 }
 
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+const extractCssUrls = (cssValue: string): string[] => {
+  if (!cssValue || cssValue === 'none') return [];
+  const out: string[] = [];
+  const re = /url\(["']?(.*?)["']?\)/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(cssValue)) != null) {
+    const u = (m[1] || '').trim();
+    if (u) out.push(u);
+  }
+  return out;
+};
+
+const collectImageUrls = (root: HTMLElement): string[] => {
+  const urls = new Set<string>();
+  // <img src>
+  root.querySelectorAll('img').forEach((img) => {
+    const el = img as HTMLImageElement;
+    const src = el.currentSrc || el.src;
+    if (src) urls.add(src);
+  });
+  // background-image urls
+  root.querySelectorAll('*').forEach((el) => {
+    const bg = window.getComputedStyle(el as Element).backgroundImage;
+    extractCssUrls(bg).forEach((u) => urls.add(u));
+  });
+  return Array.from(urls);
+};
+
+const preloadImage = (url: string) =>
+  new Promise<void>((resolve) => {
+    const img = new Image();
+    // Helps when the URL supports CORS. (blob: URLs ignore this.)
+    img.crossOrigin = 'anonymous';
+    img.onload = () => resolve();
+    img.onerror = () => resolve();
+    img.src = url;
+  });
 
 const dataUrlToBlob = (dataUrl: string): Blob => {
   // Safari can return 0-byte blobs when using fetch() on data: URLs. Convert manually instead.
@@ -303,19 +342,24 @@ export class ExportService {
     quality: number,
   ): Promise<Blob> {
     const { createRoot } = await import('react-dom/client');
-    const { toPng, toJpeg } = await import('html-to-image');
+    // Prefer toBlob when available to avoid data URL edge cases.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { toPng, toJpeg, toBlob } = (await import('html-to-image')) as any;
 
-    const { width, height } = getCanvasDimensions(canvasSize, 'portrait');
+    const orientation = screen?.settings?.orientation ?? 'portrait';
+    const { width, height } = getCanvasDimensions(canvasSize, orientation);
     const isPro = this.isProUser();
 
     const container = document.createElement('div');
     container.style.position = 'fixed';
+    // Keep it off-screen but still in the DOM/layout flow.
     container.style.left = '-10000px';
     container.style.top = '0';
     container.style.width = `${width}px`;
     container.style.height = `${height}px`;
     container.style.background = 'transparent';
     container.style.zIndex = '-1';
+    container.style.pointerEvents = 'none';
     document.body.appendChild(container);
 
     const root = createRoot(container);
@@ -324,13 +368,15 @@ export class ExportService {
         // IMPORTANT: This is a separate React root; Mantine context does not cross roots.
         // Wrap with MantineProvider to avoid "MantineProvider was not found" crashes during export.
         <MantineProvider theme={theme}>
-          <ExportSurface
-            screen={screen}
-            canvasSize={canvasSize}
-            width={width}
-            height={height}
-            isPro={isPro}
-          />
+          <InteractionLockProvider>
+            <ExportSurface
+              screen={screen}
+              canvasSize={canvasSize}
+              width={width}
+              height={height}
+              isPro={isPro}
+            />
+          </InteractionLockProvider>
         </MantineProvider>
       );
 
@@ -345,13 +391,78 @@ export class ExportService {
       const node = container.firstElementChild as HTMLElement | null;
       if (!node) throw new Error('Export render failed: no node');
 
-      const dataUrl = format === 'png'
-        ? await toPng(node, { pixelRatio: 2, cacheBust: true })
-        : await toJpeg(node, { pixelRatio: 2, cacheBust: true, quality: Math.max(0, Math.min(1, quality / 100)) });
+      // Wait for CSS background images to be available, especially OPFS blob URLs.
+      const expectedMediaCount =
+        new Set<number>([
+          ...(typeof screen.settings.canvasBackgroundMediaId === 'number' ? [screen.settings.canvasBackgroundMediaId] : []),
+          ...((screen.images || [])
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            .filter((img) => !(img as any)?.cleared)
+            .map((img) => img?.mediaId)
+            .filter((id): id is number => typeof id === 'number')),
+        ]).size;
 
-      const blob = dataUrlToBlob(dataUrl);
+      const waitStart = Date.now();
+      while (expectedMediaCount > 0) {
+        const urls = collectImageUrls(node);
+        const blobCount = urls.filter((u) => u.startsWith('blob:')).length;
+        if (blobCount >= expectedMediaCount) break;
+        if (Date.now() - waitStart > 2500) break;
+        await sleep(60);
+      }
+
+      const allUrls = collectImageUrls(node);
+
+      // Preload any discovered images (best-effort).
+      const urlsToPreload = allUrls
+        .filter((u) => !u.startsWith('data:'))
+        .slice(0, 40); // avoid pathological cases
+      await Promise.all(urlsToPreload.map(preloadImage));
+
+      const options = {
+        cacheBust: true,
+        pixelRatio: 1,
+        // If tainting occurs, having useCORS may help when servers set proper headers.
+        useCORS: true,
+      };
+
+      const nonBlobDataUrls = allUrls.filter((u) => !u.startsWith('blob:') && !u.startsWith('data:'));
+
+      // IMPORTANT: Store uploads require exact pixel dimensions.
+      // Since the node is already sized to the store resolution, use pixelRatio=1.
+      const renderOnce = async (): Promise<Blob> => {
+        if (format === 'png' && typeof toBlob === 'function') {
+          const blob: Blob | null = await toBlob(node, options);
+          if (blob && blob.size > 0) return blob;
+        }
+
+        const dataUrl =
+          format === 'png'
+            ? await toPng(node, options)
+            : await toJpeg(node, { ...options, quality: Math.max(0, Math.min(1, quality / 100)) });
+        return dataUrlToBlob(dataUrl);
+      };
+
+      // Retry a couple times to avoid rare “empty blob” races.
+      let blob = await renderOnce();
       if (!blob || blob.size === 0) {
-        throw new Error('Export render failed: empty blob');
+        await sleep(150);
+        await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+        blob = await renderOnce();
+      }
+      if (!blob || blob.size === 0) {
+        await sleep(300);
+        blob = await renderOnce();
+      }
+
+      if (!blob || blob.size === 0) {
+        const hints: string[] = [];
+        if (nonBlobDataUrls.length > 0) {
+          hints.push(`Non-blob image URLs detected (likely CORS): ${nonBlobDataUrls.slice(0, 3).join(', ')}${nonBlobDataUrls.length > 3 ? '…' : ''}`);
+        }
+        hints.push(`Expected media refs: ${expectedMediaCount}, discovered URLs: ${allUrls.length}`);
+        hints.push(`Export size: ${width}×${height}px`);
+        throw new Error(`Export render failed: empty blob. ${hints.join(' | ')}`);
       }
       return blob;
     } finally {

@@ -140,7 +140,9 @@ export function DeviceTab({
   const currentImages = currentScreen?.images || [];
   
   // Get the device frame for the selected frame
-  const currentDeviceFrame = currentImages[selectedFrameIndex]?.deviceFrame || 'iphone-14-pro';
+  const rawDeviceFrame = currentImages[selectedFrameIndex]?.deviceFrame;
+  const isCleared = currentImages[selectedFrameIndex]?.cleared === true || rawDeviceFrame === '';
+  const currentDeviceFrame = isCleared ? '' : (rawDeviceFrame || 'iphone-14-pro');
 
   const handleDeviceSelect = (deviceId: string) => {
     if (onFrameDeviceChange) {

@@ -74,6 +74,9 @@ export function TextElement({
   onUpdate,
   onDelete,
 }: TextElementProps) {
+  const isExporting =
+    typeof document !== 'undefined' && document.body?.dataset?.appframesExporting === 'true';
+  const effectiveSelected = selected && !isExporting;
   const { isLocked, isOwnerActive, begin, end } = useInteractionLock();
   const [isEditing, setIsEditing] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
@@ -382,20 +385,21 @@ export function TextElement({
           position: 'absolute',
           inset: -6,
           borderRadius: style.backgroundRadius + 6,
-          border: selected
+          border: effectiveSelected
             ? '2px solid #7950f2'
             : (isHovered || isDragging)
               ? '2px dashed #667eea'
               : '2px dashed transparent',
-          backgroundColor: (isHovered || isDragging) && !selected ? 'rgba(102, 126, 234, 0.05)' : 'transparent',
+          backgroundColor: (isHovered || isDragging) && !effectiveSelected ? 'rgba(102, 126, 234, 0.05)' : 'transparent',
           transition: 'all 0.15s ease',
           pointerEvents: 'none',
         }}
       />
 
       {/* Rotation handle */}
-      {selected && !isEditing && (
+      {effectiveSelected && !isEditing && (
         <Box
+          data-export-hide="true"
           style={{
             position: 'absolute',
             top: -34,
@@ -407,6 +411,7 @@ export function TextElement({
           }}
         >
           <ActionIcon
+            data-export-hide="true"
             size="sm"
             variant="filled"
             color="violet"
@@ -419,6 +424,7 @@ export function TextElement({
           </ActionIcon>
           {isRotating && (
             <Box
+              data-export-hide="true"
               style={{
                 fontSize: 11,
                 fontWeight: 600,
@@ -437,8 +443,9 @@ export function TextElement({
       )}
 
       {/* Delete button */}
-      {selected && !isEditing && (
+      {effectiveSelected && !isEditing && (
         <ActionIcon
+          data-export-hide="true"
           size="sm"
           variant="filled"
           color="red"
@@ -456,8 +463,9 @@ export function TextElement({
       )}
 
       {/* Resize handle (adjusts maxWidth to control wrapping) */}
-      {selected && !isEditing && (
+      {effectiveSelected && !isEditing && (
         <Box
+          data-export-hide="true"
           onMouseDown={handleResizeMouseDown}
           style={{
             position: 'absolute',

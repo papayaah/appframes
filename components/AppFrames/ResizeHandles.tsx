@@ -210,7 +210,10 @@ export function ResizeHandles({
   ];
 
   return (
-    <Box style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 49 }}>
+    <Box
+      data-export-hide="true"
+      style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 49 }}
+    >
       {onRotatePreview && onRotateCommit && (
         <>
           <Box

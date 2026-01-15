@@ -1,9 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import { Box, Tabs, Text, ThemeIcon } from '@mantine/core';
-import { IconLayout, IconDeviceMobile, IconPhoto, IconTypography, IconChevronRight, IconChevronLeft } from '@tabler/icons-react';
+import { Box, Tabs, Text, ThemeIcon, Stack, Select, Slider, Group } from '@mantine/core';
+import { IconLayout, IconDeviceMobile, IconPhoto, IconTypography, IconChevronRight, IconChevronLeft, IconSettings } from '@tabler/icons-react';
 import { Sidebar } from './Sidebar';
 import { DeviceTab } from './DeviceTab';
 import { TextTab } from './TextTab';
@@ -18,6 +18,10 @@ interface SidebarTabsProps {
   onFrameDeviceChange?: (frameIndex: number, deviceFrame: string) => void;
   onMediaSelect?: (mediaId: number) => void;
   onPanelToggle?: (isOpen: boolean) => void;
+  downloadFormat: 'png' | 'jpg';
+  onDownloadFormatChange: (format: 'png' | 'jpg') => void;
+  downloadJpegQuality: number;
+  onDownloadJpegQualityChange: (quality: number) => void;
 }
 
 export function SidebarTabs({ 
@@ -27,15 +31,31 @@ export function SidebarTabs({
   selectedFrameIndex = 0,
   onFrameDeviceChange,
   onMediaSelect, 
-  onPanelToggle 
+  onPanelToggle,
+  downloadFormat,
+  onDownloadFormatChange,
+  downloadJpegQuality,
+  onDownloadJpegQualityChange,
 }: SidebarTabsProps) {
   const router = useRouter();
   const pathname = usePathname();
   const [isPanelOpen, setIsPanelOpen] = useState(true);
+  const prevTabRef = useRef<string | null>(null);
 
   // Extract tab from pathname (e.g., "/layout" -> "layout", "/" -> "layout")
   const currentTab = pathname === '/' ? 'layout' : pathname.replace('/', '');
-  const tab = ['layout', 'device', 'text', 'media'].includes(currentTab) ? currentTab : 'layout';
+  const tab = ['layout', 'device', 'text', 'media', 'settings'].includes(currentTab) ? currentTab : 'layout';
+
+  // If navigation happens programmatically (e.g. selecting a text element pushes /text),
+  // ensure the panel opens so the user sees the controls.
+  useEffect(() => {
+    if (prevTabRef.current === tab) return;
+    prevTabRef.current = tab;
+    if (!isPanelOpen) {
+      setIsPanelOpen(true);
+      onPanelToggle?.(true);
+    }
+  }, [tab, isPanelOpen, onPanelToggle]);
 
   const handleTabChange = (value: string | null) => {
     if (value) {
@@ -111,7 +131,7 @@ export function SidebarTabs({
           >
             <Box style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4, width: '100%', height: '100%' }}>
               <IconDeviceMobile size={24} />
-              <Text size="xs">Device</Text>
+              <Text size="xs">Frame</Text>
             </Box>
           </Tabs.Tab>
           
@@ -150,6 +170,24 @@ export function SidebarTabs({
               <Text size="xs">Media</Text>
             </Box>
           </Tabs.Tab>
+
+          <Tabs.Tab 
+            value="settings" 
+            style={{ 
+              width: 64,
+              height: 64,
+              padding: 0,
+              borderRadius: 8,
+              backgroundColor: tab === 'settings' ? '#f8f9ff' : 'transparent',
+              color: tab === 'settings' ? '#667eea' : '#666',
+              border: 'none',
+            }}
+          >
+            <Box style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4, width: '100%', height: '100%' }}>
+              <IconSettings size={24} />
+              <Text size="xs">Settings</Text>
+            </Box>
+          </Tabs.Tab>
         </Tabs.List>
 
         {isPanelOpen && (
@@ -177,6 +215,45 @@ export function SidebarTabs({
                 onSelectMedia={(mediaId) => onMediaSelect && onMediaSelect(mediaId)}
                 selectedSlot={settings.selectedScreenIndex}
               />
+            </Tabs.Panel>
+
+            <Tabs.Panel value="settings" style={{ height: '100%' }}>
+              <Box style={{ height: '100%', overflow: 'auto' }}>
+                <Stack gap="md" p="md">
+                  <Text fw={700}>Download</Text>
+                  <Select
+                    label="Format"
+                    description="PNG can preserve transparency; JPG flattens the image (no alpha)."
+                    value={downloadFormat}
+                    onChange={(v) => {
+                      if (v === 'png' || v === 'jpg') onDownloadFormatChange(v);
+                    }}
+                    data={[
+                      { value: 'png', label: 'PNG (transparency supported)' },
+                      { value: 'jpg', label: 'JPG (no transparency)' },
+                    ]}
+                  />
+                  {downloadFormat === 'jpg' && (
+                    <Box>
+                      <Group justify="space-between" mb={6}>
+                        <Text size="sm" fw={600}>JPG quality</Text>
+                        <Text size="sm" c="dimmed">{downloadJpegQuality}</Text>
+                      </Group>
+                      <Slider
+                        value={downloadJpegQuality}
+                        onChange={onDownloadJpegQualityChange}
+                        min={0}
+                        max={100}
+                        step={1}
+                        label={(v) => `${v}`}
+                      />
+                    </Box>
+                  )}
+                  <Text size="xs" c="dimmed">
+                    Tip: App Store screenshot uploads often reject alpha. Use JPG or set a solid Background Color.
+                  </Text>
+                </Stack>
+              </Box>
             </Tabs.Panel>
           </Box>
         )}

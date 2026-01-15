@@ -6,13 +6,17 @@ import { persistenceDB, Project } from '@/lib/PersistenceDB';
 import { usePersistence } from '@/hooks/usePersistence';
 
 // Canvas dimensions helper (App Store requirements)
-export const getCanvasDimensions = (canvasSize: string, _orientation: string) => {
-  const dimensions: Record<string, { width: number; height: number }> = {
-    // Apple App Store - iPhone (Portrait only)
+export const getCanvasDimensions = (canvasSize: string, orientation: string) => {
+  const dimensions: Record<
+    string,
+    { width: number; height: number } | { portrait: { width: number; height: number }; landscape: { width: number; height: number } }
+  > = {
+    // Apple App Store - iPhone (base portrait dimensions; landscape is computed by swapping)
     'iphone-6.9': { width: 1320, height: 2868 },
     'iphone-6.9-1290x2796': { width: 1290, height: 2796 },
     'iphone-6.9-1260x2736': { width: 1260, height: 2736 },
     'iphone-6.5': { width: 1284, height: 2778 },
+    'iphone-6.5-1242x2688': { width: 1242, height: 2688 },
     'iphone-6.3': { width: 1206, height: 2622 },
     'iphone-6.3-1179x2556': { width: 1179, height: 2556 },
     // Apple App Store - iPhone 6.1" display (additional accepted sizes)
@@ -22,10 +26,18 @@ export const getCanvasDimensions = (canvasSize: string, _orientation: string) =>
     'iphone-5.5': { width: 1242, height: 2208 },
     'iphone-4.7': { width: 750, height: 1334 },
     'iphone-4.0': { width: 640, height: 1136 },
-    'iphone-4.0-640x1096': { width: 640, height: 1096 },
+    // iPhone 4.0" "without status bar" is NOT a simple swap in landscape (Apple accepts 1136×600).
+    'iphone-4.0-640x1096': {
+      portrait: { width: 640, height: 1096 },
+      landscape: { width: 1136, height: 600 },
+    },
     'iphone-3.5': { width: 640, height: 960 },
-    'iphone-3.5-640x920': { width: 640, height: 920 },
-    // Apple App Store - iPad (Portrait only)
+    // iPhone 3.5" "without status bar" is NOT a simple swap in landscape (Apple accepts 960×600).
+    'iphone-3.5-640x920': {
+      portrait: { width: 640, height: 920 },
+      landscape: { width: 960, height: 600 },
+    },
+    // Apple App Store - iPad (base portrait dimensions; landscape is computed by swapping)
     'ipad-13': { width: 2064, height: 2752 },
     'ipad-11': { width: 1668, height: 2388 },
     'ipad-12.9-gen2': { width: 2048, height: 2732 },
@@ -38,7 +50,7 @@ export const getCanvasDimensions = (canvasSize: string, _orientation: string) =>
     'watch-s9': { width: 396, height: 484 },
     'watch-s6': { width: 368, height: 448 },
     'watch-s3': { width: 312, height: 390 },
-    // Google Play Store (Portrait only for phones and tablets)
+    // Google Play Store (base portrait dimensions; landscape is computed by swapping)
     'google-phone': { width: 1080, height: 1920 },
     'google-tablet-7': { width: 1536, height: 2048 },
     'google-tablet-10': { width: 2048, height: 2732 },
@@ -46,9 +58,17 @@ export const getCanvasDimensions = (canvasSize: string, _orientation: string) =>
     'google-xr': { width: 1920, height: 1080 },
   };
 
-  const dim = dimensions[canvasSize] || { width: 1284, height: 2778 };
+  const entry = dimensions[canvasSize] || { width: 1284, height: 2778 };
+  const dim =
+    'portrait' in entry
+      ? (orientation === 'landscape' ? entry.landscape : entry.portrait)
+      : entry;
 
-  // Don't apply orientation transform since dimensions already include orientation
+  // If the entry had explicit portrait/landscape dims, we're done.
+  if ('portrait' in entry) return dim;
+
+  // Otherwise, compute landscape by swapping base portrait dimensions.
+  if (orientation === 'landscape') return { width: dim.height, height: dim.width };
   return dim;
 };
 
@@ -60,6 +80,7 @@ export const getCanvasSizeLabel = (canvasSize: string): string => {
     'iphone-6.9-1290x2796': 'iPhone 6.9" (1290×2796)',
     'iphone-6.9-1260x2736': 'iPhone 6.9" (1260×2736)',
     'iphone-6.5': 'iPhone 6.5" (1284×2778)',
+    'iphone-6.5-1242x2688': 'iPhone 6.5" (1242×2688)',
     'iphone-6.3': 'iPhone 6.3" (1206×2622)',
     'iphone-6.3-1179x2556': 'iPhone 6.3" (1179×2556)',
     'iphone-6.1-1170x2532': 'iPhone 6.1" (1170×2532)',
@@ -192,9 +213,14 @@ interface FramesContextType {
   setSidebarPanelOpen: (open: boolean) => void;
   navWidth: number;
   setNavWidth: (width: number) => void;
+  downloadFormat: 'png' | 'jpg';
+  setDownloadFormat: (format: 'png' | 'jpg') => void;
+  downloadJpegQuality: number;
+  setDownloadJpegQuality: (quality: number) => void;
   // Canvas size switching
   switchCanvasSize: (newSize: string) => void;
   getCurrentScreens: () => Screen[];
+  reorderScreens: (fromIndex: number, toIndex: number) => void;
   // Project management
   createNewProject: (name: string) => Promise<void>;
   switchProject: (projectId: string) => Promise<void>;
@@ -238,6 +264,8 @@ export function FramesProvider({ children }: { children: ReactNode }) {
   const [sidebarTab, setSidebarTab] = useState<string>('layout');
   const [sidebarPanelOpen, setSidebarPanelOpen] = useState<boolean>(true);
   const [navWidth, setNavWidth] = useState<number>(300);
+  const [downloadFormat, setDownloadFormat] = useState<'png' | 'jpg'>('png');
+  const [downloadJpegQuality, setDownloadJpegQuality] = useState<number>(90);
 
   // Initialize with one empty screen with default settings
   const defaultTextElements: TextElement[] = [createDefaultTextElement([])];
@@ -628,6 +656,33 @@ export function FramesProvider({ children }: { children: ReactNode }) {
     setSelectedFrameIndex(0);
   }, [screensByCanvasSize]);
 
+  const reorderScreens = useCallback((fromIndex: number, toIndex: number) => {
+    setScreens((prev) => {
+      if (fromIndex === toIndex) return prev;
+      if (fromIndex < 0 || toIndex < 0) return prev;
+      if (fromIndex >= prev.length || toIndex >= prev.length) return prev;
+
+      const next = [...prev];
+      const [moved] = next.splice(fromIndex, 1);
+      next.splice(toIndex, 0, moved);
+
+      // Preserve selection by screen id(s), not by raw index.
+      setSelectedScreenIndices((prevSel) => {
+        const selectedIds = prevSel.map((i) => prev[i]?.id).filter(Boolean) as string[];
+        if (selectedIds.length === 0) return prevSel;
+
+        const idToIndex = new Map(next.map((s, i) => [s.id, i]));
+        const remapped = selectedIds
+          .map((id) => idToIndex.get(id))
+          .filter((i): i is number => typeof i === 'number');
+
+        return remapped.length > 0 ? remapped : prevSel;
+      });
+
+      return next;
+    });
+  }, []);
+
   // Load project data into React state
   const loadProjectIntoState = useCallback((project: Project) => {
     setCurrentProjectId(project.id);
@@ -686,6 +741,8 @@ export function FramesProvider({ children }: { children: ReactNode }) {
             sidebarTab,
             sidebarPanelOpen,
             navWidth,
+            downloadFormat,
+            downloadJpegQuality,
           });
         } else {
           // No projects exist, create default project with current screens
@@ -706,6 +763,12 @@ export function FramesProvider({ children }: { children: ReactNode }) {
         setSidebarTab(appState.sidebarTab);
         setSidebarPanelOpen(appState.sidebarPanelOpen);
         setNavWidth(appState.navWidth);
+        if (appState.downloadFormat === 'png' || appState.downloadFormat === 'jpg') {
+          setDownloadFormat(appState.downloadFormat);
+        }
+        if (typeof appState.downloadJpegQuality === 'number') {
+          setDownloadJpegQuality(Math.max(0, Math.min(100, appState.downloadJpegQuality)));
+        }
       }
     } catch (error) {
       console.error('Failed to load persisted state:', error);
@@ -750,6 +813,8 @@ export function FramesProvider({ children }: { children: ReactNode }) {
         sidebarTab,
         sidebarPanelOpen,
         navWidth,
+        downloadFormat,
+        downloadJpegQuality,
       });
     });
   };
@@ -783,11 +848,11 @@ export function FramesProvider({ children }: { children: ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [zoom]);
 
-  // Save app state when sidebarTab changes
+  // Save app state when UI prefs change
   useEffect(() => {
     saveAppState();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sidebarTab]);
+  }, [currentProjectId, sidebarTab, sidebarPanelOpen, navWidth, downloadFormat, downloadJpegQuality]);
 
   // Sync screens with screensByCanvasSize for current canvas size
   // This ensures screens always reflects the current canvas size
@@ -868,6 +933,8 @@ export function FramesProvider({ children }: { children: ReactNode }) {
         sidebarTab,
         sidebarPanelOpen,
         navWidth,
+        downloadFormat,
+        downloadJpegQuality,
       });
     } catch (error) {
       console.error('Failed to create new project:', error);
@@ -911,6 +978,8 @@ export function FramesProvider({ children }: { children: ReactNode }) {
           sidebarTab,
           sidebarPanelOpen,
           navWidth,
+          downloadFormat,
+          downloadJpegQuality,
         });
       } else {
         console.error('Project not found:', projectId);
@@ -1018,8 +1087,13 @@ export function FramesProvider({ children }: { children: ReactNode }) {
         setSidebarPanelOpen,
         navWidth,
         setNavWidth,
+        downloadFormat,
+        setDownloadFormat,
+        downloadJpegQuality,
+        setDownloadJpegQuality,
         switchCanvasSize,
         getCurrentScreens,
+        reorderScreens,
         createNewProject,
         switchProject,
         deleteProject,

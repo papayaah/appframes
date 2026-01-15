@@ -187,6 +187,10 @@ export function DeviceFrame({
   onFrameMoveEnd,
   frameY = 50
 }: DeviceFrameProps) {
+  const isExporting =
+    typeof document !== 'undefined' && document.body?.dataset?.appframesExporting === 'true';
+  const effectiveSelected = isExporting ? false : isSelected;
+  const effectiveHighlighted = isExporting ? false : isHighlighted;
   const { isLocked, isOwnerActive, begin, end } = useInteractionLock();
   const { imageUrl } = useMediaImage(mediaId);
   const displayImage = imageUrl || image;
@@ -650,9 +654,9 @@ export function DeviceFrame({
           paddingBottom: bottomPadding + imacChin,
           paddingLeft: sidePadding,
           paddingRight: sidePadding,
-          boxShadow: isHighlighted
+          boxShadow: effectiveHighlighted
             ? '0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 0 3px rgba(102, 126, 234, 0.8), 0 0 20px rgba(102, 126, 234, 0.5)'
-            : isSelected
+            : effectiveSelected
               ? '0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 0 3px #667eea'
               : '0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.1) inset',
           position: 'relative',
@@ -787,8 +791,9 @@ export function DeviceFrame({
 
         {/* Frame Drag Handle - hide during any drag operation */}
         {/* When frame is near the top (frameY < 20%), show handle at bottom instead */}
-        {onFramePositionChange && (isHovered || isFrameDragging) && !isDragging && (
+        {onFramePositionChange && !isExporting && (isHovered || isFrameDragging) && !isDragging && (
           <Box
+            data-export-hide="true"
             onMouseDown={handleFrameDragStart}
             data-no-frame-drag="true"
             style={{
@@ -815,7 +820,7 @@ export function DeviceFrame({
         )}
 
         {/* Quick Media Picker Button - hide during any drag operation */}
-        {(onMediaSelect || onPexelsSelect) && (isHovered || pickerOpen) && !isDragging && !isFrameDragging && (
+        {(onMediaSelect || onPexelsSelect) && !isExporting && (isHovered || pickerOpen) && !isDragging && !isFrameDragging && (
           <Popover
             opened={pickerOpen}
             onChange={setPickerOpen}
@@ -826,6 +831,7 @@ export function DeviceFrame({
           >
             <Popover.Target>
               <ActionIcon
+                data-export-hide="true"
                 size="md"
                 variant="filled"
                 color="violet"

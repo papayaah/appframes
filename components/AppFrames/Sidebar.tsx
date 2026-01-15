@@ -134,6 +134,11 @@ const CompositionButton = ({
 );
 
 export function Sidebar({ settings, setSettings, screens }: SidebarProps) {
+  const currentScreen = screens[settings.selectedScreenIndex];
+  const hasAnyFrames =
+    (currentScreen?.images ?? []).some((img) => !(img?.cleared === true || img?.deviceFrame === ''));
+  const effectiveComposition = hasAnyFrames ? settings.composition : undefined;
+
   return (
     <Stack gap="lg" style={{ overflow: 'auto', height: '100%', padding: '16px' }}>
       <Box>
@@ -159,6 +164,7 @@ export function Sidebar({ settings, setSettings, screens }: SidebarProps) {
             { 
               group: 'iPhone — 6.5" Display',
               items: [
+                { value: 'iphone-6.5-1242x2688', label: '1242 × 2688' },
                 { value: 'iphone-6.5', label: '1284 × 2778' },
               ]
             },
@@ -249,25 +255,25 @@ export function Sidebar({ settings, setSettings, screens }: SidebarProps) {
           <CompositionButton
             type="single"
             label="Single"
-            selected={settings.composition === 'single'}
+            selected={effectiveComposition === 'single'}
             onClick={() => setSettings({ ...settings, composition: 'single' })}
           />
           <CompositionButton
             type="dual"
             label="Dual"
-            selected={settings.composition === 'dual'}
+            selected={effectiveComposition === 'dual'}
             onClick={() => setSettings({ ...settings, composition: 'dual' })}
           />
           <CompositionButton
             type="stack"
             label="Stack"
-            selected={settings.composition === 'stack'}
+            selected={effectiveComposition === 'stack'}
             onClick={() => setSettings({ ...settings, composition: 'stack' })}
           />
           <CompositionButton
             type="triple"
             label="Triple"
-            selected={settings.composition === 'triple'}
+            selected={effectiveComposition === 'triple'}
             onClick={() => setSettings({ ...settings, composition: 'triple' })}
           />
         </SimpleGrid>
@@ -275,7 +281,7 @@ export function Sidebar({ settings, setSettings, screens }: SidebarProps) {
           <CompositionButton
             type="fan"
             label="Fan"
-            selected={settings.composition === 'fan'}
+            selected={effectiveComposition === 'fan'}
             onClick={() => setSettings({ ...settings, composition: 'fan' })}
           />
         </Box>

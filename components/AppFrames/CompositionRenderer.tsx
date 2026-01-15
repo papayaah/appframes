@@ -360,6 +360,7 @@ export function CompositionRenderer({
     case 'single':
       const offset0 = getFrameOffset(0);
       const t0 = getFrameTransforms(0);
+      const isCleared0 = images[0]?.cleared === true || images[0]?.deviceFrame === '';
       return (
         <Box style={{ height: '100%', perspective: '2000px', perspectiveOrigin: 'center center' }}>
           <Center style={{ height: '100%' }}>
@@ -371,15 +372,17 @@ export function CompositionRenderer({
               tiltX={t0.tiltX}
               tiltY={t0.tiltY}
               rotateZ={t0.rotateZ}
-              isSelected={selectedFrameIndex === 0}
-              onResizeScale={(next, _handle) => onFrameScaleChange?.(0, next)}
-              onRotate={(next) => onFrameRotateChange?.(0, next)}
+              isSelected={selectedFrameIndex === 0 && !isCleared0}
+              onResizeScale={isCleared0 ? undefined : (next, _handle) => onFrameScaleChange?.(0, next)}
+              onRotate={isCleared0 ? undefined : (next) => onFrameRotateChange?.(0, next)}
               gestureOwnerKey={`frame:${screen.id}:0`}
             >
-              <DeviceFrame
-                {...getFrameProps(0, 1)}
-                showInstructions={images.length === 0 || (!images[0]?.image && !images[0]?.mediaId)}
-              />
+              {isCleared0 ? null : (
+                <DeviceFrame
+                  {...getFrameProps(0, 1)}
+                  showInstructions={images.length === 0 || (!images[0]?.image && !images[0]?.mediaId)}
+                />
+              )}
             </DraggableFrame>
           </Center>
         </Box>
@@ -390,6 +393,8 @@ export function CompositionRenderer({
       const dualOffset1 = getFrameOffset(1);
       const dt0 = getFrameTransforms(0);
       const dt1 = getFrameTransforms(1);
+      const isClearedDual0 = images[0]?.cleared === true || images[0]?.deviceFrame === '';
+      const isClearedDual1 = images[1]?.cleared === true || images[1]?.deviceFrame === '';
       return (
         <Box style={{ height: '100%', perspective: '2000px', perspectiveOrigin: 'center center' }}>
           <Center style={{ height: '100%', gap: 20 }}>
@@ -402,12 +407,12 @@ export function CompositionRenderer({
               tiltX={dt0.tiltX}
               tiltY={dt0.tiltY}
               rotateZ={dt0.rotateZ}
-              isSelected={selectedFrameIndex === 0}
-              onResizeScale={(next, _handle) => onFrameScaleChange?.(0, next)}
-              onRotate={(next) => onFrameRotateChange?.(0, next)}
+              isSelected={selectedFrameIndex === 0 && !isClearedDual0}
+              onResizeScale={isClearedDual0 ? undefined : (next, _handle) => onFrameScaleChange?.(0, next)}
+              onRotate={isClearedDual0 ? undefined : (next) => onFrameRotateChange?.(0, next)}
               gestureOwnerKey={`frame:${screen.id}:0`}
             >
-              <DeviceFrame {...getFrameProps(0, 0.9)} />
+              {isClearedDual0 ? null : <DeviceFrame {...getFrameProps(0, 0.9)} />}
             </DraggableFrame>
             <DraggableFrame
               frameX={dualOffset1.frameX}
@@ -418,12 +423,12 @@ export function CompositionRenderer({
               tiltX={dt1.tiltX}
               tiltY={dt1.tiltY}
               rotateZ={dt1.rotateZ}
-              isSelected={selectedFrameIndex === 1}
-              onResizeScale={(next, _handle) => onFrameScaleChange?.(1, next)}
-              onRotate={(next) => onFrameRotateChange?.(1, next)}
+              isSelected={selectedFrameIndex === 1 && !isClearedDual1}
+              onResizeScale={isClearedDual1 ? undefined : (next, _handle) => onFrameScaleChange?.(1, next)}
+              onRotate={isClearedDual1 ? undefined : (next) => onFrameRotateChange?.(1, next)}
               gestureOwnerKey={`frame:${screen.id}:1`}
             >
-              <DeviceFrame {...getFrameProps(1, 0.9)} />
+              {isClearedDual1 ? null : <DeviceFrame {...getFrameProps(1, 0.9)} />}
             </DraggableFrame>
           </Center>
         </Box>
@@ -434,6 +439,8 @@ export function CompositionRenderer({
       const stackOffset1 = getFrameOffset(1);
       const st0 = getFrameTransforms(0);
       const st1 = getFrameTransforms(1);
+      const isClearedStack0 = images[0]?.cleared === true || images[0]?.deviceFrame === '';
+      const isClearedStack1 = images[1]?.cleared === true || images[1]?.deviceFrame === '';
       return (
         <Box style={{ height: '100%', perspective: '2000px', perspectiveOrigin: 'center center' }}>
           <Center style={{ height: '100%', position: 'relative' }}>
@@ -452,12 +459,12 @@ export function CompositionRenderer({
                 tiltX={st0.tiltX}
                 tiltY={st0.tiltY}
                 rotateZ={st0.rotateZ}
-                isSelected={selectedFrameIndex === 0}
-                onResizeScale={(next, _handle) => onFrameScaleChange?.(0, next)}
-                onRotate={(next) => onFrameRotateChange?.(0, next)}
+                isSelected={selectedFrameIndex === 0 && !isClearedStack0}
+                onResizeScale={isClearedStack0 ? undefined : (next, _handle) => onFrameScaleChange?.(0, next)}
+                onRotate={isClearedStack0 ? undefined : (next) => onFrameRotateChange?.(0, next)}
                 gestureOwnerKey={`frame:${screen.id}:0`}
               >
-                <DeviceFrame {...getFrameProps(0, 0.85)} />
+                {isClearedStack0 ? null : <DeviceFrame {...getFrameProps(0, 0.85)} />}
               </DraggableFrame>
               <DraggableFrame
                 frameX={stackOffset1.frameX}
@@ -471,12 +478,12 @@ export function CompositionRenderer({
                 tiltX={st1.tiltX}
                 tiltY={st1.tiltY}
                 rotateZ={st1.rotateZ}
-                isSelected={selectedFrameIndex === 1}
-                onResizeScale={(next, _handle) => onFrameScaleChange?.(1, next)}
-                onRotate={(next) => onFrameRotateChange?.(1, next)}
+                isSelected={selectedFrameIndex === 1 && !isClearedStack1}
+                onResizeScale={isClearedStack1 ? undefined : (next, _handle) => onFrameScaleChange?.(1, next)}
+                onRotate={isClearedStack1 ? undefined : (next) => onFrameRotateChange?.(1, next)}
                 gestureOwnerKey={`frame:${screen.id}:1`}
               >
-                <DeviceFrame {...getFrameProps(1, 0.85)} />
+                {isClearedStack1 ? null : <DeviceFrame {...getFrameProps(1, 0.85)} />}
               </DraggableFrame>
             </Box>
           </Center>
@@ -490,6 +497,9 @@ export function CompositionRenderer({
       const tt0 = getFrameTransforms(0);
       const tt1 = getFrameTransforms(1);
       const tt2 = getFrameTransforms(2);
+      const isClearedTriple0 = images[0]?.cleared === true || images[0]?.deviceFrame === '';
+      const isClearedTriple1 = images[1]?.cleared === true || images[1]?.deviceFrame === '';
+      const isClearedTriple2 = images[2]?.cleared === true || images[2]?.deviceFrame === '';
       return (
         <Box style={{ height: '100%', perspective: '2000px', perspectiveOrigin: 'center center' }}>
           <Center style={{ height: '100%', gap: 15 }}>
@@ -502,12 +512,12 @@ export function CompositionRenderer({
               tiltX={tt0.tiltX}
               tiltY={tt0.tiltY}
               rotateZ={tt0.rotateZ}
-              isSelected={selectedFrameIndex === 0}
-              onResizeScale={(next, _handle) => onFrameScaleChange?.(0, next)}
-              onRotate={(next) => onFrameRotateChange?.(0, next)}
+              isSelected={selectedFrameIndex === 0 && !isClearedTriple0}
+              onResizeScale={isClearedTriple0 ? undefined : (next, _handle) => onFrameScaleChange?.(0, next)}
+              onRotate={isClearedTriple0 ? undefined : (next) => onFrameRotateChange?.(0, next)}
               gestureOwnerKey={`frame:${screen.id}:0`}
             >
-              <DeviceFrame {...getFrameProps(0, 0.75)} />
+              {isClearedTriple0 ? null : <DeviceFrame {...getFrameProps(0, 0.75)} />}
             </DraggableFrame>
             <DraggableFrame
               frameX={tripleOffset1.frameX}
@@ -518,12 +528,12 @@ export function CompositionRenderer({
               tiltX={tt1.tiltX}
               tiltY={tt1.tiltY}
               rotateZ={tt1.rotateZ}
-              isSelected={selectedFrameIndex === 1}
-              onResizeScale={(next, _handle) => onFrameScaleChange?.(1, next)}
-              onRotate={(next) => onFrameRotateChange?.(1, next)}
+              isSelected={selectedFrameIndex === 1 && !isClearedTriple1}
+              onResizeScale={isClearedTriple1 ? undefined : (next, _handle) => onFrameScaleChange?.(1, next)}
+              onRotate={isClearedTriple1 ? undefined : (next) => onFrameRotateChange?.(1, next)}
               gestureOwnerKey={`frame:${screen.id}:1`}
             >
-              <DeviceFrame {...getFrameProps(1, 0.75)} />
+              {isClearedTriple1 ? null : <DeviceFrame {...getFrameProps(1, 0.75)} />}
             </DraggableFrame>
             <DraggableFrame
               frameX={tripleOffset2.frameX}
@@ -534,12 +544,12 @@ export function CompositionRenderer({
               tiltX={tt2.tiltX}
               tiltY={tt2.tiltY}
               rotateZ={tt2.rotateZ}
-              isSelected={selectedFrameIndex === 2}
-              onResizeScale={(next, _handle) => onFrameScaleChange?.(2, next)}
-              onRotate={(next) => onFrameRotateChange?.(2, next)}
+              isSelected={selectedFrameIndex === 2 && !isClearedTriple2}
+              onResizeScale={isClearedTriple2 ? undefined : (next, _handle) => onFrameScaleChange?.(2, next)}
+              onRotate={isClearedTriple2 ? undefined : (next) => onFrameRotateChange?.(2, next)}
               gestureOwnerKey={`frame:${screen.id}:2`}
             >
-              <DeviceFrame {...getFrameProps(2, 0.75)} />
+              {isClearedTriple2 ? null : <DeviceFrame {...getFrameProps(2, 0.75)} />}
             </DraggableFrame>
           </Center>
         </Box>
@@ -552,6 +562,9 @@ export function CompositionRenderer({
       const ft0 = getFrameTransforms(0);
       const ft1 = getFrameTransforms(1);
       const ft2 = getFrameTransforms(2);
+      const isClearedFan0 = images[0]?.cleared === true || images[0]?.deviceFrame === '';
+      const isClearedFan1 = images[1]?.cleared === true || images[1]?.deviceFrame === '';
+      const isClearedFan2 = images[2]?.cleared === true || images[2]?.deviceFrame === '';
       return (
         <Box style={{ height: '100%', perspective: '2000px', perspectiveOrigin: 'center center' }}>
           <Center style={{ height: '100%', position: 'relative' }}>
@@ -571,12 +584,12 @@ export function CompositionRenderer({
               tiltX={ft0.tiltX}
               tiltY={ft0.tiltY}
               rotateZ={ft0.rotateZ}
-              isSelected={selectedFrameIndex === 0}
-              onResizeScale={(next, _handle) => onFrameScaleChange?.(0, next)}
-              onRotate={(next) => onFrameRotateChange?.(0, next)}
+              isSelected={selectedFrameIndex === 0 && !isClearedFan0}
+              onResizeScale={isClearedFan0 ? undefined : (next, _handle) => onFrameScaleChange?.(0, next)}
+              onRotate={isClearedFan0 ? undefined : (next) => onFrameRotateChange?.(0, next)}
               gestureOwnerKey={`frame:${screen.id}:0`}
             >
-              <DeviceFrame {...getFrameProps(0, 0.7, -8)} />
+              {isClearedFan0 ? null : <DeviceFrame {...getFrameProps(0, 0.7, -8)} />}
             </DraggableFrame>
             <DraggableFrame
               frameX={fanOffset1.frameX}
@@ -593,12 +606,12 @@ export function CompositionRenderer({
               tiltX={ft1.tiltX}
               tiltY={ft1.tiltY}
               rotateZ={ft1.rotateZ}
-              isSelected={selectedFrameIndex === 1}
-              onResizeScale={(next, _handle) => onFrameScaleChange?.(1, next)}
-              onRotate={(next) => onFrameRotateChange?.(1, next)}
+              isSelected={selectedFrameIndex === 1 && !isClearedFan1}
+              onResizeScale={isClearedFan1 ? undefined : (next, _handle) => onFrameScaleChange?.(1, next)}
+              onRotate={isClearedFan1 ? undefined : (next) => onFrameRotateChange?.(1, next)}
               gestureOwnerKey={`frame:${screen.id}:1`}
             >
-              <DeviceFrame {...getFrameProps(1, 0.7, 0)} />
+              {isClearedFan1 ? null : <DeviceFrame {...getFrameProps(1, 0.7, 0)} />}
             </DraggableFrame>
             <DraggableFrame
               frameX={fanOffset2.frameX}
@@ -615,12 +628,12 @@ export function CompositionRenderer({
               tiltX={ft2.tiltX}
               tiltY={ft2.tiltY}
               rotateZ={ft2.rotateZ}
-              isSelected={selectedFrameIndex === 2}
-              onResizeScale={(next, _handle) => onFrameScaleChange?.(2, next)}
-              onRotate={(next) => onFrameRotateChange?.(2, next)}
+              isSelected={selectedFrameIndex === 2 && !isClearedFan2}
+              onResizeScale={isClearedFan2 ? undefined : (next, _handle) => onFrameScaleChange?.(2, next)}
+              onRotate={isClearedFan2 ? undefined : (next) => onFrameRotateChange?.(2, next)}
               gestureOwnerKey={`frame:${screen.id}:2`}
             >
-              <DeviceFrame {...getFrameProps(2, 0.7, 8)} />
+              {isClearedFan2 ? null : <DeviceFrame {...getFrameProps(2, 0.7, 8)} />}
             </DraggableFrame>
             </Box>
           </Center>

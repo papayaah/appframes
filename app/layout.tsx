@@ -9,6 +9,7 @@ import { ColorSchemeScript, mantineHtmlProps, MantineProvider } from '@mantine/c
 import { Notifications } from '@mantine/notifications';
 import { theme } from '../theme';
 import { FramesProvider } from '../components/AppFrames/FramesContext';
+import { AuthIntegrationProvider } from '../components/Auth/AuthIntegrationProvider';
 
 export const metadata = {
   title: 'AppFrames - Create Beautiful App Screenshots',
@@ -29,7 +30,9 @@ export default function RootLayout({ children }: { children: any }) {
       <body>
         <MantineProvider theme={theme}>
           <Notifications position="top-right" />
-          <FramesProvider>{children}</FramesProvider>
+          <AuthIntegrationProvider>
+            <FramesProvider>{children}</FramesProvider>
+          </AuthIntegrationProvider>
         </MantineProvider>
         <Analytics />
       </body>

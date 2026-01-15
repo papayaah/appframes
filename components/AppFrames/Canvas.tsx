@@ -121,7 +121,7 @@ export function Canvas({
     refreshCanvasBounds();
   }, [zoom, applyInnerTransform, refreshCanvasBounds]);
 
-  // Wheel handler: Cmd+Scroll = zoom, regular scroll = navigate screens
+  // Wheel handler: Cmd+Scroll = zoom (leave normal scroll alone)
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
@@ -141,40 +141,6 @@ export function Canvas({
         const newZoom = Math.min(400, Math.max(10, zoom + zoomDelta));
 
         onZoomChange(Math.round(newZoom));
-      } else if (onSelectScreen && screens.length > 0) {
-        // If multiple screens are selected, don't use the mouse wheel to navigate screens.
-        // Navigating screens collapses multi-selection, which feels like an accidental deselect.
-        if (selectedScreenIndices.length > 1) {
-          return;
-        }
-
-        // Regular scroll = navigate between screens
-        // Debounce to prevent too rapid navigation
-        const now = Date.now();
-        if (now - lastScrollTime.current < 200) return;
-        lastScrollTime.current = now;
-
-        e.preventDefault();
-
-        // Get current primary selected screen index
-        const currentIndex = selectedScreenIndices.length > 0
-          ? selectedScreenIndices[selectedScreenIndices.length - 1]
-          : 0;
-
-        // Scroll down = next screen, scroll up = previous screen
-        let newIndex: number;
-        if (e.deltaY > 0) {
-          // Next screen
-          newIndex = Math.min(screens.length - 1, currentIndex + 1);
-        } else {
-          // Previous screen
-          newIndex = Math.max(0, currentIndex - 1);
-        }
-
-        // Select single screen (remove multi-selection)
-        if (newIndex !== currentIndex || selectedScreenIndices.length > 1) {
-          onSelectScreen(newIndex, false);
-        }
       }
     };
 
@@ -184,7 +150,7 @@ export function Canvas({
     return () => {
       container.removeEventListener('wheel', handleWheel);
     };
-  }, [zoom, onZoomChange, onSelectScreen, screens.length, selectedScreenIndices]);
+  }, [zoom, onZoomChange]);
 
   // Middle mouse button panning
   useEffect(() => {
