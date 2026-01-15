@@ -52,6 +52,72 @@ const snapRotation = (deg: number, snapPoints: number[], thresholdDeg: number) =
   return a;
 };
 
+type TextResizeHandle = 'left' | 'right' | 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
+
+const clamp = (v: number, min: number, max: number) => Math.max(min, Math.min(max, v));
+const degToRad = (deg: number) => (deg * Math.PI) / 180;
+const rotatePoint = (p: { x: number; y: number }, deg: number) => {
+  const r = degToRad(deg);
+  const c = Math.cos(r);
+  const s = Math.sin(r);
+  return { x: p.x * c - p.y * s, y: p.x * s + p.y * c };
+};
+
+const MIN_TEXT_BOX_WIDTH_PCT = 2; // allow very small boxes (Canva-like)
+const MAX_TEXT_BOX_WIDTH_PCT = 100;
+const MIN_TEXT_FONT_SIZE = 8;
+const MAX_TEXT_FONT_SIZE = 240;
+
+const HANDLE_SIZE = 10;
+const HANDLE_OFFSET = -8;
+
+const getTextHandleCursor = (handle: TextResizeHandle): string => {
+  switch (handle) {
+    case 'left':
+    case 'right':
+      return 'ew-resize';
+    case 'top-left':
+    case 'bottom-right':
+      return 'nwse-resize';
+    case 'top-right':
+    case 'bottom-left':
+      return 'nesw-resize';
+    default:
+      return 'pointer';
+  }
+};
+
+const getTextHandleStyle = (handle: TextResizeHandle): React.CSSProperties => {
+  const base: React.CSSProperties = {
+    position: 'absolute',
+    width: HANDLE_SIZE,
+    height: HANDLE_SIZE,
+    borderRadius: 999,
+    backgroundColor: 'white',
+    border: '2px solid #7950f2',
+    boxShadow: '0 2px 8px rgba(0,0,0,0.12)',
+    pointerEvents: 'auto',
+    zIndex: 51,
+  };
+
+  switch (handle) {
+    case 'top-left':
+      return { ...base, top: HANDLE_OFFSET, left: HANDLE_OFFSET };
+    case 'top-right':
+      return { ...base, top: HANDLE_OFFSET, right: HANDLE_OFFSET };
+    case 'bottom-left':
+      return { ...base, bottom: HANDLE_OFFSET, left: HANDLE_OFFSET };
+    case 'bottom-right':
+      return { ...base, bottom: HANDLE_OFFSET, right: HANDLE_OFFSET };
+    case 'left':
+      return { ...base, left: HANDLE_OFFSET, top: '50%', transform: 'translateY(-50%)' };
+    case 'right':
+      return { ...base, right: HANDLE_OFFSET, top: '50%', transform: 'translateY(-50%)' };
+    default:
+      return base;
+  }
+};
+
 const isEditableTarget = (target: EventTarget | null): boolean => {
   if (!target || !(target instanceof HTMLElement)) return false;
   if (target.isContentEditable) return true;
@@ -93,6 +159,14 @@ export function TextElement({
   const lastClickAtRef = useRef<number>(0);
   const dragPosRef = useRef<{ x: number; y: number } | null>(null);
   const dragRafRef = useRef<number | null>(null);
+  const resizeRafRef = useRef<number | null>(null);
+  const pendingVisualRef = useRef<{
+    x?: number;
+    y?: number;
+    boxWidthPct?: number;
+    fontSizePx?: number;
+    paddingPx?: number;
+  } | null>(null);
   const gestureTokenRef = useRef<string | null>(null);
   const ownerKey = `text:${element.id}`;
 
@@ -114,6 +188,10 @@ export function TextElement({
       if (dragRafRef.current != null) {
         cancelAnimationFrame(dragRafRef.current);
         dragRafRef.current = null;
+      }
+      if (resizeRafRef.current != null) {
+        cancelAnimationFrame(resizeRafRef.current);
+        resizeRafRef.current = null;
       }
     };
   }, []);
@@ -137,6 +215,25 @@ export function TextElement({
   const displayText = style.uppercase ? decodedText.toUpperCase() : decodedText;
 
   const effectiveRotation = rotationPreview ?? element.rotation;
+
+  const scheduleApplyResizeVisual = () => {
+    if (resizeRafRef.current != null) return;
+    resizeRafRef.current = window.requestAnimationFrame(() => {
+      resizeRafRef.current = null;
+      const el = rootRef.current;
+      const pending = pendingVisualRef.current;
+      if (!el || !pending) return;
+      if (typeof pending.x === 'number') el.style.left = `${pending.x}%`;
+      if (typeof pending.y === 'number') el.style.top = `${pending.y}%`;
+      if (typeof pending.boxWidthPct === 'number') el.style.width = `${pending.boxWidthPct}%`;
+      if (typeof pending.fontSizePx === 'number') {
+        el.style.setProperty('--appframes-text-font-size', `${pending.fontSizePx}px`);
+      }
+      if (typeof pending.paddingPx === 'number') {
+        el.style.setProperty('--appframes-text-bg-padding', `${pending.paddingPx}px`);
+      }
+    });
+  };
 
   const handleSelect = (e: React.MouseEvent) => {
     if (disabled) return;
@@ -235,18 +332,31 @@ export function TextElement({
     document.addEventListener('mouseup', handleEnd);
   };
 
-  const handleResizeMouseDown = (e: React.MouseEvent) => {
+  const handleTextResizeMouseDown = (handle: TextResizeHandle) => (e: React.MouseEvent) => {
     if (disabled) return;
     if (isEditing || isRotating || isDragging) return;
     e.preventDefault();
     e.stopPropagation();
     onSelect();
 
-    const parent = rootRef.current?.parentElement;
-    if (!parent) return;
+    const el = rootRef.current;
+    const parent = el?.parentElement;
+    if (!el || !parent) return;
+
     const parentRect = parent.getBoundingClientRect();
-    const startX = e.clientX;
-    const startMaxWidth = element.style.maxWidth;
+    const selfRect = el.getBoundingClientRect();
+
+    const startClient = { x: e.clientX, y: e.clientY };
+    const start = {
+      x: element.x,
+      y: element.y,
+      boxWidthPct: element.style.maxWidth,
+      boxWidthPx: (element.style.maxWidth / 100) * parentRect.width,
+      boxHeightPx: selfRect.height,
+      fontSizePx: element.style.fontSize,
+      paddingPx: element.style.backgroundPadding,
+      rotationDeg: effectiveRotation,
+    };
 
     setIsResizing(true);
     if (!gestureTokenRef.current) {
@@ -254,14 +364,106 @@ export function TextElement({
     }
 
     const handleMove = (moveEvent: MouseEvent) => {
-      const deltaX = moveEvent.clientX - startX;
-      const deltaPct = (deltaX / parentRect.width) * 100;
-      const next = Math.max(10, Math.min(100, startMaxWidth + deltaPct));
-      onUpdate({ style: { maxWidth: next } });
+      const deltaScreen = { x: moveEvent.clientX - startClient.x, y: moveEvent.clientY - startClient.y };
+      // Convert pointer delta into the element's local (un-rotated) space so resize feels correct when rotated.
+      const deltaLocal = rotatePoint(deltaScreen, -start.rotationDeg);
+
+      // Width resize (side handles): adjust the *box width* and shift the element center so the opposite edge stays anchored.
+      if (handle === 'left' || handle === 'right') {
+        const deltaWidthPct =
+          handle === 'right'
+            ? (deltaLocal.x / parentRect.width) * 100
+            : (-deltaLocal.x / parentRect.width) * 100;
+
+        const nextBoxWidthPct = clamp(
+          start.boxWidthPct + deltaWidthPct,
+          MIN_TEXT_BOX_WIDTH_PCT,
+          MAX_TEXT_BOX_WIDTH_PCT
+        );
+
+        const deltaBoxWidthPx = ((nextBoxWidthPct - start.boxWidthPct) / 100) * parentRect.width;
+        const centerShiftLocal = {
+          x: (deltaBoxWidthPx / 2) * (handle === 'right' ? 1 : -1),
+          y: 0,
+        };
+        const centerShiftScreen = rotatePoint(centerShiftLocal, start.rotationDeg);
+        const nextX = start.x + (centerShiftScreen.x / parentRect.width) * 100;
+        const nextY = start.y + (centerShiftScreen.y / parentRect.height) * 100;
+
+        pendingVisualRef.current = { x: nextX, y: nextY, boxWidthPct: nextBoxWidthPct };
+        scheduleApplyResizeVisual();
+        return;
+      }
+
+      // Corner handles: "scale" the text (font size + box size) proportionally (Canva-like).
+      const signX = handle.includes('right') ? 1 : -1;
+      const signY = handle.includes('bottom') ? 1 : -1;
+      const outwardX = signX * deltaLocal.x;
+      const outwardY = signY * deltaLocal.y;
+      const outward = (outwardX + outwardY) / 2;
+      const magnitude = Math.max(Math.abs(outwardX), Math.abs(outwardY));
+      const delta = Math.sign(outward) * magnitude;
+
+      // Sensitivity tuned so ~100px drag ≈ ~50% size change.
+      const scaleFactor = clamp(1 + delta * 0.005, 0.2, 5);
+
+      const nextFontSizePx = clamp(start.fontSizePx * scaleFactor, MIN_TEXT_FONT_SIZE, MAX_TEXT_FONT_SIZE);
+      const nextPaddingPx = clamp(start.paddingPx * scaleFactor, 0, 80);
+      const nextBoxWidthPct = clamp(
+        (start.boxWidthPx * scaleFactor / parentRect.width) * 100,
+        MIN_TEXT_BOX_WIDTH_PCT,
+        MAX_TEXT_BOX_WIDTH_PCT
+      );
+
+      const nextBoxHeightPx = start.boxHeightPx * scaleFactor;
+      const deltaW = (nextBoxWidthPct - start.boxWidthPct) / 100 * parentRect.width;
+      const deltaH = nextBoxHeightPx - start.boxHeightPx;
+
+      const centerShiftLocal = { x: (signX * deltaW) / 2, y: (signY * deltaH) / 2 };
+      const centerShiftScreen = rotatePoint(centerShiftLocal, start.rotationDeg);
+      const nextX = start.x + (centerShiftScreen.x / parentRect.width) * 100;
+      const nextY = start.y + (centerShiftScreen.y / parentRect.height) * 100;
+
+      pendingVisualRef.current = {
+        x: nextX,
+        y: nextY,
+        boxWidthPct: nextBoxWidthPct,
+        fontSizePx: nextFontSizePx,
+        paddingPx: nextPaddingPx,
+      };
+      scheduleApplyResizeVisual();
     };
 
     const handleEnd = () => {
       setIsResizing(false);
+
+      const finalPending = pendingVisualRef.current;
+      pendingVisualRef.current = null;
+      if (resizeRafRef.current != null) {
+        cancelAnimationFrame(resizeRafRef.current);
+        resizeRafRef.current = null;
+      }
+
+      // Commit to React state once (persistence + re-renders happen after gesture).
+      if (finalPending) {
+        const updates: Omit<Partial<TextElementModel>, 'style'> & { style?: Partial<TextStyle> } = {};
+        if (typeof finalPending.x === 'number') updates.x = finalPending.x;
+        if (typeof finalPending.y === 'number') updates.y = finalPending.y;
+        const styleUpdates: Partial<TextStyle> = {};
+        if (typeof finalPending.boxWidthPct === 'number') styleUpdates.maxWidth = finalPending.boxWidthPct;
+        if (typeof finalPending.fontSizePx === 'number') styleUpdates.fontSize = finalPending.fontSizePx;
+        if (typeof finalPending.paddingPx === 'number') styleUpdates.backgroundPadding = finalPending.paddingPx;
+        if (Object.keys(styleUpdates).length > 0) updates.style = styleUpdates;
+        if (Object.keys(updates).length > 0) onUpdate(updates);
+      }
+
+      // Ensure CSS vars snap back to state-driven values after commit.
+      const el = rootRef.current;
+      if (el) {
+        el.style.setProperty('--appframes-text-font-size', `${element.style.fontSize}px`);
+        el.style.setProperty('--appframes-text-bg-padding', `${element.style.backgroundPadding}px`);
+      }
+
       if (gestureTokenRef.current) {
         end(gestureTokenRef.current);
         gestureTokenRef.current = null;
@@ -353,7 +555,11 @@ export function TextElement({
         userSelect: isEditing ? 'text' : 'none',
         pointerEvents: disabled ? 'none' : 'auto',
         zIndex: selected ? 1000 : (element.zIndex ?? 1) + 10,
-        maxWidth: `${style.maxWidth}%`,
+        // Treat `style.maxWidth` as the editable text box width (Canva-like), not just a wrapping cap.
+        width: `${style.maxWidth}%`,
+        // Drive live resize previews via CSS vars (imperative updates) to avoid React rerenders per mousemove.
+        ['--appframes-text-font-size' as any]: `${style.fontSize}px`,
+        ['--appframes-text-bg-padding' as any]: `${style.backgroundPadding}px`,
       }}
       onMouseDown={handleMouseDown}
       onMouseUp={(e) => {
@@ -469,25 +675,38 @@ export function TextElement({
         </ActionIcon>
       )}
 
-      {/* Resize handle (adjusts maxWidth to control wrapping) */}
+      {/* Canva-style resize handles */}
       {effectiveSelected && !isEditing && (
         <Box
           data-export-hide="true"
-          onMouseDown={handleResizeMouseDown}
-          style={{
-            position: 'absolute',
-            right: -10,
-            top: '50%',
-            transform: 'translateY(-50%)',
-            width: 10,
-            height: 22,
-            borderRadius: 6,
-            backgroundColor: 'rgba(121, 80, 242, 0.95)',
-            boxShadow: '0 2px 10px rgba(0,0,0,0.15)',
-            cursor: 'ew-resize',
-          }}
-          title="Drag to resize text box"
-        />
+          style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 50 }}
+        >
+          {(
+            [
+              'top-left',
+              'top-right',
+              'bottom-right',
+              'bottom-left',
+              'left',
+              'right',
+            ] as TextResizeHandle[]
+          ).map((h) => (
+            <Box
+              key={h}
+              onMouseDown={handleTextResizeMouseDown(h)}
+              style={{
+                ...getTextHandleStyle(h),
+                cursor: getTextHandleCursor(h),
+                backgroundColor: isResizing ? '#7950f2' : 'white',
+              }}
+              title={
+                h === 'left' || h === 'right'
+                  ? 'Resize text box width'
+                  : 'Scale text (font size + box)'
+              }
+            />
+          ))}
+        </Box>
       )}
 
       {isEditing ? (
@@ -520,7 +739,7 @@ export function TextElement({
             styles={{
               input: {
                 fontFamily: style.fontFamily,
-                fontSize: style.fontSize,
+                fontSize: 'var(--appframes-text-font-size)',
                 fontWeight: style.fontWeight,
                 fontStyle: style.italic ? 'italic' : 'normal',
                 color: style.color,
@@ -531,7 +750,8 @@ export function TextElement({
                 border: 'none',
                 background: 'transparent',
                 padding: 0,
-                minWidth: 200,
+                width: '100%',
+                minWidth: 0,
                 resize: 'none',
               },
             }}
@@ -559,7 +779,7 @@ export function TextElement({
           {/* Actual text with background */}
           <Box
             style={{
-              padding: style.backgroundPadding,
+              padding: 'var(--appframes-text-bg-padding)',
               borderRadius: style.backgroundRadius,
               backgroundColor: bgColor,
             }}
@@ -567,7 +787,7 @@ export function TextElement({
             <Box
               style={{
                 fontFamily: style.fontFamily,
-                fontSize: style.fontSize,
+                fontSize: 'var(--appframes-text-font-size)',
                 fontWeight: style.fontWeight,
                 fontStyle: style.italic ? 'italic' : 'normal',
                 color: style.color,
