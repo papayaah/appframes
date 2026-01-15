@@ -4,26 +4,50 @@ import { Box, Text, Select, Slider, ColorInput, Switch, SegmentedControl, Divide
 import { IconChevronDown, IconChevronUp, IconItalic, IconLetterCase, IconAlignLeft, IconAlignCenter, IconAlignRight } from '@tabler/icons-react';
 import { useState } from 'react';
 import { TextStyle } from './types';
+import { ensureFontLoaded } from './fontLoader';
 
 interface TextStylePanelProps {
   style: TextStyle;
   onStyleChange: (updates: Partial<TextStyle>) => void;
 }
 
-// Available fonts (web-safe + Google Fonts commonly available)
-const FONT_OPTIONS = [
-  { value: 'Inter', label: 'Inter' },
-  { value: 'system-ui', label: 'System UI' },
+type FontOption = { value: string; label: string };
+
+// Available fonts (web-safe + Google Fonts + optional self-hosted).
+// Keep this list sorted so it's easy to scan, and enable search in the UI.
+const RAW_FONT_OPTIONS: FontOption[] = [
   { value: 'Arial', label: 'Arial' },
-  { value: 'Helvetica', label: 'Helvetica' },
-  { value: 'Georgia', label: 'Georgia' },
-  { value: 'Times New Roman', label: 'Times New Roman' },
-  { value: 'Courier New', label: 'Courier New' },
-  { value: 'Verdana', label: 'Verdana' },
-  { value: 'Trebuchet MS', label: 'Trebuchet MS' },
-  { value: 'Impact', label: 'Impact' },
   { value: 'Comic Sans MS', label: 'Comic Sans MS' },
+  { value: 'Courier New', label: 'Courier New' },
+  { value: 'EB Garamond', label: 'EB Garamond' },
+  { value: 'Glacial Indifference', label: 'Glacial Indifference' },
+  { value: 'Georgia', label: 'Georgia' },
+  { value: 'Helvetica', label: 'Helvetica' },
+  { value: 'Impact', label: 'Impact' },
+  { value: 'Inter', label: 'Inter' },
+  // Note: This font is commonly distributed as “personal use only” unless you purchase a commercial license.
+  { value: 'Jimmy Script', label: 'Jimmy Script (license required for commercial use)' },
+  { value: 'Lato', label: 'Lato' },
+  { value: 'Montserrat', label: 'Montserrat' },
+  { value: 'Noto Sans', label: 'Noto Sans' },
+  { value: 'Nunito', label: 'Nunito' },
+  { value: 'Open Sans', label: 'Open Sans' },
+  { value: 'Oswald', label: 'Oswald' },
+  { value: 'Playfair Display', label: 'Playfair Display' },
+  { value: 'Poppins', label: 'Poppins' },
+  { value: 'Raleway', label: 'Raleway' },
+  { value: 'Roboto', label: 'Roboto' },
+  { value: 'Roboto Condensed', label: 'Roboto Condensed' },
+  { value: 'Roboto Mono', label: 'Roboto Mono' },
+  { value: 'system-ui', label: 'System UI' },
+  { value: 'Times New Roman', label: 'Times New Roman' },
+  { value: 'Trebuchet MS', label: 'Trebuchet MS' },
+  { value: 'Verdana', label: 'Verdana' },
 ];
+
+const FONT_OPTIONS: FontOption[] = [...RAW_FONT_OPTIONS].sort((a, b) =>
+  a.label.localeCompare(b.label, undefined, { sensitivity: 'base' })
+);
 
 // Font weight options
 const WEIGHT_OPTIONS = [
@@ -55,8 +79,15 @@ export function TextStylePanel({ style, onStyleChange }: TextStylePanelProps) {
       <Select
         size="xs"
         data={FONT_OPTIONS}
+        searchable
+        nothingFoundMessage="No matching fonts"
+        maxDropdownHeight={260}
         value={style.fontFamily}
-        onChange={(value) => value && onStyleChange({ fontFamily: value })}
+        onChange={(value) => {
+          if (!value) return;
+          ensureFontLoaded(value);
+          onStyleChange({ fontFamily: value });
+        }}
         mb="md"
       />
 

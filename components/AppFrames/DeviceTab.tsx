@@ -21,6 +21,7 @@ interface DeviceOption {
 
 const devices: DeviceOption[] = [
   // PHONES - iOS
+  { id: 'iphone-frameless', name: 'Frameless', dimensions: 'No bezel', category: 'PHONES', subcategory: 'iOS' },
   { id: 'iphone-14-pro', name: 'iPhone 14 Pro', dimensions: 'Dynamic Island', category: 'PHONES', subcategory: 'iOS' },
   { id: 'iphone-14', name: 'iPhone 14', dimensions: 'Notch', category: 'PHONES', subcategory: 'iOS' },
   { id: 'iphone-13', name: 'iPhone 13', dimensions: 'Notch', category: 'PHONES', subcategory: 'iOS' },

@@ -51,12 +51,25 @@ interface DeviceConfig {
   radius: number;
   frameColor: string;
   screenRadius: number;
-  type: 'notch' | 'punch-hole' | 'tablet' | 'laptop' | 'monitor' | 'home-button' | 'dynamic-island';
+  type: 'notch' | 'punch-hole' | 'tablet' | 'laptop' | 'monitor' | 'home-button' | 'dynamic-island' | 'frameless';
   notchWidth?: number;
   bezelWidth?: number;
 }
 
 const getDeviceConfig = (deviceId: string = 'iphone-14-pro'): DeviceConfig => {
+  // Frameless phone (no visible bezel / black border)
+  if (deviceId === 'iphone-frameless') {
+    return {
+      width: 280,
+      height: 575,
+      radius: 52,
+      frameColor: 'transparent',
+      screenRadius: 52,
+      type: 'frameless',
+      bezelWidth: 0,
+    };
+  }
+
   // iPhone 14 Pro (Dynamic Island)
   if (deviceId === 'iphone-14-pro') {
     return {
@@ -458,6 +471,7 @@ export function DeviceFrame({
 
   // Adjust padding for iMac (chin)
   const imacChin = config.type === 'monitor' && deviceType?.includes('imac') ? 40 * scale : 0;
+  const isFrameless = config.type === 'frameless';
 
   const renderDecorations = () => {
     switch (config.type) {
@@ -649,16 +663,16 @@ export function DeviceFrame({
           width,
           height: height + imacChin, // Add chin height if iMac
           borderRadius: config.radius * scale,
-          background: `linear-gradient(145deg, ${config.frameColor}, ${config.frameColor})`,
-          paddingTop: topPadding,
-          paddingBottom: bottomPadding + imacChin,
-          paddingLeft: sidePadding,
-          paddingRight: sidePadding,
-          boxShadow: effectiveHighlighted
-            ? '0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 0 3px rgba(102, 126, 234, 0.8), 0 0 20px rgba(102, 126, 234, 0.5)'
-            : effectiveSelected
-              ? '0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 0 3px #667eea'
-              : '0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.1) inset',
+          background: isFrameless ? 'transparent' : `linear-gradient(145deg, ${config.frameColor}, ${config.frameColor})`,
+          paddingTop: isFrameless ? 0 : topPadding,
+          paddingBottom: (isFrameless ? 0 : bottomPadding) + imacChin,
+          paddingLeft: isFrameless ? 0 : sidePadding,
+          paddingRight: isFrameless ? 0 : sidePadding,
+          // IMPORTANT: Keep the base frame shadow stable. Selection/highlight rings are rendered
+          // as separate overlay elements so exports can drop them via `data-export-hide` filtering.
+          boxShadow: isFrameless
+            ? '0 18px 40px -14px rgba(0, 0, 0, 0.35)'
+            : '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
           position: 'relative',
           display: 'flex',
           flexDirection: 'column',
@@ -684,6 +698,37 @@ export function DeviceFrame({
           onClick();
         } : undefined}
       >
+        {/* Subtle inset border for non-frameless frames (part of the device look, keep in exports) */}
+        {!isFrameless && (
+          <Box
+            style={{
+              position: 'absolute',
+              inset: 0,
+              borderRadius: config.radius * scale,
+              pointerEvents: 'none',
+              boxShadow: 'inset 0 0 0 1px rgba(255, 255, 255, 0.1)',
+              zIndex: 1,
+            }}
+          />
+        )}
+
+        {/* Selection/highlight ring (UI only; excluded from exports) */}
+        {(effectiveHighlighted || effectiveSelected) && (
+          <Box
+            data-export-hide="true"
+            style={{
+              position: 'absolute',
+              inset: 0,
+              borderRadius: config.radius * scale,
+              pointerEvents: 'none',
+              zIndex: 2,
+              boxShadow: effectiveHighlighted
+                ? '0 0 0 3px rgba(102, 126, 234, 0.8), 0 0 20px rgba(102, 126, 234, 0.5)'
+                : '0 0 0 3px #667eea',
+            }}
+          />
+        )}
+
         {renderDecorations()}
 
         {/* Screen */}
@@ -696,7 +741,9 @@ export function DeviceFrame({
             backgroundColor: '#000',
             overflow: 'hidden',
             position: 'relative',
-            boxShadow: '0 0 0 1px rgba(255, 255, 255, 0.05) inset',
+            boxShadow: isFrameless
+              ? '0 0 0 1px rgba(0, 0, 0, 0.08)'
+              : '0 0 0 1px rgba(255, 255, 255, 0.05) inset',
             cursor: displayImage && onPanChange ? (isDragging ? 'grabbing' : 'grab') : 'pointer',
           }}
           onMouseDown={handleMouseDown}

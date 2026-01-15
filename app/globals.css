@@ -1,3 +1,39 @@
+/*
+  Google Fonts are lazy-loaded on demand (see `components/AppFrames/fontLoader.ts`).
+  This keeps initial page load fast even with a long font list.
+*/
+
+/*
+  Optional self-hosted fonts.
+
+  To enable these, add font files under `public/fonts/` with the names below.
+  (We can’t vendor font binaries in-repo here.)
+
+  - Glacial Indifference: commonly distributed under SIL OFL (e.g. Font Squirrel).
+  - Jimmy Script: often “free for personal use” — acquire a commercial license if needed.
+*/
+@font-face {
+  font-family: 'Glacial Indifference';
+  src: url('/fonts/GlacialIndifference-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Glacial Indifference';
+  src: url('/fonts/GlacialIndifference-Bold.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Jimmy Script';
+  src: url('/fonts/JimmyScript-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
 * {
   box-sizing: border-box;
 }

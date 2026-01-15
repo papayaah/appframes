@@ -335,6 +335,10 @@ export function Canvas({
 
           // Only show selection for the primary selected screen (last one)
           const isPrimaryScreen = screenIndex === selectedScreenIndices[selectedScreenIndices.length - 1];
+          // Only show *one* set of handles at a time:
+          // - If a text element is selected, suppress frame selection/handles.
+          const effectiveSelectedFrameIndex =
+            isPrimaryScreen && !screenSettings.selectedTextId ? selectedFrameIndex : undefined;
 
           return (
             <Box
@@ -394,7 +398,7 @@ export function Canvas({
                     hoveredFrameIndex={hoveredScreenIndex === screenIndex ? hoveredFrameIndex : null}
                     onFrameHover={setHoveredFrameIndex}
                     dragFileCount={dragFileCount}
-                    selectedFrameIndex={isPrimaryScreen ? selectedFrameIndex : undefined}
+                    selectedFrameIndex={effectiveSelectedFrameIndex}
                     onSelectFrame={isPrimaryScreen ? onSelectFrame : undefined}
                     onMediaSelect={(frameIndex, mediaId) => onMediaSelect?.(screenIndex, frameIndex, mediaId)}
                     onPexelsSelect={(frameIndex, url) => onPexelsSelect?.(screenIndex, frameIndex, url)}

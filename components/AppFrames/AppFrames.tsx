@@ -549,7 +549,12 @@ export function AppFrames() {
             screens={screens}
             selectedScreenIndices={selectedScreenIndices}
             selectedFrameIndex={selectedFrameIndex}
-            onSelectFrame={setSelectedFrameIndex}
+            onSelectFrame={(frameIndex) => {
+              setSelectedFrameIndex(frameIndex);
+              // Frame interactions stop propagation (for smooth drag/pan), so make sure
+              // selecting a frame explicitly clears any selected text element.
+              selectTextElement(null);
+            }}
             onSelectScreen={handleScreenSelect}
             zoom={zoom}
             onZoomChange={setZoom}

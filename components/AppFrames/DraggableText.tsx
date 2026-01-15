@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from 'react';
 import { Box, Textarea } from '@mantine/core';
 import ReactMarkdown from 'react-markdown';
 import { TextStyle, DEFAULT_TEXT_STYLE } from './types';
+import { ensureFontLoaded } from './fontLoader';
 
 // Decode HTML entities like &gt; &lt; &amp; etc.
 const decodeHtmlEntities = (text: string): string => {
@@ -56,6 +57,11 @@ export function DraggableText({
 }: DraggableTextProps) {
   // Merge provided style with defaults
   const style: TextStyle = { ...DEFAULT_TEXT_STYLE, ...styleProp };
+
+  // Lazy-load Google Fonts on demand.
+  useEffect(() => {
+    ensureFontLoaded(style?.fontFamily);
+  }, [style?.fontFamily]);
 
   const [isEditing, setIsEditing] = useState(false);
   const [isDragging, setIsDragging] = useState(false);

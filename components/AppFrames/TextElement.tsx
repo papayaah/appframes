@@ -6,6 +6,7 @@ import { IconRotate, IconTrash } from '@tabler/icons-react';
 import ReactMarkdown from 'react-markdown';
 import type { TextElement as TextElementModel, TextStyle } from './types';
 import { useInteractionLock } from './InteractionLockContext';
+import { ensureFontLoaded } from './fontLoader';
 
 // Decode HTML entities like &gt; &lt; &amp; etc.
 const decodeHtmlEntities = (text: string): string => {
@@ -118,6 +119,11 @@ export function TextElement({
   }, []);
 
   const style = element.style;
+
+  // Lazy-load Google Fonts on demand (avoids fetching a big font bundle at app start).
+  useEffect(() => {
+    ensureFontLoaded(style?.fontFamily);
+  }, [style?.fontFamily]);
 
   const textShadowCss = style.textShadow
     ? `${style.textShadowOffsetX}px ${style.textShadowOffsetY}px ${style.textShadowBlur}px ${style.textShadowColor}`
@@ -381,6 +387,7 @@ export function TextElement({
     >
       {/* Hover/selection border */}
       <Box
+        data-export-hide="true"
         style={{
           position: 'absolute',
           inset: -6,
