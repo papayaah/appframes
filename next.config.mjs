@@ -8,8 +8,7 @@ export default withBundleAnalyzer({
   reactStrictMode: false,
   experimental: {
     optimizePackageImports: ['@mantine/core', '@mantine/hooks'],
-    // Needed because `@reactkits.dev/better-auth-connect` is installed via `file:../buzzer/...`
-    // (a symlink outside the Next.js project root). Turbopack otherwise fails module resolution.
+    // Keep enabled so local packages/submodules work smoothly.
     externalDir: true,
   },
   transpilePackages: ['@reactkits.dev/better-auth-connect', '@reactkits.dev/react-media-library'],

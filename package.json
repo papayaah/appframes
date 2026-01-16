@@ -2,9 +2,12 @@
   "name": "appframes",
   "version": "1.0.0",
   "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
   "scripts": {
-    "dev": "next dev --webpack",
-    "build": "next build --webpack",
+    "dev": "next dev",
+    "build": "next build",
     "analyze": "ANALYZE=true next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",
@@ -23,8 +26,8 @@
     "@mantine/hooks": "8.3.9",
     "@mantine/notifications": "^8.3.9",
     "@next/bundle-analyzer": "^16.0.8",
-    "@reactkits.dev/better-auth-connect": "file:../buzzer/packages/better-auth-connect",
-    "@reactkits.dev/react-media-library": "file:../buzzer/packages/media-library",
+    "@reactkits.dev/better-auth-connect": "workspace:*",
+    "@reactkits.dev/react-media-library": "workspace:*",
     "@tabler/icons-react": "^3.35.0",
     "@types/jszip": "^3.4.0",
     "@vercel/analytics": "^1.6.1",

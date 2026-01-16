@@ -1,0 +1,8 @@
+[submodule "packages/media-library"]
+	path = packages/media-library
+	url = git@github.com:papayaah/react-media-library.git
+	branch = master
+[submodule "packages/better-auth-connect"]
+	path = packages/better-auth-connect
+	url = git@github.com:papayaah/better-auth-connect.git
+	branch = main
