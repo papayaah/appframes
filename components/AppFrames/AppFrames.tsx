@@ -80,73 +80,28 @@ export function AppFrames() {
     initPersistence();
   }, []);
 
-  const createThumbnail = useCallback((file: File): Promise<string> => {
-    return new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const img = new Image();
-        img.onload = () => {
-          const canvas = document.createElement('canvas');
-          const maxSize = 200;
-          let width = img.width;
-          let height = img.height;
-
-          if (width > height && width > maxSize) {
-            height = (height * maxSize) / width;
-            width = maxSize;
-          } else if (height >= width && height > maxSize) {
-            width = (width * maxSize) / height;
-            height = maxSize;
-          }
-
-          canvas.width = width;
-          canvas.height = height;
-          const ctx = canvas.getContext('2d');
-          ctx?.drawImage(img, 0, 0, width, height);
-          resolve(canvas.toDataURL('image/jpeg', 0.8));
-        };
-        img.src = e.target?.result as string;
-      };
-      reader.readAsDataURL(file);
-    });
-  }, []);
-
   const handleMediaUpload = useCallback(async (file: File): Promise<number | null> => {
     try {
-      const { persistenceDB } = await import('../../lib/PersistenceDB');
-      const { OPFSManager } = await import('../../lib/opfs');
+      const { saveFileToOpfs, addAssetToDB, getAssetType } = await import('@reactkits.dev/react-media-library');
 
-      // Save to OPFS
-      const fileName = `${Date.now()}-${file.name}`;
-      await OPFSManager.saveFile(fileName, file);
-
-      // Create thumbnail
-      const thumbnail = await createThumbnail(file);
-
-      // Get image dimensions
-      const img = await createImageBitmap(file);
-      const width = img.width;
-      const height = img.height;
-
-      // Save metadata to IndexedDB
-      const id = await persistenceDB.addMediaFile({
-        name: file.name,
-        fileHandle: fileName,
-        thumbnail,
-        width,
-        height,
+      const handleName = await saveFileToOpfs(file);
+      const id = await addAssetToDB({
+        handleName,
+        fileName: file.name,
+        fileType: getAssetType(file.type),
+        mimeType: file.type,
         size: file.size,
-        createdAt: new Date(),
-        updatedAt: new Date(),
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
       });
 
-      return id as number;
+      return typeof id === 'number' ? id : Number(id);
     } catch (error) {
       // eslint-disable-next-line no-console
       console.error('Error uploading media:', error);
       return null;
     }
-  }, [createThumbnail]);
+  }, []);
 
   // Paste clipboard screenshots/images into the currently selected frame
   useEffect(() => {
@@ -293,8 +248,8 @@ export function AppFrames() {
     try {
       const canvasSize = settings.canvasSize;
       const { toPng } = await import('html-to-image');
-      const { persistenceDB } = await import('../../lib/PersistenceDB');
-      const { OPFSManager } = await import('../../lib/opfs');
+      const { initDB, getFileFromOpfs } = await import('@reactkits.dev/react-media-library');
+      const mediaDb = await initDB();
 
       const fileToDataUrl = (file: File) =>
         new Promise<string>((resolve, reject) => {
@@ -328,9 +283,9 @@ export function AppFrames() {
 
           const mediaId = reverse.get(blobUrl);
           if (typeof mediaId === 'number' && Number.isFinite(mediaId)) {
-            const media = await persistenceDB.getMediaFile(mediaId);
-            if (media) {
-              const file = await OPFSManager.getFile(media.fileHandle);
+            const asset = await mediaDb.get('assets', mediaId);
+            if (asset) {
+              const file = await getFileFromOpfs(asset.handleName);
               if (file) {
                 const dataUrl = await fileToDataUrl(file);
                 blobToData.set(blobUrl, dataUrl);

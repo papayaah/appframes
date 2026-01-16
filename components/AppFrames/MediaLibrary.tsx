@@ -1,11 +1,43 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { Box, Text, SimpleGrid, ActionIcon, Loader, Center, Button } from '@mantine/core';
-import { Dropzone, IMAGE_MIME_TYPE } from '@mantine/dropzone';
-import { IconX, IconUpload, IconPhoto } from '@tabler/icons-react';
-import { persistenceDB, MediaFile } from '../../lib/PersistenceDB';
-import { OPFSManager } from '../../lib/opfs';
+import { useCallback, useMemo, useRef, useState } from 'react';
+import {
+  Badge,
+  Box,
+  Button,
+  Card,
+  Center,
+  Checkbox,
+  FileButton,
+  Image,
+  Loader,
+  Modal,
+  Skeleton,
+  Stack,
+  Text,
+  TextInput,
+  UnstyledButton,
+} from '@mantine/core';
+import { Select } from '@mantine/core';
+import {
+  IconAdjustmentsHorizontal,
+  IconCheck,
+  IconColumns,
+  IconFile,
+  IconFileText,
+  IconLayoutGrid,
+  IconList,
+  IconMusic,
+  IconPhoto,
+  IconSearch,
+  IconTrash,
+  IconUpload,
+  IconVideo,
+  IconX,
+  IconZoomIn,
+} from '@tabler/icons-react';
+import type { ComponentPreset, MediaAsset } from '@reactkits.dev/react-media-library';
+import { MediaGrid, MediaLibraryProvider, useMediaLibraryContext } from '@reactkits.dev/react-media-library';
 import { PexelsImagePicker } from './PexelsImagePicker';
 
 interface MediaLibraryProps {
@@ -13,263 +45,308 @@ interface MediaLibraryProps {
   selectedSlot?: number;
 }
 
-export function MediaLibrary({ onSelectMedia, selectedSlot }: MediaLibraryProps) {
-  const [mediaFiles, setMediaFiles] = useState<MediaFile[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [uploading, setUploading] = useState(false);
-  const [pexelsPickerOpen, setPexelsPickerOpen] = useState(false);
+const mantinePreset: ComponentPreset = {
+  Card: ({ children, onClick, selected, className, style }) => (
+    <Card
+      shadow="sm"
+      padding="md"
+      radius="md"
+      withBorder
+      onClick={onClick}
+      className={className}
+      style={{
+        cursor: onClick ? 'pointer' : 'default',
+        borderColor: selected ? 'var(--mantine-color-violet-6)' : undefined,
+        borderWidth: selected ? 2 : 1,
+        transition: 'all 0.15s',
+        ...style,
+      }}
+    >
+      {children}
+    </Card>
+  ),
 
-  useEffect(() => {
-    loadMedia();
-  }, []);
+  Button: ({ children, onClick, variant = 'primary', disabled, loading, size = 'md', fullWidth, leftIcon, className, ...rest }) => {
+    const variantMap = {
+      primary: 'filled',
+      secondary: 'light',
+      danger: 'filled',
+      outline: 'outline',
+    } as const;
 
-  const loadMedia = async () => {
-    try {
-      const files = await persistenceDB.getAllMediaFiles();
-      setMediaFiles(files.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()));
-    } catch (error) {
-      console.error('Error loading media:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const createThumbnail = (file: File): Promise<string> => {
-    return new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const img = new Image();
-        img.onload = () => {
-          const canvas = document.createElement('canvas');
-          const maxSize = 200;
-          let width = img.width;
-          let height = img.height;
-
-          if (width > height) {
-            if (width > maxSize) {
-              height = (height * maxSize) / width;
-              width = maxSize;
-            }
-          } else {
-            if (height > maxSize) {
-              width = (width * maxSize) / height;
-              height = maxSize;
-            }
-          }
-
-          canvas.width = width;
-          canvas.height = height;
-          const ctx = canvas.getContext('2d');
-          ctx?.drawImage(img, 0, 0, width, height);
-          resolve(canvas.toDataURL('image/jpeg', 0.8));
-        };
-        img.src = e.target?.result as string;
-      };
-      reader.readAsDataURL(file);
-    });
-  };
-
-  const handleDrop = async (files: File[]) => {
-    setUploading(true);
-    try {
-      for (const file of files) {
-        // Save to OPFS
-        const fileName = `${Date.now()}-${file.name}`;
-        await OPFSManager.saveFile(fileName, file);
-
-        // Create thumbnail
-        const thumbnail = await createThumbnail(file);
-
-        // Get image dimensions
-        const img = await createImageBitmap(file);
-        const width = img.width;
-        const height = img.height;
-
-        // Save metadata to IndexedDB
-        await persistenceDB.addMediaFile({
-          name: file.name,
-          fileHandle: fileName,
-          thumbnail,
-          width,
-          height,
-          size: file.size,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        });
-      }
-      await loadMedia();
-    } catch (error) {
-      console.error('Error uploading files:', error);
-      alert('Failed to upload files');
-    } finally {
-      setUploading(false);
-    }
-  };
-
-  const handleDelete = async (id: number, fileHandle: string) => {
-    try {
-      await persistenceDB.deleteMediaFile(id);
-      await OPFSManager.deleteFile(fileHandle);
-      await loadMedia();
-    } catch (error) {
-      console.error('Error deleting file:', error);
-    }
-  };
-
-  if (loading) {
     return (
-      <Center p="xl">
-        <Loader size="sm" />
-      </Center>
+      <Button
+        onClick={onClick}
+        variant={variantMap[variant]}
+        color={variant === 'danger' ? 'red' : 'violet'}
+        disabled={disabled}
+        loading={loading}
+        size={size}
+        fullWidth={fullWidth}
+        leftSection={leftIcon}
+        className={className}
+        {...rest}
+      >
+        {children}
+      </Button>
     );
-  }
+  },
+
+  TextInput: ({ value, onChange, placeholder, type, leftIcon, className }) => (
+    <TextInput
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      placeholder={placeholder}
+      type={type}
+      leftSection={leftIcon}
+      className={className}
+    />
+  ),
+
+  Select: ({ value, onChange, options, placeholder, label, 'aria-label': ariaLabel, className }) => (
+    <Select
+      value={value}
+      onChange={(val) => onChange(val || '')}
+      placeholder={placeholder}
+      label={label}
+      aria-label={!label ? (ariaLabel || placeholder) : undefined}
+      data={options}
+      className={className}
+    />
+  ),
+
+  Checkbox: ({ checked, onChange, label, className }) => (
+    <Checkbox checked={checked} onChange={(e) => onChange(e.target.checked)} label={label} className={className} />
+  ),
+
+  Badge: ({ children, variant = 'default', className }) => {
+    const variantMap = {
+      default: 'light',
+      primary: 'filled',
+      secondary: 'outline',
+    } as const;
+    return (
+      <Badge variant={variantMap[variant]} size="sm" className={className}>
+        {children}
+      </Badge>
+    );
+  },
+
+  Image: ({ src, alt, className, onLoad, style, loading, decoding }) => (
+    <Image
+      src={src}
+      alt={alt}
+      className={className}
+      style={style}
+      fit="cover"
+      w="100%"
+      h="100%"
+      loading={loading}
+      decoding={decoding}
+      onLoad={onLoad}
+    />
+  ),
+
+  Modal: ({ isOpen, onClose, title, children }) => (
+    <Modal opened={isOpen} onClose={onClose} title={title} size="xl">
+      {children}
+    </Modal>
+  ),
+
+  Loader: ({ size = 'md', className }) => <Loader size={size} className={className} />,
+
+  EmptyState: ({ icon, message, className }) => (
+    <Center p="xl" className={className}>
+      <Stack align="center" gap="md">
+        {icon}
+        <Text c="dimmed">{message}</Text>
+      </Stack>
+    </Center>
+  ),
+
+  FileButton: ({ onSelect, multiple, disabled, children }) => (
+    <FileButton onChange={(files) => files && onSelect(Array.isArray(files) ? files : [files])} multiple={multiple} disabled={disabled}>
+      {(props) => <div {...props}>{children}</div>}
+    </FileButton>
+  ),
+
+  Grid: ({ children, className, columns = 4, gap = '1rem' }) => (
+    <div
+      className={className}
+      style={{
+        display: 'grid',
+        gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`,
+        gap,
+      }}
+    >
+      {children}
+    </div>
+  ),
+
+  Skeleton: ({ className }) => <Skeleton className={className} style={{ width: '100%', height: '100%' }} />,
+
+  UploadCard: ({ onClick, isDragging, className, children }) => (
+    <UnstyledButton
+      onClick={onClick}
+      className={className}
+      style={{
+        height: '100%',
+        width: '100%',
+        minHeight: 160,
+        border: `2px dashed ${isDragging ? 'var(--mantine-color-violet-6)' : 'var(--mantine-color-gray-4)'}`,
+        borderRadius: 'var(--mantine-radius-md)',
+        backgroundColor: isDragging ? 'var(--mantine-color-violet-0)' : 'transparent',
+        transition: 'all 0.15s',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
+    >
+      {children}
+    </UnstyledButton>
+  ),
+
+  Viewer: ({ isOpen, onClose, main, sidebar, actions }: any) => (
+    <Modal opened={isOpen} onClose={onClose} fullScreen withCloseButton={false} padding={0} styles={{ body: { height: '100vh', display: 'flex' } }}>
+      <div
+        style={{
+          flex: 1,
+          position: 'relative',
+          backgroundColor: 'var(--mantine-color-body)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        {main}
+        <div style={{ position: 'absolute', top: '1rem', right: '1rem', zIndex: 10 }}>{actions}</div>
+      </div>
+      <div
+        style={{
+          width: 250,
+          borderLeft: '1px solid light-dark(var(--mantine-color-gray-3), var(--mantine-color-dark-4))',
+          backgroundColor: 'light-dark(var(--mantine-color-gray-0), var(--mantine-color-dark-8))',
+          display: 'flex',
+          flexDirection: 'column',
+        }}
+      >
+        <div style={{ padding: '1rem', borderBottom: '1px solid light-dark(var(--mantine-color-gray-3), var(--mantine-color-dark-4))' }}>
+          <Text fw={500} c="dimmed" size="sm">
+            Library
+          </Text>
+        </div>
+        <div style={{ flex: 1, overflowY: 'auto', padding: '0.5rem' }}>{sidebar}</div>
+      </div>
+    </Modal>
+  ),
+
+  ViewerThumbnail: ({ src, alt, selected, onClick }: any) => (
+    <UnstyledButton
+      onClick={onClick}
+      style={{
+        width: '100%',
+        aspectRatio: '1/1',
+        borderRadius: 'var(--mantine-radius-md)',
+        overflow: 'hidden',
+        border: selected ? '2px solid var(--mantine-color-violet-6)' : '2px solid transparent',
+        opacity: selected ? 1 : 0.6,
+        transition: 'all 0.15s',
+        backgroundColor: 'light-dark(var(--mantine-color-gray-1), var(--mantine-color-dark-6))',
+      }}
+    >
+      <Image src={src} alt={alt} fit="contain" w="100%" h="100%" />
+    </UnstyledButton>
+  ),
+};
+
+function MediaLibraryContent({ onSelectMedia, selectedSlot }: MediaLibraryProps) {
+  const { uploadFiles } = useMediaLibraryContext();
+  const [pexelsPickerOpen, setPexelsPickerOpen] = useState(false);
+  const prevSelectedIdsRef = useRef<Set<number>>(new Set());
+
+  const icons = useMemo(
+    () => ({
+      upload: IconUpload,
+      search: IconSearch,
+      trash: IconTrash,
+      photo: IconPhoto,
+      video: IconVideo,
+      audio: IconMusic,
+      document: IconFileText,
+      file: IconFile,
+      layoutGrid: IconLayoutGrid,
+      list: IconList,
+      columns: IconColumns,
+      slidersHorizontal: IconAdjustmentsHorizontal,
+      check: IconCheck,
+      x: IconX,
+      zoomIn: IconZoomIn,
+    }),
+    []
+  );
+
+  const handleSelectionChange = useCallback(
+    (selectedAssets: MediaAsset[]) => {
+      const next = new Set<number>(
+        selectedAssets
+          .map((a) => a.id)
+          .filter((id): id is number => typeof id === 'number' && Number.isFinite(id))
+      );
+
+      const prev = prevSelectedIdsRef.current;
+      let newlyAdded: number | null = null;
+      const nextArr = Array.from(next);
+      for (let i = 0; i < nextArr.length; i += 1) {
+        const id = nextArr[i]!;
+        if (!prev.has(id)) {
+          newlyAdded = id;
+          break;
+        }
+      }
+
+      // If nothing new was added but exactly one item is selected, treat that as the selection.
+      if (newlyAdded == null && next.size === 1) {
+        newlyAdded = Array.from(next)[0]!;
+      }
+
+      prevSelectedIdsRef.current = next;
+      if (newlyAdded != null) onSelectMedia(newlyAdded);
+    },
+    [onSelectMedia]
+  );
 
   return (
     <Box p="md" style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-      <Box mb="xs">
-        <Text size="sm" fw={700} mb={4}>
-          Media
-        </Text>
-        {selectedSlot !== undefined && (
-          <Text size="xs" c="dimmed">
-            APPLIES TO SLOT {selectedSlot + 1}
+      <Box mb="xs" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+        <Box>
+          <Text size="sm" fw={700} mb={4}>
+            Media
           </Text>
-        )}
+          {selectedSlot !== undefined && (
+            <Text size="xs" c="dimmed">
+              APPLIES TO SLOT {selectedSlot + 1}
+            </Text>
+          )}
+        </Box>
+
+        <Button variant="light" size="xs" leftSection={<IconPhoto size={14} />} onClick={() => setPexelsPickerOpen(true)}>
+          Pexels
+        </Button>
       </Box>
 
-      <Dropzone
-        onDrop={handleDrop}
-        accept={IMAGE_MIME_TYPE}
-        loading={uploading}
-        style={{
-          border: '2px dashed #dee2e6',
-          borderRadius: 8,
-          padding: 0,
-          minHeight: 'auto',
-          marginBottom: 16,
-          flexShrink: 0,
-        }}
-      >
-        <Center p="md">
-          <Box style={{ textAlign: 'center' }}>
-            <IconUpload size={24} color="#868e96" style={{ margin: '0 auto 8px' }} />
-            <Text size="sm" fw={500} c="dimmed">
-              Click to Upload
-            </Text>
-            <Text size="xs" c="dimmed">
-              or drag and drop
-            </Text>
-          </Box>
-        </Center>
-      </Dropzone>
+      <PexelsImagePicker opened={pexelsPickerOpen} onClose={() => setPexelsPickerOpen(false)} onImport={uploadFiles} />
 
-      <Button
-        variant="light"
-        size="xs"
-        leftSection={<IconPhoto size={14} />}
-        onClick={() => setPexelsPickerOpen(true)}
-        mb="md"
-        fullWidth
-      >
-        Browse Pexels Images
-      </Button>
-
-      <PexelsImagePicker
-        opened={pexelsPickerOpen}
-        onClose={() => setPexelsPickerOpen(false)}
-        onImport={handleDrop}
-      />
-
-      <Text size="xs" fw={700} c="dimmed" mb="xs" tt="uppercase">
-        Library
-      </Text>
-
-      <Box style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden' }}>
-        <SimpleGrid cols={2} spacing="xs">
-          {mediaFiles.map((media) => (
-            <Box
-              key={media.id}
-              style={{
-                position: 'relative',
-                aspectRatio: '1',
-                borderRadius: 8,
-                overflow: 'hidden',
-                cursor: 'pointer',
-                border: '1px solid #dee2e6',
-                transition: 'all 0.2s',
-              }}
-              onClick={() => media.id && onSelectMedia(media.id)}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.borderColor = '#667eea';
-                e.currentTarget.style.transform = 'scale(1.02)';
-                const deleteBtn = e.currentTarget.querySelector('.delete-btn') as HTMLElement;
-                if (deleteBtn) deleteBtn.style.opacity = '1';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.borderColor = '#dee2e6';
-                e.currentTarget.style.transform = 'scale(1)';
-                const deleteBtn = e.currentTarget.querySelector('.delete-btn') as HTMLElement;
-                if (deleteBtn) deleteBtn.style.opacity = '0';
-              }}
-            >
-              <img
-                src={media.thumbnail}
-                alt={media.name}
-                style={{
-                  width: '100%',
-                  height: '100%',
-                  objectFit: 'cover',
-                }}
-                draggable
-                onDragStart={(e) => {
-                  e.dataTransfer.setData('mediaId', String(media.id));
-                }}
-              />
-              <ActionIcon
-                size="xs"
-                color="red"
-                variant="filled"
-                className="delete-btn"
-                style={{
-                  position: 'absolute',
-                  top: 4,
-                  right: 4,
-                  opacity: 0,
-                  transition: 'opacity 0.2s',
-                }}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  media.id && handleDelete(media.id, media.fileHandle);
-                }}
-              >
-                <IconX size={12} />
-              </ActionIcon>
-              <Box
-                style={{
-                  position: 'absolute',
-                  bottom: 0,
-                  left: 0,
-                  right: 0,
-                  padding: 4,
-                  background: 'linear-gradient(to top, rgba(0,0,0,0.7), transparent)',
-                }}
-              >
-                <Text
-                  size="xs"
-                  c="white"
-                  style={{
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
-                  }}
-                >
-                  {media.name}
-                </Text>
-              </Box>
-            </Box>
-          ))}
-        </SimpleGrid>
+      <Box style={{ flex: 1, overflow: 'auto' }}>
+        <MediaGrid preset={mantinePreset} icons={icons as any} onSelectionChange={handleSelectionChange} />
       </Box>
     </Box>
+  );
+}
+
+export function MediaLibrary(props: MediaLibraryProps) {
+  return (
+    <MediaLibraryProvider enableDragDrop={true}>
+      <MediaLibraryContent {...props} />
+    </MediaLibraryProvider>
   );
 }

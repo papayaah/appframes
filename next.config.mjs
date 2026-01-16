@@ -12,5 +12,5 @@ export default withBundleAnalyzer({
     // (a symlink outside the Next.js project root). Turbopack otherwise fails module resolution.
     externalDir: true,
   },
-  transpilePackages: ['@reactkits.dev/better-auth-connect'],
+  transpilePackages: ['@reactkits.dev/better-auth-connect', '@reactkits.dev/react-media-library'],
 });

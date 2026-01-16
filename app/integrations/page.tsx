@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { Box, Button, Container, Group, Stack, Text, Title } from '@mantine/core';
-import { GOOGLE_PERMISSIONS, IntegrationCard } from '@reactkits.dev/better-auth-connect';
+import { IntegrationCard } from '@reactkits.dev/better-auth-connect';
 import { mantinePreset } from '@reactkits.dev/better-auth-connect/presets/mantine';
 import { useAuthSession } from '@reactkits.dev/better-auth-connect';
 
@@ -10,7 +10,6 @@ import { integrationIcons } from '@/components/Auth/integrationIcons';
 
 export default function IntegrationsPage() {
   const { session, loading } = useAuthSession();
-  const googleMinimalPermissionIds = GOOGLE_PERMISSIONS.filter((p) => p.required).map((p) => p.id);
 
   return (
     <Container size="md" py="xl">
@@ -38,7 +37,6 @@ export default function IntegrationsPage() {
           platform="google"
           preset={mantinePreset}
           icons={integrationIcons}
-          permissionIds={googleMinimalPermissionIds}
         />
       </Stack>
     </Container>

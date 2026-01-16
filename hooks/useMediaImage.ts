@@ -1,6 +1,5 @@
 import { useContext, useEffect, useState } from 'react';
-import { persistenceDB } from '../lib/PersistenceDB';
-import { OPFSManager } from '../lib/opfs';
+import { getFileFromOpfs, initDB } from '@reactkits.dev/react-media-library';
 import { FramesContextInternal } from '../components/AppFrames/FramesContext';
 
 // Fallback cache used when `FramesProvider` is not present (e.g. off-screen export rendering).
@@ -47,8 +46,9 @@ export function useMediaImage(mediaId: number | undefined) {
           return;
         }
 
-        const media = await persistenceDB.getMediaFile(mediaId);
-        if (!media) {
+        const db = await initDB();
+        const asset = await db.get('assets', mediaId);
+        if (!asset) {
           if (active) {
             setImageUrl(undefined);
             setLoading(false);
@@ -56,7 +56,7 @@ export function useMediaImage(mediaId: number | undefined) {
           return;
         }
 
-        const file = await OPFSManager.getFile(media.fileHandle);
+        const file = await getFileFromOpfs(asset.handleName);
         if (file) {
           const objectUrl = URL.createObjectURL(file);
           
