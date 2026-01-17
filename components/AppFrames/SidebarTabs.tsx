@@ -197,13 +197,7 @@ export function SidebarTabs({
             </Tabs.Panel>
 
             <Tabs.Panel value="device" style={{ height: '100%' }}>
-              <DeviceTab 
-                settings={settings} 
-                setSettings={setSettings}
-                selectedFrameIndex={selectedFrameIndex}
-                onFrameDeviceChange={onFrameDeviceChange}
-                screens={screens}
-              />
+              <DeviceTab />
             </Tabs.Panel>
 
             <Tabs.Panel value="text" style={{ height: '100%' }}>

@@ -212,10 +212,13 @@ const DraggableFrame = ({
         position: baseStyleNoTransform.position ?? 'relative',
         // For side-by-side layouts, use fixed width to prevent shifting
         ...(fixedWidth ? {
-          minWidth: 300,
           display: 'flex',
           justifyContent: 'center',
           alignItems: 'center',
+          // Important: don't force a large min-width; the canvas clips overflow,
+          // so big layout boxes can hide other frames entirely (transforms don't affect layout size).
+          minWidth: 0,
+          flex: '0 1 auto',
         } : {}),
       }}
     >
@@ -502,7 +505,15 @@ export function CompositionRenderer({
       const isClearedTriple2 = images[2]?.cleared === true || images[2]?.deviceFrame === '';
       return (
         <Box style={{ height: '100%', perspective: '2000px', perspectiveOrigin: 'center center' }}>
-          <Center style={{ height: '100%', gap: 15 }}>
+          <Center
+            style={{
+              height: '100%',
+              gap: 12,
+              flexWrap: 'wrap',
+              alignContent: 'center',
+              padding: 12,
+            }}
+          >
             <DraggableFrame
               frameX={tripleOffset0.frameX}
               frameY={tripleOffset0.frameY}
@@ -517,7 +528,7 @@ export function CompositionRenderer({
               onRotate={isClearedTriple0 ? undefined : (next) => onFrameRotateChange?.(0, next)}
               gestureOwnerKey={`frame:${screen.id}:0`}
             >
-              {isClearedTriple0 ? null : <DeviceFrame {...getFrameProps(0, 0.75)} />}
+              {isClearedTriple0 ? null : <DeviceFrame {...getFrameProps(0, 0.68)} />}
             </DraggableFrame>
             <DraggableFrame
               frameX={tripleOffset1.frameX}
@@ -533,7 +544,7 @@ export function CompositionRenderer({
               onRotate={isClearedTriple1 ? undefined : (next) => onFrameRotateChange?.(1, next)}
               gestureOwnerKey={`frame:${screen.id}:1`}
             >
-              {isClearedTriple1 ? null : <DeviceFrame {...getFrameProps(1, 0.75)} />}
+              {isClearedTriple1 ? null : <DeviceFrame {...getFrameProps(1, 0.68)} />}
             </DraggableFrame>
             <DraggableFrame
               frameX={tripleOffset2.frameX}
@@ -549,7 +560,7 @@ export function CompositionRenderer({
               onRotate={isClearedTriple2 ? undefined : (next) => onFrameRotateChange?.(2, next)}
               gestureOwnerKey={`frame:${screen.id}:2`}
             >
-              {isClearedTriple2 ? null : <DeviceFrame {...getFrameProps(2, 0.75)} />}
+              {isClearedTriple2 ? null : <DeviceFrame {...getFrameProps(2, 0.68)} />}
             </DraggableFrame>
           </Center>
         </Box>

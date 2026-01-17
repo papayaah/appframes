@@ -1,15 +1,8 @@
 'use client';
 
-import { Stack, Text, Box, ScrollArea } from '@mantine/core';
-import { CanvasSettings } from './AppFrames';
-
-interface DeviceTabProps {
-  settings: CanvasSettings;
-  setSettings: (settings: CanvasSettings) => void;
-  selectedFrameIndex?: number;
-  onFrameDeviceChange?: (frameIndex: number, deviceFrame: string) => void;
-  screens?: any[]; // To access current screen's images
-}
+import { Stack, Text, Box, ScrollArea, Group, Button } from '@mantine/core';
+import { IconPlus } from '@tabler/icons-react';
+import { useFrames, getCompositionFrameCount } from './FramesContext';
 
 interface DeviceOption {
   id: string;
@@ -128,16 +121,20 @@ const DeviceButton = ({
 );
 
 export function DeviceTab({ 
-  settings, 
-  setSettings, 
-  selectedFrameIndex = 0,
-  onFrameDeviceChange,
-  screens = []
-}: DeviceTabProps) {
+}: {}) {
+  const {
+    screens,
+    primarySelectedIndex,
+    selectedFrameIndex,
+    setSelectedFrameIndex,
+    setFrameDevice,
+    addFrameSlot,
+    selectTextElement,
+  } = useFrames();
   const categories = ['PHONES', 'TABLETS', 'LAPTOPS', 'DESKTOPS'];
 
   // Get current screen and its images
-  const currentScreen = screens[settings.selectedScreenIndex];
+  const currentScreen = screens[primarySelectedIndex];
   const currentImages = currentScreen?.images || [];
   
   // Get the device frame for the selected frame
@@ -145,20 +142,57 @@ export function DeviceTab({
   const isCleared = currentImages[selectedFrameIndex]?.cleared === true || rawDeviceFrame === '';
   const currentDeviceFrame = isCleared ? '' : (rawDeviceFrame || 'iphone-14-pro');
 
+  const currentFrameCount = getCompositionFrameCount(currentScreen?.settings?.composition ?? 'single');
+  const canAddFrame = currentFrameCount < 3;
+
   const handleDeviceSelect = (deviceId: string) => {
-    if (onFrameDeviceChange) {
-      onFrameDeviceChange(selectedFrameIndex, deviceId);
-    }
+    setFrameDevice(primarySelectedIndex, selectedFrameIndex, deviceId);
   };
 
   return (
     <ScrollArea style={{ height: '100%' }}>
       <Stack gap="xl" p="md">
+        <Group justify="space-between" align="center">
+          <Text fw={700}>Frame</Text>
+          <Button
+            size="xs"
+            leftSection={<IconPlus size={14} />}
+            disabled={!currentScreen || !canAddFrame}
+            onClick={() => {
+              if (!currentScreen) return;
+              // Keep selection semantics consistent: frames and text are mutually exclusive.
+              selectTextElement(null);
+              addFrameSlot();
+            }}
+          >
+            Add Frame
+          </Button>
+        </Group>
+
+        {currentScreen && currentFrameCount > 1 && (
+          <Group gap="xs">
+            {Array.from({ length: currentFrameCount }).map((_, i) => (
+              <Button
+                key={i}
+                size="xs"
+                variant={selectedFrameIndex === i ? 'filled' : 'light'}
+                onClick={() => {
+                  // Keep selection semantics consistent: frames and text are mutually exclusive.
+                  selectTextElement(null);
+                  setSelectedFrameIndex(i);
+                }}
+              >
+                Frame {i + 1}
+              </Button>
+            ))}
+          </Group>
+        )}
+
         {/* Show which frame is being edited */}
-        {onFrameDeviceChange && (
+        {currentScreen && (
           <Box p="xs" style={{ backgroundColor: '#f8f9ff', borderRadius: 8 }}>
             <Text size="xs" c="dimmed" fw={500}>
-              Editing Frame {selectedFrameIndex + 1}
+              Editing Frame {selectedFrameIndex + 1} of {currentFrameCount}
             </Text>
           </Box>
         )}

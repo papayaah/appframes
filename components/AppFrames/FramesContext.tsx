@@ -194,6 +194,7 @@ interface FramesContextType {
   settings: CanvasSettings;
   handleScreenSelect: (index: number, multi: boolean) => void;
   addScreen: (imageOrMediaId?: string | number) => void;
+  addFrameSlot: () => void;
   updateSelectedScreenSettings: (updates: Partial<Omit<CanvasSettings, 'selectedScreenIndex'>>) => void;
   setSettings: (newSettings: CanvasSettings | ((prev: CanvasSettings) => CanvasSettings)) => void;
   removeScreen: (id: string) => void;
@@ -498,11 +499,12 @@ export function FramesProvider({ children }: { children: ReactNode }) {
     commitCurrentScreens(label, (list) => {
       const screen = list[primarySelectedIndex];
       if (!screen) return;
+      const prevComposition = screen.settings.composition;
       screen.settings = { ...screen.settings, ...updates };
 
       // If composition changed, resize images array to match new composition
       // and reset frame positions to default
-      if (updates.composition && updates.composition !== screen.settings.composition) {
+      if (updates.composition && updates.composition !== prevComposition) {
         const newFrameCount = getCompositionFrameCount(updates.composition);
         const imgs = [...(screen.images || [])].map((img) => ({
           ...img,
@@ -514,6 +516,33 @@ export function FramesProvider({ children }: { children: ReactNode }) {
       }
     });
   };
+
+  const addFrameSlot = useCallback(() => {
+    const screen = screens[primarySelectedIndex];
+    const currentComposition = screen?.settings?.composition ?? 'single';
+    const currentCount = getCompositionFrameCount(currentComposition);
+    if (!screen) return;
+    if (currentCount >= 3) return;
+
+    const nextComposition =
+      currentComposition === 'single' ? 'dual'
+      : currentComposition === 'dual' || currentComposition === 'stack' ? 'triple'
+      : 'triple';
+
+    const nextCount = getCompositionFrameCount(nextComposition);
+
+    commitCurrentScreens('Add frame', (list) => {
+      const s = list[primarySelectedIndex];
+      if (!s) return;
+      s.settings = { ...s.settings, composition: nextComposition };
+      const imgs = [...(s.images || [])];
+      while (imgs.length < nextCount) imgs.push({ deviceFrame: 'iphone-14-pro', frameX: 0, frameY: 0 });
+      s.images = imgs.slice(0, nextCount);
+    });
+
+    // Select the newly-added frame slot.
+    setSelectedFrameIndex(nextCount - 1);
+  }, [commitCurrentScreens, primarySelectedIndex, screens, setSelectedFrameIndex]);
 
   // Set settings (for backward compatibility, updates selected screen)
   const setSettings = (newSettings: CanvasSettings | ((prev: CanvasSettings) => CanvasSettings)) => {
@@ -1191,6 +1220,7 @@ export function FramesProvider({ children }: { children: ReactNode }) {
         settings,
         handleScreenSelect,
         addScreen,
+        addFrameSlot,
         updateSelectedScreenSettings,
         setSettings,
         removeScreen,
