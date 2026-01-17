@@ -2,6 +2,12 @@
 
 > For implementation-level details of cross-device project sync (API contracts, conflicts, deletions, “claim local projects”), see `specs/cross-device-project-sync.md`.
 
+## Status / do we still need this doc?
+
+- **Local state persistence is already implemented** (IndexedDB via `idb` + debounced saves).
+- This doc is only needed if we still want **remote sync (IndexedDB → Postgres)** on the roadmap.
+  - If we’re not doing remote sync anytime soon, we can delete this file and keep the local persistence behavior as code-only (or move it into a smaller dedicated “Local persistence” note).
+
 ## Goals
 
 - **Offline-first UX**: all edits are instant and work with no network.

@@ -3,7 +3,7 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { Group, Text, ActionIcon, Box, Slider, Tooltip, Menu, Button, Modal, TextInput, Stack, Badge } from '@mantine/core';
-import { IconDownload, IconChevronDown, IconPlus, IconEdit, IconTrash, IconFolder, IconCheck, IconAlertCircle, IconUser } from '@tabler/icons-react';
+import { IconDownload, IconChevronDown, IconPlus, IconEdit, IconTrash, IconFolder, IconCheck, IconAlertCircle, IconUser, IconHistory } from '@tabler/icons-react';
 import { useState, useEffect } from 'react';
 import type { Project } from '@/lib/PersistenceDB';
 
@@ -23,6 +23,8 @@ interface HeaderProps {
   onGetAllProjects?: () => Promise<Project[]>;
   // Save status
   saveStatus?: 'idle' | 'saving' | 'saved' | 'error';
+  historyOpen?: boolean;
+  onToggleHistory?: () => void;
 }
 
 export function Header({
@@ -39,6 +41,8 @@ export function Header({
   onDeleteProject,
   onGetAllProjects,
   saveStatus = 'idle',
+  historyOpen = false,
+  onToggleHistory,
 }: HeaderProps) {
   const [projects, setProjects] = useState<Project[]>([]);
   const [showNewProjectModal, setShowNewProjectModal] = useState(false);
@@ -244,6 +248,17 @@ export function Header({
               aria-label="Download"
             >
               <IconDownload size={18} />
+            </ActionIcon>
+          </Tooltip>
+          <Tooltip label={historyOpen ? 'Hide history' : 'Show history'}>
+            <ActionIcon
+              size="lg"
+              variant={historyOpen ? 'filled' : 'light'}
+              color={historyOpen ? 'violet' : undefined}
+              onClick={onToggleHistory}
+              aria-label="History"
+            >
+              <IconHistory size={18} />
             </ActionIcon>
           </Tooltip>
           <Tooltip label="Account & integrations (optional)">

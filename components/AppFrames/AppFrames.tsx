@@ -8,11 +8,13 @@ import { Header } from './Header';
 import { SidebarTabs } from './SidebarTabs';
 import { Canvas } from './Canvas';
 import { ScreensPanel } from './ScreensPanel';
+import { HistorySidebar } from './HistorySidebar';
 import { useFrames, getCanvasDimensions, getCompositionFrameCount } from './FramesContext';
 import { Screen, CanvasSettings, ScreenImage, AppFramesActions, clampFrameTransform } from './types';
 import { CrossCanvasDragProvider } from './CrossCanvasDragContext';
 import { InteractionLockProvider } from './InteractionLockContext';
 import { exportService } from '@/lib/ExportService';
+import { useUndoRedoHotkeys } from '@/hooks/useUndoRedoHotkeys';
 
 // Re-export types for compatibility
 export type { Screen, CanvasSettings, ScreenImage, AppFramesActions };
@@ -52,6 +54,20 @@ export function AppFrames() {
     selectTextElement,
     reorderScreens,
     mediaCache,
+    undo,
+    redo,
+    canUndo,
+    canRedo,
+    historyEntries,
+    historyPosition,
+    goToHistory,
+    setCanvasBackgroundMedia,
+    clearFrameSlot,
+    setFrameDevice,
+    setFramePan,
+    addFramePositionDelta,
+    setFrameScale,
+    setFrameRotate,
     downloadFormat,
     downloadJpegQuality,
     setDownloadFormat,
@@ -59,6 +75,16 @@ export function AppFrames() {
   } = useFrames();
 
   const [navWidth, setNavWidth] = useState(360); // Rail (80) + Panel (~280)
+  const [historyPanelOpen, setHistoryPanelOpen] = useState(false);
+  const historyWidth = historyPanelOpen ? 320 : 16;
+
+  useUndoRedoHotkeys({
+    undo,
+    redo,
+    canUndo,
+    canRedo,
+    isEditableTarget,
+  });
 
   // Initialize persistence database and handle errors
   useEffect(() => {
@@ -177,31 +203,7 @@ export function AppFrames() {
       // No text selected: treat Delete/Backspace as "delete the frame slot" (blank canvas).
       // This clears the frame choice and removes any image from that slot.
       e.preventDefault();
-      setScreens((prev) => {
-        const updated = [...prev];
-        const s = updated[primarySelectedIndex];
-        if (!s) return prev;
-
-        const newImages = [...(s.images || [])];
-        while (newImages.length <= selectedFrameIndex) newImages.push({});
-        newImages[selectedFrameIndex] = {
-          // Explicitly cleared: no frame selected in the Frame tab.
-          deviceFrame: '',
-          cleared: true,
-          image: undefined,
-          mediaId: undefined,
-          panX: undefined,
-          panY: undefined,
-          frameX: 0,
-          frameY: 0,
-          tiltX: 0,
-          tiltY: 0,
-          rotateZ: 0,
-          frameScale: 100,
-        };
-        updated[primarySelectedIndex] = { ...s, images: newImages };
-        return updated;
-      });
+      clearFrameSlot(primarySelectedIndex, selectedFrameIndex);
     };
 
     window.addEventListener('keydown', onKeyDown);
@@ -210,36 +212,7 @@ export function AppFrames() {
 
   // Handle device frame change for a specific frame
   const handleFrameDeviceChange = (frameIndex: number, deviceFrame: string) => {
-    setScreens((prevScreens) => {
-      const updated = [...prevScreens];
-      const screen = updated[primarySelectedIndex];
-      
-      if (screen) {
-        const newImages = [...(screen.images || [])];
-        
-        // Ensure the images array has enough slots
-        const frameCount = getCompositionFrameCount(screen.settings.composition);
-        while (newImages.length < frameCount) {
-          newImages.push({});
-        }
-        
-        // Update the specific frame's device
-        if (frameIndex < newImages.length) {
-          newImages[frameIndex] = {
-            ...newImages[frameIndex],
-            deviceFrame,
-            cleared: false,
-          };
-        }
-        
-        updated[primarySelectedIndex] = {
-          ...screen,
-          images: newImages,
-        };
-      }
-      
-      return updated;
-    });
+    setFrameDevice(primarySelectedIndex, frameIndex, deviceFrame);
   };
 
   // Helper to convert canvas element to PNG blob
@@ -449,10 +422,12 @@ export function AppFrames() {
       <AppShell
       header={{ height: 45 }}
       navbar={{ width: navWidth, breakpoint: 'sm' }}
+      aside={{ width: historyWidth, breakpoint: 'sm' }}
       padding={0}
       styles={{
         main: { backgroundColor: '#F9FAFB' },
         navbar: { overflow: 'visible' }, // Allow notch to protrude
+        aside: { overflow: 'visible' }, // Allow notch to protrude
       }}
     >
       <AppShell.Header>
@@ -470,6 +445,8 @@ export function AppFrames() {
           onDeleteProject={deleteProject}
           onGetAllProjects={getAllProjects}
           saveStatus={saveStatus}
+          historyOpen={historyPanelOpen}
+          onToggleHistory={() => setHistoryPanelOpen((v) => !v)}
         />
       </AppShell.Header>
 
@@ -552,20 +529,7 @@ export function AppFrames() {
                   const backgroundMediaId = validMediaIds[0];
                   if (!backgroundMediaId) return;
 
-                  setScreens(prevScreens => {
-                    const updated = [...prevScreens];
-                    if (!updated[screenIndex]) return prevScreens;
-
-                    const screen = updated[screenIndex];
-                    updated[screenIndex] = {
-                      ...screen,
-                      settings: {
-                        ...screen.settings,
-                        canvasBackgroundMediaId: backgroundMediaId,
-                      },
-                    };
-                    return updated;
-                  });
+                  setCanvasBackgroundMedia(screenIndex, backgroundMediaId);
 
                   return;
                 }
@@ -633,93 +597,16 @@ export function AppFrames() {
               }
             }}
             onPanChange={(screenIndex, frameIndex, panX, panY) => {
-              setScreens(prevScreens => {
-                const updated = [...prevScreens];
-                if (updated[screenIndex]) {
-                  const screen = updated[screenIndex];
-                  const newImages = [...screen.images];
-                  // Ensure the frame slot exists
-                  while (newImages.length <= frameIndex) {
-                    newImages.push({});
-                  }
-                  newImages[frameIndex] = {
-                    ...newImages[frameIndex],
-                    panX,
-                    panY,
-                  };
-                  updated[screenIndex] = {
-                    ...screen,
-                    images: newImages,
-                  };
-                }
-                return updated;
-              });
+              setFramePan(screenIndex, frameIndex, panX, panY);
             }}
             onFramePositionChange={(screenIndex, frameIndex, frameX, frameY) => {
-              setScreens(prevScreens => {
-                const updated = [...prevScreens];
-                if (updated[screenIndex]) {
-                  const screen = updated[screenIndex];
-                  const newImages = [...screen.images];
-                  // Ensure the frame slot exists
-                  while (newImages.length <= frameIndex) {
-                    newImages.push({});
-                  }
-                  // Get current position and add delta
-                  const currentFrameX = newImages[frameIndex]?.frameX ?? 0;
-                  const currentFrameY = newImages[frameIndex]?.frameY ?? 0;
-                  newImages[frameIndex] = {
-                    ...newImages[frameIndex],
-                    frameX: currentFrameX + frameX,
-                    frameY: currentFrameY + frameY,
-                  };
-                  updated[screenIndex] = {
-                    ...screen,
-                    images: newImages,
-                  };
-                }
-                return updated;
-              });
+              addFramePositionDelta(screenIndex, frameIndex, frameX, frameY);
             }}
             onFrameScaleChange={(screenIndex, frameIndex, frameScale) => {
-              setScreens(prevScreens => {
-                const updated = [...prevScreens];
-                if (!updated[screenIndex]) return prevScreens;
-                const screen = updated[screenIndex];
-                const newImages = [...screen.images];
-                while (newImages.length <= frameIndex) newImages.push({});
-
-                newImages[frameIndex] = {
-                  ...newImages[frameIndex],
-                  frameScale: clampFrameTransform(frameScale, 'frameScale'),
-                };
-
-                updated[screenIndex] = {
-                  ...screen,
-                  images: newImages,
-                };
-                return updated;
-              });
+              setFrameScale(screenIndex, frameIndex, clampFrameTransform(frameScale, 'frameScale'));
             }}
             onFrameRotateChange={(screenIndex, frameIndex, rotateZ) => {
-              setScreens(prevScreens => {
-                const updated = [...prevScreens];
-                if (!updated[screenIndex]) return prevScreens;
-                const screen = updated[screenIndex];
-                const newImages = [...screen.images];
-                while (newImages.length <= frameIndex) newImages.push({});
-
-                newImages[frameIndex] = {
-                  ...newImages[frameIndex],
-                  rotateZ: clampFrameTransform(rotateZ, 'rotateZ'),
-                };
-
-                updated[screenIndex] = {
-                  ...screen,
-                  images: newImages,
-                };
-                return updated;
-              });
+              setFrameRotate(screenIndex, frameIndex, clampFrameTransform(rotateZ, 'rotateZ'));
             }}
             onMediaSelect={(screenIndex, frameIndex, mediaId) => {
               replaceScreen(screenIndex, mediaId, frameIndex);
@@ -751,6 +638,20 @@ export function AppFrames() {
           />
         </Box>
       </AppShell.Main>
+
+      <AppShell.Aside p={0} style={{ borderLeft: '1px solid #E5E7EB' }}>
+        <HistorySidebar
+          open={historyPanelOpen}
+          onToggleOpen={() => setHistoryPanelOpen((v) => !v)}
+          entries={historyEntries}
+          position={historyPosition}
+          goTo={goToHistory}
+          canUndo={canUndo}
+          canRedo={canRedo}
+          undo={undo}
+          redo={redo}
+        />
+      </AppShell.Aside>
       </AppShell>
     </InteractionLockProvider>
   </CrossCanvasDragProvider>
