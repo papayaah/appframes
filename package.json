@@ -26,6 +26,7 @@
     "@mantine/hooks": "8.3.9",
     "@mantine/notifications": "^8.3.9",
     "@next/bundle-analyzer": "^16.0.8",
+    "@reactkits.dev/ai-connect": "workspace:*",
     "@reactkits.dev/better-auth-connect": "workspace:*",
     "@reactkits.dev/react-media-library": "workspace:*",
     "@tabler/icons-react": "^3.35.0",

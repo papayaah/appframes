@@ -11,5 +11,5 @@ export default withBundleAnalyzer({
     // Keep enabled so local packages/submodules work smoothly.
     externalDir: true,
   },
-  transpilePackages: ['@reactkits.dev/better-auth-connect', '@reactkits.dev/react-media-library'],
+  transpilePackages: ['@reactkits.dev/better-auth-connect', '@reactkits.dev/react-media-library', '@reactkits.dev/ai-connect'],
 });

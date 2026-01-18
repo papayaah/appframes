@@ -6,3 +6,6 @@
 	path = packages/better-auth-connect
 	url = git@github.com:papayaah/better-auth-connect.git
 	branch = main
+[submodule "packages/ai-connect"]
+	path = packages/ai-connect
+	url = git@github.com:papayaah/ai-connect.git
