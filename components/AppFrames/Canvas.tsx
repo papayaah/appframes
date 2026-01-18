@@ -356,6 +356,30 @@ export function Canvas({
               onDrop={(e) => {
                 e.preventDefault();
                 e.stopPropagation(); // Stop propagation to parent
+                // 1) Prefer mediaId payload (dragging from media library)
+                const mediaIdRaw = (() => {
+                  try {
+                    return e.dataTransfer.getData('mediaId');
+                  } catch {
+                    return '';
+                  }
+                })();
+                const mediaId = Number(mediaIdRaw);
+                if (Number.isFinite(mediaId) && mediaId > 0) {
+                  const targetFrameIndex =
+                    hoveredFrameIndex ??
+                    // Fall back to currently selected frame (primary screen), or 0.
+                    (screenIndex === selectedScreenIndices[selectedScreenIndices.length - 1]
+                      ? (selectedFrameIndex ?? 0)
+                      : 0);
+                  onMediaSelect?.(screenIndex, targetFrameIndex, mediaId);
+                  setHoveredFrameIndex(null);
+                  setHoveredScreenIndex(null);
+                  setDragFileCount(0);
+                  return;
+                }
+
+                // 2) Otherwise treat it as a file drop (upload/replace)
                 const files = Array.from(e.dataTransfer.files);
                 handleDrop(files, hoveredFrameIndex ?? undefined, screenIndex);
               }}

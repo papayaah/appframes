@@ -4,10 +4,21 @@ This is a brand new app. No need for backward compatibility.
 
 - **Project**: Brand new Next.js (App Router) + TypeScript app.
 - **UI**: Mantine components.
-- **Persistence**: Uses browser **IndexedDB** (see `lib/PersistenceDB.ts` and `hooks/usePersistence.ts`).
+- **Persistence**:
+  - **Projects/state**: browser **IndexedDB** (see `lib/PersistenceDB.ts` and `hooks/usePersistence.ts`).
+  - **Media assets**: handled by the local shared package in `packages/media-library` (`@reactkits.dev/react-media-library`) which uses IndexedDB + OPFS.
 - **Dev constraints**: Do **not** start/run the dev server from the agent.
 - **Testing**: No tests needed for changes right now.
 - **Conventions**: Prefer editing existing files; keep canvas size presets centralized in `components/AppFrames/FramesContext.tsx`.
+
+## Shared packages in `packages/*` (keep the app thin)
+
+We intentionally keep this app small by pushing reusable/opinionated functionality into **local shared packages** under `packages/*` (which can also be published to npm).
+
+- **Default rule**: if a feature is reusable (or should be opinionated with strong defaults), implement it in `packages/*` and keep `appframes/` as a light integration layer.
+- **Prefer “defaults-first” packages**: packages can expose ready-to-use presets (e.g. Mantine presets) so the app doesn’t re-implement UI logic.
+- **App code should mostly wire things together**: data flow, minimal adapters, and app-specific behavior only.
+- **Drag-and-drop contracts should be package-driven**: prefer having packages define payload formats and helper utilities; the app should only consume them.
 
 ## Canvas interaction technique: “preview in rAF, commit on end”
 

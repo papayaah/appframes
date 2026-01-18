@@ -337,7 +337,24 @@ function MediaLibraryContent({ onSelectMedia, selectedSlot }: MediaLibraryProps)
       <PexelsImagePicker opened={pexelsPickerOpen} onClose={() => setPexelsPickerOpen(false)} onImport={uploadFiles} />
 
       <Box style={{ flex: 1, overflow: 'auto' }}>
-        <MediaGrid preset={mantinePreset} icons={icons as any} onSelectionChange={handleSelectionChange} />
+        <MediaGrid
+          preset={mantinePreset}
+          icons={icons as any}
+          onSelectionChange={handleSelectionChange}
+          draggable={true}
+          onDragStart={(asset, e) => {
+            // Compatibility with appframes' existing drop handling expectations.
+            // We keep the library's own payloads (application/json, text/uri-list)
+            // and add a simple numeric mediaId for drops onto frames.
+            if (typeof asset.id === 'number') {
+              try {
+                e.dataTransfer.setData('mediaId', String(asset.id));
+              } catch {
+                // ignore
+              }
+            }
+          }}
+        />
       </Box>
     </Box>
   );
