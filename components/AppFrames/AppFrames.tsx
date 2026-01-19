@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { AppShell, Box } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
@@ -15,6 +15,10 @@ import { CrossCanvasDragProvider } from './CrossCanvasDragContext';
 import { InteractionLockProvider } from './InteractionLockContext';
 import { exportService } from '@/lib/ExportService';
 import { useUndoRedoHotkeys } from '@/hooks/useUndoRedoHotkeys';
+import { FloatingSettingsPanel } from './FloatingSettingsPanel';
+import { ImageSettingsPanel } from './ImageSettingsPanel';
+import { FrameSettingsPanel } from './FrameSettingsPanel';
+import { getDeviceConfig } from './DeviceFrame';
 
 // Re-export types for compatibility
 export type { Screen, CanvasSettings, ScreenImage, AppFramesActions };
@@ -33,6 +37,7 @@ export function AppFrames() {
     zoom,
     setZoom,
     selectedScreenIndices,
+    setSelectedScreenIndices,
     primarySelectedIndex,
     selectedFrameIndex,
     setSelectedFrameIndex,
@@ -68,6 +73,8 @@ export function AppFrames() {
     addFramePositionDelta,
     setFrameScale,
     setFrameRotate,
+    setFrameColor,
+    setImageRotation,
     downloadFormat,
     downloadJpegQuality,
     setDownloadFormat,
@@ -78,6 +85,53 @@ export function AppFrames() {
   const [aiSidebarOpen, setAiSidebarOpen] = useState(false);
   const [historyPanelOpen, setHistoryPanelOpen] = useState(false);
   const historyWidth = historyPanelOpen ? 320 : 16;
+
+  // Track which screen the currently selected frame belongs to (for floating panels)
+  // This is separate from primarySelectedIndex to avoid reordering canvases when clicking frames
+  const [activeFrameScreenIndex, setActiveFrameScreenIndex] = useState<number>(primarySelectedIndex);
+
+  // Keep activeFrameScreenIndex in sync with primarySelectedIndex when selection changes via other means
+  useEffect(() => {
+    setActiveFrameScreenIndex(primarySelectedIndex);
+  }, [primarySelectedIndex]);
+
+  // Track selected frame element for floating panel anchoring
+  const [selectedFrameElement, setSelectedFrameElement] = useState<HTMLElement | null>(null);
+
+  // Update selected frame element when selection changes
+  useEffect(() => {
+    if (selectedFrameIndex === null || selectedFrameIndex === undefined) {
+      setSelectedFrameElement(null);
+      return;
+    }
+
+    // Query for the selected frame element using data attributes (scoped to correct screen)
+    const frameEl = document.querySelector<HTMLElement>(
+      `[data-frame-drop-zone="true"][data-screen-index="${activeFrameScreenIndex}"][data-frame-index="${selectedFrameIndex}"]`
+    );
+    setSelectedFrameElement(frameEl);
+  }, [selectedFrameIndex, activeFrameScreenIndex, screens]);
+
+  // Get current screen and frame data for floating panels (use activeFrameScreenIndex, not primarySelectedIndex)
+  const currentScreen = screens[activeFrameScreenIndex];
+  const currentFrameData = currentScreen?.images?.[selectedFrameIndex ?? 0];
+
+  // Check if a text element is selected (hide frame panels when text is selected)
+  const hasTextSelected = currentScreen?.settings?.selectedTextId != null;
+
+  // Check if frame has a valid device frame (for frame settings panel)
+  // Hide when text is selected
+  const hasValidFrame = currentScreen &&
+    selectedFrameIndex !== null &&
+    selectedFrameIndex !== undefined &&
+    currentFrameData &&
+    !currentFrameData.cleared &&
+    currentFrameData.deviceFrame !== '' &&
+    !hasTextSelected;
+
+  // Check if frame has an actual image (for image settings panel)
+  const hasImage = hasValidFrame &&
+    (currentFrameData?.mediaId != null || currentFrameData?.image != null);
 
   // Listen for AI sidebar open/close events to expand navWidth
   useEffect(() => {
@@ -491,7 +545,10 @@ export function AppFrames() {
             screens={screens}
             selectedScreenIndices={selectedScreenIndices}
             selectedFrameIndex={selectedFrameIndex}
-            onSelectFrame={(frameIndex) => {
+            onSelectFrame={(screenIndex, frameIndex) => {
+              // Track which screen the selected frame belongs to (for floating panels)
+              // This doesn't change the canvas order - just tracks where the frame is
+              setActiveFrameScreenIndex(screenIndex);
               setSelectedFrameIndex(frameIndex);
               // Frame interactions stop propagation (for smooth drag/pan), so make sure
               // selecting a frame explicitly clears any selected text element.
@@ -688,6 +745,63 @@ export function AppFrames() {
           redo={redo}
         />
       </AppShell.Aside>
+
+      {/* Floating settings panel for image (only when frame has an image) */}
+      <FloatingSettingsPanel
+        title="Image Settings"
+        subtitle={hasImage ? `Slot ${(selectedFrameIndex ?? 0) + 1}` : undefined}
+        isOpen={!!hasImage}
+        anchorToElement={selectedFrameElement}
+        positionKey="image-settings-panel"
+      >
+        <ImageSettingsPanel
+          screenScale={currentScreen?.settings?.screenScale ?? 50}
+          screenPanX={currentFrameData?.panX ?? 50}
+          screenPanY={currentFrameData?.panY ?? 50}
+          imageRotation={currentFrameData?.imageRotation ?? 0}
+          onScaleChange={(value) => {
+            if (!currentScreen) return;
+            setSettings({ ...settings, screenScale: value });
+          }}
+          onPanXChange={(value) => {
+            if (selectedFrameIndex === null || selectedFrameIndex === undefined) return;
+            setFramePan(activeFrameScreenIndex, selectedFrameIndex, value, currentFrameData?.panY ?? 50);
+          }}
+          onPanYChange={(value) => {
+            if (selectedFrameIndex === null || selectedFrameIndex === undefined) return;
+            setFramePan(activeFrameScreenIndex, selectedFrameIndex, currentFrameData?.panX ?? 50, value);
+          }}
+          onRotationChange={(value) => {
+            if (selectedFrameIndex === null || selectedFrameIndex === undefined) return;
+            setImageRotation(activeFrameScreenIndex, selectedFrameIndex, value);
+          }}
+          onReset={() => {
+            if (selectedFrameIndex === null || selectedFrameIndex === undefined) return;
+            setSettings({ ...settings, screenScale: 50 });
+            setFramePan(activeFrameScreenIndex, selectedFrameIndex, 50, 50);
+            setImageRotation(activeFrameScreenIndex, selectedFrameIndex, 0);
+          }}
+        />
+      </FloatingSettingsPanel>
+
+      {/* Floating settings panel for frame appearance (always shows when frame is selected) */}
+      <FloatingSettingsPanel
+        title="Frame Settings"
+        subtitle={hasValidFrame ? `Slot ${(selectedFrameIndex ?? 0) + 1}` : undefined}
+        isOpen={!!hasValidFrame}
+        anchorToElement={selectedFrameElement}
+        positionKey="frame-settings-panel"
+        anchorOffset={{ x: 20, y: hasImage ? 280 : 0 }} // Offset down if image panel is also open
+      >
+        <FrameSettingsPanel
+          frameColor={currentFrameData?.frameColor}
+          defaultFrameColor={getDeviceConfig(currentFrameData?.deviceFrame).frameColor}
+          onFrameColorChange={(color) => {
+            if (selectedFrameIndex === null || selectedFrameIndex === undefined) return;
+            setFrameColor(activeFrameScreenIndex, selectedFrameIndex, color);
+          }}
+        />
+      </FloatingSettingsPanel>
       </AppShell>
     </InteractionLockProvider>
   </CrossCanvasDragProvider>

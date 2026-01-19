@@ -356,6 +356,9 @@ export function CompositionRenderer({
       onPanChange: (x: number, y: number) => onPanChange?.(index, x, y),
       onFramePositionChange: (x: number, y: number) => onFramePositionChange?.(index, x, y),
       frameY: handlePosition,
+      frameColor: images[index]?.frameColor,
+      imageRotation: images[index]?.imageRotation ?? 0,
+      screenIndex,
     };
   };
 

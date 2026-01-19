@@ -7,6 +7,8 @@ export interface ScreenImage {
   // Per-frame image pan (position of image inside the frame)
   panX?: number; // 0-100, default 50 (centered)
   panY?: number; // 0-100, default 50 (centered)
+  /** Image rotation inside the frame (0-360 degrees, default 0) */
+  imageRotation?: number;
   // Per-frame position on canvas (offset from default layout position)
   frameX?: number; // Offset in pixels from default position
   frameY?: number; // Offset in pixels from default position
@@ -20,6 +22,10 @@ export interface ScreenImage {
   rotateZ?: number;
   /** 20 to 200 percent, default 100 */
   frameScale?: number;
+
+  // Per-frame appearance
+  /** Custom frame color (overrides device default). If undefined, uses device default. */
+  frameColor?: string;
 }
 
 export interface TextStyle {

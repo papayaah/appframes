@@ -16,7 +16,7 @@ interface CanvasProps {
   screens: Screen[];
   selectedScreenIndices: number[];
   selectedFrameIndex?: number;
-  onSelectFrame?: (index: number) => void;
+  onSelectFrame?: (screenIndex: number, frameIndex: number) => void;
   onSelectScreen?: (index: number, multi: boolean) => void;
   onReplaceScreen?: (files: File[], targetFrameIndex?: number, screenIndex?: number) => void;
   onPanChange?: (screenIndex: number, frameIndex: number, panX: number, panY: number) => void;
@@ -461,7 +461,7 @@ export function Canvas({
                     onFrameHover={setHoveredFrameIndex}
                     dragFileCount={dragFileCount}
                     selectedFrameIndex={effectiveSelectedFrameIndex}
-                    onSelectFrame={isPrimaryScreen ? onSelectFrame : undefined}
+                    onSelectFrame={(frameIndex) => onSelectFrame?.(screenIndex, frameIndex)}
                     onMediaSelect={(frameIndex, mediaId) => onMediaSelect?.(screenIndex, frameIndex, mediaId)}
                     onPexelsSelect={(frameIndex, url) => onPexelsSelect?.(screenIndex, frameIndex, url)}
                   />

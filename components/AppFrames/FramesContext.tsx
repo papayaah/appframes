@@ -251,6 +251,8 @@ interface FramesContextType {
   addFramePositionDelta: (screenIndex: number, frameIndex: number, dx: number, dy: number) => void;
   setFrameScale: (screenIndex: number, frameIndex: number, frameScale: number) => void;
   setFrameRotate: (screenIndex: number, frameIndex: number, rotateZ: number) => void;
+  setFrameColor: (screenIndex: number, frameIndex: number, frameColor: string | undefined) => void;
+  setImageRotation: (screenIndex: number, frameIndex: number, imageRotation: number) => void;
 }
 
 const FramesContext = createContext<FramesContextType | undefined>(undefined);
@@ -806,6 +808,28 @@ export function FramesProvider({ children }: { children: ReactNode }) {
     });
   }, [commitCurrentScreens]);
 
+  const setFrameColor = useCallback((screenIndex: number, frameIndex: number, frameColor: string | undefined) => {
+    commitCurrentScreens('Change frame color', (list) => {
+      const screen = list[screenIndex];
+      if (!screen) return;
+      if (!screen.images) screen.images = [];
+      while (screen.images.length <= frameIndex) screen.images.push({});
+      screen.images[frameIndex] = { ...(screen.images[frameIndex] || {}), frameColor };
+    });
+  }, [commitCurrentScreens]);
+
+  const setImageRotation = useCallback((screenIndex: number, frameIndex: number, imageRotation: number) => {
+    commitCurrentScreens('Rotate image', (list) => {
+      const screen = list[screenIndex];
+      if (!screen) return;
+      if (!screen.images) screen.images = [];
+      while (screen.images.length <= frameIndex) screen.images.push({});
+      // Normalize rotation to 0-360 range
+      const normalizedRotation = ((imageRotation % 360) + 360) % 360;
+      screen.images[frameIndex] = { ...(screen.images[frameIndex] || {}), imageRotation: normalizedRotation };
+    });
+  }, [commitCurrentScreens]);
+
   // Get screens for current canvas size
   const getCurrentScreens = useCallback((): Screen[] => {
     return doc.screensByCanvasSize[currentCanvasSize] || [];
@@ -1274,6 +1298,8 @@ export function FramesProvider({ children }: { children: ReactNode }) {
         addFramePositionDelta,
         setFrameScale,
         setFrameRotate,
+        setFrameColor,
+        setImageRotation,
       }}
     >
       {children}

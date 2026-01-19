@@ -11,6 +11,7 @@ interface DeviceFrameProps {
   deviceType?: string;
   image?: string;
   mediaId?: number;
+  screenIndex?: number;
   scale: number;
   // Scale applied by the outer canvas (e.g. zoom). Used to normalize drag deltas.
   viewportScale?: number;
@@ -37,6 +38,10 @@ interface DeviceFrameProps {
   onFrameMove?: (deltaX: number, deltaY: number) => void;
   onFrameMoveEnd?: () => void;
   frameY?: number; // The frame's Y position percentage (0-100)
+  /** Custom frame color (overrides device default) */
+  frameColor?: string;
+  /** Image rotation inside the frame (0-360 degrees) */
+  imageRotation?: number;
 }
 
 const isInteractiveTarget = (target: EventTarget | null): boolean => {
@@ -56,7 +61,7 @@ interface DeviceConfig {
   bezelWidth?: number;
 }
 
-const getDeviceConfig = (deviceId: string = 'iphone-14-pro'): DeviceConfig => {
+export const getDeviceConfig = (deviceId: string = 'iphone-14-pro'): DeviceConfig => {
   // Frameless devices (no visible bezel / black border)
   if (deviceId === 'iphone-frameless' || deviceId === 'frameless-phone') {
     return {
@@ -210,6 +215,7 @@ export function DeviceFrame({
   deviceType,
   image,
   mediaId,
+  screenIndex,
   scale,
   viewportScale = 1,
   dragRotateZ = 0,
@@ -231,7 +237,9 @@ export function DeviceFrame({
   onFramePositionChange,
   onFrameMove,
   onFrameMoveEnd,
-  frameY = 50
+  frameY = 50,
+  frameColor: customFrameColor,
+  imageRotation = 0,
 }: DeviceFrameProps) {
   const isExporting =
     typeof document !== 'undefined' && document.body?.dataset?.appframesExporting === 'true';
@@ -261,6 +269,8 @@ export function DeviceFrame({
   const gestureTokenRef = useRef<string | null>(null);
 
   const config = getDeviceConfig(deviceType);
+  // Use custom frame color if provided, otherwise use device default
+  const effectiveFrameColor = customFrameColor ?? config.frameColor;
 
   const applyPanVisual = useCallback((x: number, y: number) => {
     const el = imageLayerRef.current;
@@ -518,7 +528,7 @@ export function DeviceFrame({
               transform: 'translateX(-50%)',
               width: (config.notchWidth || 100) * scale,
               height: 25 * scale,
-              background: config.frameColor,
+              background: effectiveFrameColor,
               borderBottomLeftRadius: 16 * scale,
               borderBottomRightRadius: 16 * scale,
               zIndex: 10,
@@ -605,6 +615,8 @@ export function DeviceFrame({
       // Laptop keyboard base - much thinner and sleeker
       const keyboardHeight = 22 * scale;
       const baseWidth = width + 12 * scale;
+      // Use frame color for laptop base (like MacBook color-matched design)
+      const laptopBaseColor = effectiveFrameColor;
       return (
         <Box
           style={{
@@ -614,7 +626,7 @@ export function DeviceFrame({
             transform: 'translateX(-50%)',
             width: baseWidth,
             height: keyboardHeight,
-            background: 'linear-gradient(180deg, #2a2a2a 0%, #1a1a1a 100%)',
+            background: `linear-gradient(180deg, ${laptopBaseColor} 0%, ${laptopBaseColor} 100%)`,
             borderBottomLeftRadius: 10 * scale,
             borderBottomRightRadius: 10 * scale,
             boxShadow: '0 10px 30px rgba(0,0,0,0.3)',
@@ -623,13 +635,14 @@ export function DeviceFrame({
             padding: 2 * scale,
             gap: 1 * scale,
             zIndex: 0, // Behind selection rings
+            filter: 'brightness(0.95)',
           }}
         >
           {/* Keyboard area - simplified and thinner */}
           <Box
             style={{
               flex: 1,
-              background: '#1a1a1a',
+              background: 'rgba(0,0,0,0.3)',
               borderRadius: 2 * scale,
               padding: 2 * scale,
               display: 'flex',
@@ -699,7 +712,11 @@ export function DeviceFrame({
       const baseWidth = 160 * scale;
       const baseHeight = 12 * scale;
       const standWidth = 20 * scale;
-      
+
+      // Use frame color for stand/base (like iMac color-matched design)
+      // Create lighter/darker variants for gradient effect
+      const standColor = effectiveFrameColor;
+
       return (
         <Box
           style={{
@@ -720,9 +737,10 @@ export function DeviceFrame({
             style={{
               width: standWidth,
               height: standHeight,
-              background: 'linear-gradient(180deg, #c0c0c0 0%, #a0a0a0 100%)',
+              background: `linear-gradient(180deg, ${standColor} 0%, ${standColor} 100%)`,
               borderRadius: `${standWidth / 2}px ${standWidth / 2}px 0 0`,
               boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
+              filter: 'brightness(1.1)',
             }}
           />
           {/* Base */}
@@ -730,12 +748,13 @@ export function DeviceFrame({
             style={{
               width: baseWidth,
               height: baseHeight,
-              background: 'linear-gradient(180deg, #d0d0d0 0%, #b0b0b0 100%)',
+              background: `linear-gradient(180deg, ${standColor} 0%, ${standColor} 100%)`,
               borderRadius: 8 * scale,
               boxShadow: '0 4px 12px rgba(0,0,0,0.25)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
+              filter: 'brightness(1.15)',
             }}
           >
             {/* Base accent line */}
@@ -767,7 +786,8 @@ export function DeviceFrame({
     <Box
       data-frame-drop-zone="true"
       data-frame-index={frameIndex}
-      style={{ 
+      data-screen-index={screenIndex}
+      style={{
         position: 'relative',
         paddingBottom: baseHeight, // Reserve space for base/stand
       }}
@@ -794,7 +814,7 @@ export function DeviceFrame({
           width,
           height: height + imacChin, // Add chin height if iMac
           borderRadius: config.radius * scale,
-          background: isFrameless ? 'transparent' : `linear-gradient(145deg, ${config.frameColor}, ${config.frameColor})`,
+          background: isFrameless ? 'transparent' : `linear-gradient(145deg, ${effectiveFrameColor}, ${effectiveFrameColor})`,
           paddingTop: isFrameless ? 0 : topPadding,
           paddingBottom: (isFrameless ? 0 : bottomPadding) + imacChin,
           paddingLeft: isFrameless ? 0 : sidePadding,
@@ -891,6 +911,9 @@ export function DeviceFrame({
                 backgroundRepeat: 'no-repeat',
                 pointerEvents: 'none',
                 willChange: isDragging ? 'background-position' : undefined,
+                transform: imageRotation ? `rotate(${imageRotation}deg)` : undefined,
+                // Scale up slightly when rotated to cover corners
+                ...(imageRotation && imageRotation % 90 !== 0 ? { scale: '1.42' } : {}),
               }}
             />
           ) : showInstructions ? (
@@ -947,7 +970,7 @@ export function DeviceFrame({
                 top: '25%',
                 width: 3 * scale,
                 height: 50 * scale,
-                backgroundColor: config.frameColor,
+                backgroundColor: effectiveFrameColor,
                 borderRadius: `0 ${2 * scale}px ${2 * scale}px 0`,
                 opacity: 0.8,
               }}
@@ -959,7 +982,7 @@ export function DeviceFrame({
                 top: '20%',
                 width: 3 * scale,
                 height: 30 * scale,
-                backgroundColor: config.frameColor,
+                backgroundColor: effectiveFrameColor,
                 borderRadius: `${2 * scale}px 0 0 ${2 * scale}px`,
                 opacity: 0.8,
               }}

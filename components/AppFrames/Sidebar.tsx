@@ -7,12 +7,8 @@ import {
   Select,
   SimpleGrid,
   Box,
-  Slider,
-  NumberInput,
   Group,
   Button,
-  TextInput,
-  Switch,
   Popover,
   ColorPicker,
   Tabs,
@@ -335,72 +331,6 @@ export function Sidebar({ settings, setSettings, screens }: SidebarProps) {
           />
         </Box>
       </Box>
-
-      {screens.length > 0 && (
-        <Box>
-          <Text size="sm" fw={700} mb="xs">
-            Selected Image
-          </Text>
-          <Text size="xs" c="dimmed" mb="xs">
-            Slot {settings.selectedScreenIndex + 1}
-          </Text>
-
-          <Text size="xs" c="dimmed" mb="xs" mt="md">
-            SCALE
-          </Text>
-          <Slider
-            value={settings.screenScale}
-            onChange={(value) => setSettings({ ...settings, screenScale: value })}
-            min={0}
-            max={100}
-            label={(value) => `${value}%`}
-          />
-
-          <Group grow mt="md">
-            <Box>
-              <Text size="xs" c="dimmed" mb="xs">
-                Pan X
-              </Text>
-              <NumberInput
-                size="xs"
-                value={settings.screenPanX}
-                onChange={(value) => setSettings({ ...settings, screenPanX: Number(value) })}
-                min={0}
-                max={100}
-              />
-            </Box>
-            <Box>
-              <Text size="xs" c="dimmed" mb="xs">
-                Pan Y
-              </Text>
-              <NumberInput
-                size="xs"
-                value={settings.screenPanY}
-                onChange={(value) => setSettings({ ...settings, screenPanY: Number(value) })}
-                min={0}
-                max={100}
-              />
-            </Box>
-          </Group>
-
-          <Button
-            size="xs"
-            variant="light"
-            fullWidth
-            mt="md"
-            onClick={() =>
-              setSettings({
-                ...settings,
-                screenScale: 50,
-                screenPanX: 50,
-                screenPanY: 50,
-              })
-            }
-          >
-            Reset
-          </Button>
-        </Box>
-      )}
 
       <Box>
         <Text size="sm" fw={700} mb="xs">
