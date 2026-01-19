@@ -75,8 +75,29 @@ export function AppFrames() {
   } = useFrames();
 
   const [navWidth, setNavWidth] = useState(360); // Rail (80) + Panel (~280)
+  const [aiSidebarOpen, setAiSidebarOpen] = useState(false);
   const [historyPanelOpen, setHistoryPanelOpen] = useState(false);
   const historyWidth = historyPanelOpen ? 320 : 16;
+
+  // Listen for AI sidebar open/close events to expand navWidth
+  useEffect(() => {
+    const handleAISidebarOpen = () => {
+      setAiSidebarOpen(true);
+      setNavWidth(780); // 360 (main) + 420 (AI sidebar)
+    };
+    const handleAISidebarClose = () => {
+      setAiSidebarOpen(false);
+      setNavWidth(360);
+    };
+
+    window.addEventListener('ai-sidebar-open', handleAISidebarOpen);
+    window.addEventListener('ai-sidebar-close', handleAISidebarClose);
+
+    return () => {
+      window.removeEventListener('ai-sidebar-open', handleAISidebarOpen);
+      window.removeEventListener('ai-sidebar-close', handleAISidebarClose);
+    };
+  }, []);
 
   useUndoRedoHotkeys({
     undo,
@@ -108,19 +129,8 @@ export function AppFrames() {
 
   const handleMediaUpload = useCallback(async (file: File): Promise<number | null> => {
     try {
-      const { saveFileToOpfs, addAssetToDB, getAssetType } = await import('@reactkits.dev/react-media-library');
-
-      const handleName = await saveFileToOpfs(file);
-      const id = await addAssetToDB({
-        handleName,
-        fileName: file.name,
-        fileType: getAssetType(file.type),
-        mimeType: file.type,
-        size: file.size,
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
-      });
-
+      const { importFileToLibrary } = await import('@reactkits.dev/react-media-library');
+      const id = await importFileToLibrary(file);
       return typeof id === 'number' ? id : Number(id);
     } catch (error) {
       // eslint-disable-next-line no-console
@@ -523,14 +533,24 @@ export function AppFrames() {
                 const mediaIds = await Promise.all(uploadPromises);
 
                 const validMediaIds = mediaIds.filter((id): id is number => typeof id === 'number');
+                const failedCount = mediaIds.length - validMediaIds.length;
+                if (failedCount > 0) {
+                  notifications.show({
+                    title: 'Some uploads failed',
+                    message: `Failed to import ${failedCount} file${failedCount === 1 ? '' : 's'} into your media library.`,
+                    color: 'red',
+                  });
+                }
 
-                // Dropped outside any device frame -> set full canvas background
-                if (targetFrameIndex === undefined) {
+                // Dropped outside any device frame:
+                // - single file -> set full canvas background
+                // - multi file -> smart-fill device frames (empty-first), ignore excess
+                const effectiveTargetFrameIndex =
+                  targetFrameIndex === undefined && files.length > 1 ? 0 : targetFrameIndex;
+                if (targetFrameIndex === undefined && files.length <= 1) {
                   const backgroundMediaId = validMediaIds[0];
                   if (!backgroundMediaId) return;
-
                   setCanvasBackgroundMedia(screenIndex, backgroundMediaId);
-
                   return;
                 }
 
@@ -551,33 +571,45 @@ export function AppFrames() {
                     newImages.push({});
                   }
 
+                  const startIndex = Math.max(0, Math.min(effectiveTargetFrameIndex ?? 0, layoutFrameCount - 1));
+                  const orderedIndices = Array.from({ length: layoutFrameCount }, (_, i) => (startIndex + i) % layoutFrameCount);
+                  const isEmptySlot = (img: any) =>
+                    img?.cleared === true || img?.deviceFrame === '' || (!img?.mediaId && !img?.image);
+
                   // Add images to the current screen's images array
-                  for (let i = 0; i < filesToProcess; i++) {
-                    const mediaId = validMediaIds[i];
+                  if (filesToProcess <= 0) {
+                    return updated;
+                  }
 
-                    let targetImageIndex = -1;
-
-                    if (files.length > 1) {
-                      // Multi-drop: fill image slots starting from targetFrameIndex (or 0 if not specified)
-                      const startIndex = targetFrameIndex !== undefined ? targetFrameIndex : 0;
-                      targetImageIndex = (startIndex + i) % layoutFrameCount;
-                    } else {
-                      // Single drop: use targetFrameIndex if specified, otherwise find first empty or use 0
-                      if (targetFrameIndex !== undefined) {
-                        targetImageIndex = targetFrameIndex;
-                      } else {
-                        targetImageIndex = newImages.findIndex(img => !img.image && !img.mediaId);
-                        if (targetImageIndex === -1) {
-                          targetImageIndex = 0; // Replace first image if all slots filled
-                        }
-                      }
+                  if (files.length <= 1) {
+                    // Single drop on an explicit device frame: always replace that frame.
+                    const mediaId = validMediaIds[0];
+                    if (typeof mediaId === 'number') {
+                      newImages[startIndex] = { ...newImages[startIndex], mediaId, image: undefined, cleared: false };
                     }
+                  } else {
+                    // Multi-drop: prefer empty slots first, then fill remaining frames in order, ignoring excess.
+                    const toFill = validMediaIds.slice(0, filesToProcess);
+                    const emptyIndices = orderedIndices.filter((idx) => isEmptySlot(newImages[idx]));
+                    const filled = new Set<number>();
 
-                    if (targetImageIndex >= 0 && targetImageIndex < layoutFrameCount) {
-                      newImages[targetImageIndex] = {
-                        mediaId: mediaId,
-                        image: undefined
-                      };
+                    let cursor = 0;
+                    // Pass 1: empties
+                    for (const idx of emptyIndices) {
+                      const mediaId = toFill[cursor];
+                      if (mediaId == null) break;
+                      newImages[idx] = { ...newImages[idx], mediaId, image: undefined, cleared: false };
+                      filled.add(idx);
+                      cursor += 1;
+                      if (cursor >= toFill.length) break;
+                    }
+                    // Pass 2: remaining indices (overwrite) up to frameCount
+                    for (const idx of orderedIndices) {
+                      if (cursor >= toFill.length) break;
+                      if (filled.has(idx)) continue;
+                      const mediaId = toFill[cursor];
+                      newImages[idx] = { ...newImages[idx], mediaId, image: undefined, cleared: false };
+                      cursor += 1;
                     }
                   }
 
@@ -592,8 +624,12 @@ export function AppFrames() {
               } catch (error) {
                 // eslint-disable-next-line no-console
                 console.error('Error processing dropped files:', error);
-                // eslint-disable-next-line no-alert
-                alert('Failed to process images. Please try again.');
+                const msg = error instanceof Error ? error.message : String(error);
+                notifications.show({
+                  title: 'Drop failed',
+                  message: msg || 'Failed to process images. Please try again.',
+                  color: 'red',
+                });
               }
             }}
             onPanChange={(screenIndex, frameIndex, panX, panY) => {

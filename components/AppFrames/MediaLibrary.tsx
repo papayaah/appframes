@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState, useEffect } from 'react';
 import {
   Badge,
   Box,
@@ -8,10 +8,13 @@ import {
   Card,
   Center,
   Checkbox,
+  Drawer,
   FileButton,
+  Group,
   Image,
   Loader,
   Modal,
+  SimpleGrid,
   Skeleton,
   Stack,
   Text,
@@ -36,9 +39,8 @@ import {
   IconX,
   IconZoomIn,
 } from '@tabler/icons-react';
-import type { ComponentPreset, MediaAsset } from '@reactkits.dev/react-media-library';
+import type { AIGenerateSidebarProps, ComponentPreset, MediaAIGenerator, MediaAsset, MediaPexelsProvider, PexelsImagePickerProps } from '@reactkits.dev/react-media-library';
 import { MediaGrid, MediaLibraryProvider, useMediaLibraryContext } from '@reactkits.dev/react-media-library';
-import { PexelsImagePicker } from './PexelsImagePicker';
 
 interface MediaLibraryProps {
   onSelectMedia: (mediaId: number) => void;
@@ -257,11 +259,318 @@ const mantinePreset: ComponentPreset = {
       <Image src={src} alt={alt} fit="contain" w="100%" h="100%" />
     </UnstyledButton>
   ),
+
+  AIGenerateSidebar: ({
+    isOpen,
+    onClose,
+    prompt,
+    onPromptChange,
+    width,
+    onWidthChange,
+    height,
+    onHeightChange,
+    steps,
+    onStepsChange,
+    model,
+    onModelChange,
+    onPresetChange,
+    error,
+    generating,
+    onGenerate,
+    onCancel,
+  }: AIGenerateSidebarProps) => {
+    // Notify parent to expand navWidth when sidebar opens
+    useEffect(() => {
+      if (isOpen) {
+        // Dispatch custom event to expand navbar
+        window.dispatchEvent(new CustomEvent('ai-sidebar-open'));
+      } else {
+        window.dispatchEvent(new CustomEvent('ai-sidebar-close'));
+      }
+    }, [isOpen]);
+
+    return isOpen ? (
+      <Box
+        style={{
+          width: '420px',
+          height: 'calc(100vh - 45px)', // Account for header height
+          borderLeft: '1px solid #E5E7EB',
+          backgroundColor: 'white',
+          display: 'flex',
+          flexDirection: 'column',
+          position: 'fixed',
+          left: '360px', // Position next to main sidebar (80px rail + 280px panel)
+          top: '45px', // Below header
+          zIndex: 100,
+          boxShadow: '-2px 0 8px rgba(0,0,0,0.1)',
+        }}
+      >
+        <Box
+          style={{
+            padding: '1.5rem',
+            borderBottom: '1px solid #E5E7EB',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+          }}
+        >
+          <Text fw={600} size="lg">Generate image</Text>
+          <UnstyledButton
+            onClick={onClose}
+            style={{
+              width: 32,
+              height: 32,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderRadius: 4,
+              cursor: 'pointer',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = '#f3f4f6';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = 'transparent';
+            }}
+          >
+            <IconX size={20} />
+          </UnstyledButton>
+        </Box>
+        <Box style={{ flex: 1, overflow: 'auto', padding: '1.5rem' }}>
+      <Stack gap="md">
+        <div>
+          <Text size="sm" fw={600} mb={4}>
+            Prompt
+          </Text>
+          <TextInput
+            value={prompt}
+            onChange={(e) => onPromptChange(e.target.value)}
+            placeholder="Describe the image you want..."
+          />
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+          <div>
+            <Text size="sm" fw={600} mb={4}>
+              Width
+            </Text>
+            <TextInput
+              value={width}
+              onChange={(e) => onWidthChange(e.target.value)}
+              type="number"
+              placeholder="768"
+            />
+          </div>
+          <div>
+            <Text size="sm" fw={600} mb={4}>
+              Height
+            </Text>
+            <TextInput
+              value={height}
+              onChange={(e) => onHeightChange(e.target.value)}
+              type="number"
+              placeholder="768"
+            />
+          </div>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+          <div>
+            <Text size="sm" fw={600} mb={4}>
+              Preset
+            </Text>
+            <Select
+              value=""
+              onChange={(val) => val && onPresetChange(val)}
+              placeholder="Pick a size"
+              data={[
+                { value: '512', label: '512 × 512' },
+                { value: '768', label: '768 × 768' },
+                { value: '1024', label: '1024 × 1024' },
+              ]}
+            />
+          </div>
+          <div>
+            <Text size="sm" fw={600} mb={4}>
+              Steps (optional)
+            </Text>
+            <TextInput
+              value={steps}
+              onChange={(e) => onStepsChange(e.target.value)}
+              type="number"
+              placeholder="25"
+            />
+          </div>
+        </div>
+
+        <div>
+          <Text size="sm" fw={600} mb={4}>
+            Model (optional)
+          </Text>
+          <TextInput
+            value={model}
+            onChange={(e) => onModelChange(e.target.value)}
+            placeholder="e.g. stability-ai/sdxl:… (provider-specific)"
+          />
+        </div>
+
+        {error && (
+          <Text size="sm" c="red">
+            {error}
+          </Text>
+        )}
+
+          <Group justify="flex-end" gap="sm" mt="md">
+            <Button variant="light" onClick={onCancel} disabled={generating}>
+              Cancel
+            </Button>
+            <Button onClick={onGenerate} loading={generating} disabled={!prompt.trim()}>
+              Generate
+            </Button>
+          </Group>
+        </Stack>
+        </Box>
+      </Box>
+    ) : null;
+  },
+
+  PexelsImagePicker: ({
+    isOpen,
+    onClose,
+    images,
+    loading,
+    selected,
+    onToggleSelect,
+    onSelectAll,
+    onDeselectAll,
+    importing,
+    onImport,
+  }: PexelsImagePickerProps) => (
+    <Modal
+      opened={isOpen}
+      onClose={onClose}
+      title={
+        <Group gap="xs">
+          <IconPhoto size={20} />
+          <Text fw={600}>Pexels Images</Text>
+        </Group>
+      }
+      size="lg"
+      styles={{
+        body: { padding: 0 },
+      }}
+    >
+      <Box p="md" style={{ borderBottom: '1px solid #e9ecef' }}>
+        <Group justify="space-between">
+          <Text size="sm" c="dimmed">
+            {images.length} images available • {selected.size} selected
+          </Text>
+          <Group gap="xs">
+            <Button variant="subtle" size="xs" onClick={selected.size === images.length ? onDeselectAll : onSelectAll}>
+              {selected.size === images.length ? 'Deselect All' : 'Select All'}
+            </Button>
+          </Group>
+        </Group>
+      </Box>
+
+      <Box p="md" style={{ maxHeight: 400, overflowY: 'auto' }}>
+        {loading ? (
+          <Center p="xl">
+            <Loader size="sm" />
+          </Center>
+        ) : images.length === 0 ? (
+          <Center p="xl">
+            <Text c="dimmed">No images found</Text>
+          </Center>
+        ) : (
+          <SimpleGrid cols={3} spacing="sm">
+            {images.map((img) => (
+              <Box
+                key={img.url}
+                style={{
+                  position: 'relative',
+                  aspectRatio: '1',
+                  borderRadius: 8,
+                  overflow: 'hidden',
+                  cursor: 'pointer',
+                  border: selected.has(img.url) ? '3px solid #667eea' : '1px solid #dee2e6',
+                  transition: 'all 0.15s',
+                }}
+                onClick={() => onToggleSelect(img.url)}
+              >
+                <img
+                  src={img.url}
+                  alt={img.name}
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'cover',
+                  }}
+                />
+                <Checkbox
+                  checked={selected.has(img.url)}
+                  onChange={() => onToggleSelect(img.url)}
+                  style={{
+                    position: 'absolute',
+                    top: 8,
+                    left: 8,
+                  }}
+                  styles={{
+                    input: {
+                      backgroundColor: selected.has(img.url) ? '#667eea' : 'rgba(255,255,255,0.9)',
+                      borderColor: selected.has(img.url) ? '#667eea' : '#dee2e6',
+                    },
+                  }}
+                />
+                <Box
+                  style={{
+                    position: 'absolute',
+                    bottom: 0,
+                    left: 0,
+                    right: 0,
+                    padding: 6,
+                    background: 'linear-gradient(to top, rgba(0,0,0,0.7), transparent)',
+                  }}
+                >
+                  <Text
+                    size="xs"
+                    c="white"
+                    style={{
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {img.name}
+                  </Text>
+                </Box>
+              </Box>
+            ))}
+          </SimpleGrid>
+        )}
+      </Box>
+
+      <Box p="md" style={{ borderTop: '1px solid #e9ecef' }}>
+        <Group justify="flex-end" gap="sm">
+          <Button variant="subtle" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button
+            leftSection={<IconCheck size={16} />}
+            onClick={onImport}
+            loading={importing}
+            disabled={selected.size === 0}
+          >
+            Import {selected.size > 0 ? `(${selected.size})` : ''}
+          </Button>
+        </Group>
+      </Box>
+    </Modal>
+  ),
 };
 
 function MediaLibraryContent({ onSelectMedia, selectedSlot }: MediaLibraryProps) {
   const { uploadFiles } = useMediaLibraryContext();
-  const [pexelsPickerOpen, setPexelsPickerOpen] = useState(false);
   const prevSelectedIdsRef = useRef<Set<number>>(new Set());
 
   const icons = useMemo(
@@ -328,15 +637,9 @@ function MediaLibraryContent({ onSelectMedia, selectedSlot }: MediaLibraryProps)
             </Text>
           )}
         </Box>
-
-        <Button variant="light" size="xs" leftSection={<IconPhoto size={14} />} onClick={() => setPexelsPickerOpen(true)}>
-          Pexels
-        </Button>
       </Box>
 
-      <PexelsImagePicker opened={pexelsPickerOpen} onClose={() => setPexelsPickerOpen(false)} onImport={uploadFiles} />
-
-      <Box style={{ flex: 1, overflow: 'auto' }}>
+      <Box style={{ flex: 1, overflow: 'auto', position: 'relative' }}>
         <MediaGrid
           preset={mantinePreset}
           icons={icons as any}
@@ -361,8 +664,55 @@ function MediaLibraryContent({ onSelectMedia, selectedSlot }: MediaLibraryProps)
 }
 
 export function MediaLibrary(props: MediaLibraryProps) {
+  const ai = useMemo<MediaAIGenerator>(
+    () => ({
+      async generateImages(req) {
+        const res = await fetch('/api/ai/images/generate', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify(req),
+        });
+        if (!res.ok) {
+          throw new Error('AI generation failed');
+        }
+        const blob = await res.blob();
+        const ext = blob.type === 'image/webp' ? 'webp' : blob.type === 'image/jpeg' ? 'jpg' : 'png';
+        const file = new File([blob], `ai-${Date.now()}.${ext}`, { type: blob.type || 'image/png' });
+        return [
+          {
+            file,
+            metadata: {
+              provider: res.headers.get('x-ai-provider') ?? 'backend',
+              model: res.headers.get('x-ai-model') ?? undefined,
+              prompt: req.prompt,
+              width: req.width,
+              height: req.height,
+            },
+          },
+        ];
+      },
+    }),
+    []
+  );
+
+  const pexels = useMemo<MediaPexelsProvider>(
+    () => ({
+      async fetchImages() {
+        const res = await fetch('/api/pexels-images');
+        const data = await res.json();
+        return (data.images || []).map((img: any) => ({
+          name: img.name,
+          url: img.url,
+          size: img.size,
+          modified: img.modified,
+        }));
+      },
+    }),
+    []
+  );
+
   return (
-    <MediaLibraryProvider enableDragDrop={true}>
+    <MediaLibraryProvider enableDragDrop={true} ai={ai} pexels={pexels}>
       <MediaLibraryContent {...props} />
     </MediaLibraryProvider>
   );

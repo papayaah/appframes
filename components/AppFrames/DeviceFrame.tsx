@@ -639,6 +639,8 @@ export function DeviceFrame({
 
   return (
     <Box
+      data-frame-drop-zone="true"
+      data-frame-index={frameIndex}
       style={{ position: 'relative' }}
       onMouseEnter={() => {
         if (isLocked && gestureOwnerKey && !isOwnerActive(gestureOwnerKey)) return;

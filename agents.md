@@ -20,6 +20,24 @@ We intentionally keep this app small by pushing reusable/opinionated functionali
 - **App code should mostly wire things together**: data flow, minimal adapters, and app-specific behavior only.
 - **Drag-and-drop contracts should be package-driven**: prefer having packages define payload formats and helper utilities; the app should only consume them.
 
+### Instant development workflow (no build step needed)
+
+All local packages (`packages/*`) are configured for **instant development**: changes in package `src/` files appear immediately in the app without running `npm run build`.
+
+**How it works:**
+- Packages use **conditional exports** in `package.json`:
+  - **Development** (`NODE_ENV !== 'production'`): exports point to `src/*.ts` files
+  - **Production**: exports point to `dist/*` (built output)
+- Next.js with `transpilePackages` compiles TypeScript from package `src/` on-the-fly
+- **No build step needed** during development — just edit `packages/*/src/**` and save
+
+**Configured packages:**
+- ✅ `@reactkits.dev/react-media-library` — exports `src/index.ts` in dev
+- ✅ `@reactkits.dev/better-auth-connect` — exports `src/**` paths in dev (main, server routes, presets, icons)
+- ✅ `@reactkits.dev/ai-connect` — already configured to use `src/` directly
+
+**Note:** For production builds, packages still need `npm run build` to generate `dist/`, but during local dev you can iterate instantly.
+
 ## Canvas interaction technique: “preview in rAF, commit on end”
 
 We want interactions (dragging frames, scaling, rotating) to feel **buttery smooth** even when the surrounding React tree is large. The key technique is:

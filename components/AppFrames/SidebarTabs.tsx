@@ -204,7 +204,7 @@ export function SidebarTabs({
               <TextTab />
             </Tabs.Panel>
 
-            <Tabs.Panel value="media" style={{ height: '100%' }}>
+            <Tabs.Panel value="media" style={{ height: '100%', position: 'relative' }}>
               <MediaLibrary
                 onSelectMedia={(mediaId) => onMediaSelect && onMediaSelect(mediaId)}
                 selectedSlot={settings.selectedScreenIndex}

@@ -91,6 +91,22 @@ export function Canvas({
   // Get cross-canvas drag context
   const crossCanvasDrag = useCrossCanvasDrag();
 
+  const getFrameIndexAtPoint = useCallback((screenIndex: number, clientX: number, clientY: number): number | null => {
+    const canvasEl = canvasRefs.current.get(screenIndex);
+    if (!canvasEl) return null;
+    const zones = Array.from(
+      canvasEl.querySelectorAll<HTMLElement>('[data-frame-drop-zone="true"][data-frame-index]')
+    );
+    for (const el of zones) {
+      const rect = el.getBoundingClientRect();
+      if (clientX >= rect.left && clientX <= rect.right && clientY >= rect.top && clientY <= rect.bottom) {
+        const idx = Number(el.dataset.frameIndex);
+        if (Number.isFinite(idx)) return idx;
+      }
+    }
+    return null;
+  }, []);
+
   const refreshCanvasBounds = useCallback(() => {
     canvasRefs.current.forEach((el, screenIndex) => {
       crossCanvasDrag.registerCanvas(screenIndex, el);
@@ -356,6 +372,7 @@ export function Canvas({
               onDrop={(e) => {
                 e.preventDefault();
                 e.stopPropagation(); // Stop propagation to parent
+                const dropFrameIndex = getFrameIndexAtPoint(screenIndex, e.clientX, e.clientY);
                 // 1) Prefer mediaId payload (dragging from media library)
                 const mediaIdRaw = (() => {
                   try {
@@ -367,6 +384,7 @@ export function Canvas({
                 const mediaId = Number(mediaIdRaw);
                 if (Number.isFinite(mediaId) && mediaId > 0) {
                   const targetFrameIndex =
+                    dropFrameIndex ??
                     hoveredFrameIndex ??
                     // Fall back to currently selected frame (primary screen), or 0.
                     (screenIndex === selectedScreenIndices[selectedScreenIndices.length - 1]
@@ -381,10 +399,15 @@ export function Canvas({
 
                 // 2) Otherwise treat it as a file drop (upload/replace)
                 const files = Array.from(e.dataTransfer.files);
-                handleDrop(files, hoveredFrameIndex ?? undefined, screenIndex);
+                handleDrop(files, dropFrameIndex ?? hoveredFrameIndex ?? undefined, screenIndex);
               }}
-              onDragOver={() => {
+              onDragOver={(e) => {
+                e.preventDefault();
                 setHoveredScreenIndex(screenIndex);
+                if (e.dataTransfer?.types?.includes('Files')) {
+                  const idx = getFrameIndexAtPoint(screenIndex, e.clientX, e.clientY);
+                  setHoveredFrameIndex(idx);
+                }
               }}
             >
               <Box
@@ -408,6 +431,20 @@ export function Canvas({
                   onSelectTextElement?.(screenIndex, null);
                 }}
               >
+                {dragFileCount > 0 && hoveredScreenIndex === screenIndex && hoveredFrameIndex == null && (
+                  <Box
+                    data-export-hide="true"
+                    style={{
+                      position: 'absolute',
+                      inset: 0,
+                      pointerEvents: 'none',
+                      zIndex: 0,
+                      border: '2px dashed rgba(102, 126, 234, 0.7)',
+                      borderRadius: 8,
+                      boxShadow: 'inset 0 0 0 2px rgba(102, 126, 234, 0.15)',
+                    }}
+                  />
+                )}
                 <CanvasBackground mediaId={screenSettings.canvasBackgroundMediaId} />
                 <Box style={{ position: 'relative', zIndex: 1, width: '100%', height: '100%' }}>
                   <CompositionRenderer
