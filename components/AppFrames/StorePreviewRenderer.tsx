@@ -23,6 +23,7 @@ import { TextElement as CanvasTextElement } from './TextElement';
 import { useMediaImage } from '@/hooks/useMediaImage';
 import { exportService } from '@/lib/ExportService';
 import { ExportModal } from './ExportModal';
+import { getBackgroundStyle } from './Sidebar';
 
 const getPlatform = (canvasSize: string): 'apple' | 'google' => {
   if (canvasSize.startsWith('google')) return 'google';
@@ -84,7 +85,7 @@ function StaticCanvas({
         overflow: 'hidden',
         borderRadius: 8,
         boxShadow: '0 10px 40px rgba(0,0,0,0.12)',
-        backgroundColor: screenSettings.backgroundColor,
+        ...getBackgroundStyle(screenSettings.backgroundColor),
       }}
     >
       <Box

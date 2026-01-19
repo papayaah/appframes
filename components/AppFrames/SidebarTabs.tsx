@@ -3,10 +3,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { Box, Tabs, Text, ThemeIcon, Stack, Select, Slider, Group } from '@mantine/core';
-import { IconLayout, IconDeviceMobile, IconPhoto, IconTypography, IconChevronRight, IconChevronLeft, IconSettings } from '@tabler/icons-react';
+import { IconLayout, IconDeviceMobile, IconPhoto, IconTypography, IconChevronRight, IconChevronLeft, IconSettings, IconStack } from '@tabler/icons-react';
 import { Sidebar } from './Sidebar';
 import { DeviceTab } from './DeviceTab';
 import { TextTab } from './TextTab';
+import { LayersTab } from './LayersTab';
 import { MediaLibrary } from './MediaLibrary';
 import { CanvasSettings, Screen } from './AppFrames';
 
@@ -44,7 +45,7 @@ export function SidebarTabs({
 
   // Extract tab from pathname (e.g., "/layout" -> "layout", "/" -> "layout")
   const currentTab = pathname === '/' ? 'layout' : pathname.replace('/', '');
-  const tab = ['layout', 'device', 'text', 'media', 'settings'].includes(currentTab) ? currentTab : 'layout';
+  const tab = ['layout', 'device', 'text', 'layers', 'media', 'settings'].includes(currentTab) ? currentTab : 'layout';
 
   // If navigation happens programmatically (e.g. selecting a text element pushes /text),
   // ensure the panel opens so the user sees the controls.
@@ -154,6 +155,24 @@ export function SidebarTabs({
           </Tabs.Tab>
           
           <Tabs.Tab 
+            value="layers" 
+            style={{ 
+              width: 64,
+              height: 64,
+              padding: 0,
+              borderRadius: 8,
+              backgroundColor: tab === 'layers' ? '#f8f9ff' : 'transparent',
+              color: tab === 'layers' ? '#667eea' : '#666',
+              border: 'none',
+            }}
+          >
+            <Box style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4, width: '100%', height: '100%' }}>
+              <IconStack size={24} />
+              <Text size="xs">Layers</Text>
+            </Box>
+          </Tabs.Tab>
+          
+          <Tabs.Tab 
             value="media" 
             style={{ 
               width: 64,
@@ -202,6 +221,10 @@ export function SidebarTabs({
 
             <Tabs.Panel value="text" style={{ height: '100%' }}>
               <TextTab />
+            </Tabs.Panel>
+
+            <Tabs.Panel value="layers" style={{ height: '100%' }}>
+              <LayersTab />
             </Tabs.Panel>
 
             <Tabs.Panel value="media" style={{ height: '100%', position: 'relative' }}>

@@ -730,19 +730,23 @@ export function FramesProvider({ children }: { children: ReactNode }) {
       if (!screen) return;
       if (!screen.images) screen.images = [];
       while (screen.images.length <= frameIndex) screen.images.push({});
+      const existing = screen.images[frameIndex] || {};
+      // Preserve position and transform when clearing media
       screen.images[frameIndex] = {
-        deviceFrame: '',
+        ...existing,
+        deviceFrame: existing.deviceFrame || '', // Keep device frame if it exists
         cleared: true,
         image: undefined,
         mediaId: undefined,
         panX: undefined,
         panY: undefined,
-        frameX: 0,
-        frameY: 0,
-        tiltX: 0,
-        tiltY: 0,
-        rotateZ: 0,
-        frameScale: 100,
+        // Preserve frameX, frameY, tiltX, tiltY, rotateZ, frameScale
+        frameX: existing.frameX ?? 0,
+        frameY: existing.frameY ?? 0,
+        tiltX: existing.tiltX ?? 0,
+        tiltY: existing.tiltY ?? 0,
+        rotateZ: existing.rotateZ ?? 0,
+        frameScale: existing.frameScale ?? 100,
       };
     });
   }, [commitCurrentScreens]);

@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import {
   Stack,
   Text,
@@ -12,8 +13,53 @@ import {
   Button,
   TextInput,
   Switch,
+  Popover,
+  ColorPicker,
+  Tabs,
 } from '@mantine/core';
+import { IconPlus } from '@tabler/icons-react';
 import { CanvasSettings, Screen } from './AppFrames';
+import { GradientEditor } from './GradientEditor';
+
+// Helper to detect if a background value is a gradient
+export const isGradient = (color: string): boolean => {
+  return color.startsWith('linear-gradient') || color.startsWith('radial-gradient');
+};
+
+// Helper to get background styles for a color/gradient
+export const getBackgroundStyle = (color: string): React.CSSProperties => {
+  if (color === 'transparent') {
+    return { backgroundColor: 'transparent' };
+  }
+  if (isGradient(color)) {
+    return { backgroundImage: color };
+  }
+  return { backgroundColor: color };
+};
+
+// Background presets: solid colors + gradients
+const BACKGROUND_PRESETS = [
+  // Solid colors (existing)
+  'transparent',
+  '#E5E7EB',
+  '#F3F4F6',
+  '#DBEAFE',
+  '#E0E7FF',
+  '#FCE7F3',
+  '#FEF3C7',
+  '#D1FAE5',
+  // Horizontal gradients
+  'linear-gradient(to right, #667eea, #764ba2)',
+  'linear-gradient(to right, #f093fb, #f5576c)',
+  'linear-gradient(to right, #4facfe, #00f2fe)',
+  'linear-gradient(to right, #43e97b, #38f9d7)',
+  // Vertical gradients
+  'linear-gradient(to bottom, #fa709a, #fee140)',
+  'linear-gradient(to bottom, #6a11cb, #2575fc)',
+  'linear-gradient(to bottom, #ff0844, #ffb199)',
+  // Diagonal gradient
+  'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+] as const;
 
 interface SidebarProps {
   settings: CanvasSettings;
@@ -134,6 +180,9 @@ const CompositionButton = ({
 );
 
 export function Sidebar({ settings, setSettings, screens }: SidebarProps) {
+  const [customColorOpen, setCustomColorOpen] = useState(false);
+  const [customColor, setCustomColor] = useState('#ffffff');
+
   const currentScreen = screens[settings.selectedScreenIndex];
   const hasAnyFrames =
     (currentScreen?.images ?? []).some((img) => !(img?.cleared === true || img?.deviceFrame === ''));
@@ -379,34 +428,95 @@ export function Sidebar({ settings, setSettings, screens }: SidebarProps) {
         <Text size="sm" fw={700} mb="xs">
           Background Color
         </Text>
-        <Group gap="xs">
-          {(['transparent', '#E5E7EB', '#F3F4F6', '#DBEAFE', '#E0E7FF', '#FCE7F3', '#FEF3C7', '#D1FAE5'] as const).map(
-            (color) => (
+        <SimpleGrid cols={4} spacing="xs">
+          {BACKGROUND_PRESETS.map((color) => (
+            <Box
+              key={color}
+              onClick={() => setSettings({ ...settings, backgroundColor: color })}
+              style={{
+                width: 32,
+                height: 32,
+                borderRadius: 8,
+                ...(color === 'transparent'
+                  ? {
+                      // Checkerboard to indicate transparency
+                      backgroundImage:
+                        'linear-gradient(45deg, #e9ecef 25%, transparent 25%), linear-gradient(-45deg, #e9ecef 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #e9ecef 75%), linear-gradient(-45deg, transparent 75%, #e9ecef 75%)',
+                      backgroundSize: '10px 10px',
+                      backgroundPosition: '0 0, 0 5px, 5px -5px, -5px 0px',
+                    }
+                  : getBackgroundStyle(color)),
+                cursor: 'pointer',
+                border:
+                  settings.backgroundColor === color ? '3px solid #228be6' : '1px solid #dee2e6',
+              }}
+            />
+          ))}
+          {/* Custom color/gradient picker button */}
+          <Popover opened={customColorOpen} onChange={setCustomColorOpen} position="bottom" withArrow>
+            <Popover.Target>
               <Box
-                key={color}
-                onClick={() => setSettings({ ...settings, backgroundColor: color })}
+                onClick={() => setCustomColorOpen(true)}
                 style={{
                   width: 32,
                   height: 32,
                   borderRadius: 8,
-                  backgroundColor: color === 'transparent' ? 'transparent' : color,
-                  ...(color === 'transparent'
-                    ? {
-                        // Checkerboard to indicate transparency
-                        backgroundImage:
-                          'linear-gradient(45deg, #e9ecef 25%, transparent 25%), linear-gradient(-45deg, #e9ecef 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #e9ecef 75%), linear-gradient(-45deg, transparent 75%, #e9ecef 75%)',
-                        backgroundSize: '10px 10px',
-                        backgroundPosition: '0 0, 0 5px, 5px -5px, -5px 0px',
-                      }
-                    : {}),
+                  border: '2px dashed #dee2e6',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
                   cursor: 'pointer',
-                  border:
-                    settings.backgroundColor === color ? '3px solid #228be6' : '1px solid #dee2e6',
+                  backgroundColor: '#fff',
                 }}
-              />
-            )
-          )}
-        </Group>
+              >
+                <IconPlus size={16} color="#868e96" />
+              </Box>
+            </Popover.Target>
+            <Popover.Dropdown>
+              <Tabs defaultValue="solid">
+                <Tabs.List>
+                  <Tabs.Tab value="solid" size="xs">
+                    Solid
+                  </Tabs.Tab>
+                  <Tabs.Tab value="gradient" size="xs">
+                    Gradient
+                  </Tabs.Tab>
+                </Tabs.List>
+
+                <Tabs.Panel value="solid" pt="xs">
+                  <Stack gap="xs">
+                    <ColorPicker
+                      format="hex"
+                      value={customColor}
+                      onChange={setCustomColor}
+                      swatches={['#E5E7EB', '#F3F4F6', '#DBEAFE', '#E0E7FF', '#FCE7F3', '#FEF3C7', '#D1FAE5', '#000000', '#FFFFFF']}
+                    />
+                    <Button
+                      size="xs"
+                      onClick={() => {
+                        setSettings({ ...settings, backgroundColor: customColor });
+                        setCustomColorOpen(false);
+                      }}
+                    >
+                      Apply
+                    </Button>
+                  </Stack>
+                </Tabs.Panel>
+
+                <Tabs.Panel value="gradient" pt="xs">
+                  <GradientEditor
+                    initialGradient={isGradient(settings.backgroundColor) ? settings.backgroundColor : undefined}
+                    onApply={(gradient) => {
+                      setSettings({ ...settings, backgroundColor: gradient });
+                      setCustomColorOpen(false);
+                    }}
+                    onCancel={() => setCustomColorOpen(false)}
+                  />
+                </Tabs.Panel>
+              </Tabs>
+            </Popover.Dropdown>
+          </Popover>
+        </SimpleGrid>
       </Box>
     </Stack>
   );

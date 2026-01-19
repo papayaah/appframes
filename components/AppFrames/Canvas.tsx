@@ -9,6 +9,7 @@ import { OverflowDeviceRenderer } from './OverflowDeviceRenderer';
 import { getCanvasDimensions } from './FramesContext';
 import { useMediaImage } from '../../hooks/useMediaImage';
 import { TextElement as CanvasTextElement } from './TextElement';
+import { getBackgroundStyle } from './Sidebar';
 
 interface CanvasProps {
   settings: CanvasSettings;
@@ -418,7 +419,7 @@ export function Canvas({
                   width: '100%',
                   maxWidth: aspectRatio > 1 ? '90%' : 600,
                   aspectRatio: `${aspectRatio}`,
-                  backgroundColor: screenSettings.backgroundColor,
+                  ...getBackgroundStyle(screenSettings.backgroundColor),
                   position: 'relative',
                   boxShadow: '0 10px 40px rgba(0,0,0,0.15)',
                   borderRadius: 8,

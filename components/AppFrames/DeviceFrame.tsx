@@ -57,14 +57,47 @@ interface DeviceConfig {
 }
 
 const getDeviceConfig = (deviceId: string = 'iphone-14-pro'): DeviceConfig => {
-  // Frameless phone (no visible bezel / black border)
-  if (deviceId === 'iphone-frameless') {
+  // Frameless devices (no visible bezel / black border)
+  if (deviceId === 'iphone-frameless' || deviceId === 'frameless-phone') {
     return {
       width: 280,
       height: 575,
       radius: 52,
       frameColor: 'transparent',
       screenRadius: 52,
+      type: 'frameless',
+      bezelWidth: 0,
+    };
+  }
+  if (deviceId === 'frameless-tablet') {
+    return {
+      width: 440,
+      height: 580,
+      radius: 24,
+      frameColor: 'transparent',
+      screenRadius: 24,
+      type: 'frameless',
+      bezelWidth: 0,
+    };
+  }
+  if (deviceId === 'frameless-laptop') {
+    return {
+      width: 600,
+      height: 380,
+      radius: 16,
+      frameColor: 'transparent',
+      screenRadius: 16,
+      type: 'frameless',
+      bezelWidth: 0,
+    };
+  }
+  if (deviceId === 'frameless-desktop') {
+    return {
+      width: 640,
+      height: 360,
+      radius: 12,
+      frameColor: 'transparent',
+      screenRadius: 12,
       type: 'frameless',
       bezelWidth: 0,
     };
@@ -566,82 +599,178 @@ export function DeviceFrame({
   };
 
   const renderBase = () => {
-    if (config.type === 'laptop') {
+    // Check if it's a laptop (including frameless)
+    const isLaptop = config.type === 'laptop' || deviceType === 'frameless-laptop';
+    if (isLaptop) {
+      // Laptop keyboard base - much thinner and sleeker
+      const keyboardHeight = 22 * scale;
+      const baseWidth = width + 12 * scale;
       return (
         <Box
           style={{
             position: 'absolute',
-            bottom: -20 * scale,
+            top: '100%', // Position directly below the frame wrapper
             left: '50%',
             transform: 'translateX(-50%)',
-            width: width + 40 * scale,
-            height: 20 * scale,
-            background: '#3a3a3a',
+            width: baseWidth,
+            height: keyboardHeight,
+            background: 'linear-gradient(180deg, #2a2a2a 0%, #1a1a1a 100%)',
             borderBottomLeftRadius: 10 * scale,
             borderBottomRightRadius: 10 * scale,
-            boxShadow: '0 10px 20px rgba(0,0,0,0.2)',
+            boxShadow: '0 10px 30px rgba(0,0,0,0.3)',
+            display: 'flex',
+            flexDirection: 'column',
+            padding: 2 * scale,
+            gap: 1 * scale,
+            zIndex: 0, // Behind selection rings
           }}
         >
-          {/* Groove */}
+          {/* Keyboard area - simplified and thinner */}
           <Box
             style={{
-              position: 'absolute',
-              top: 0,
-              left: '50%',
-              transform: 'translateX(-50%)',
-              width: 80 * scale,
-              height: 4 * scale,
-              background: '#2a2a2a',
-              borderBottomLeftRadius: 4 * scale,
-              borderBottomRightRadius: 4 * scale,
+              flex: 1,
+              background: '#1a1a1a',
+              borderRadius: 2 * scale,
+              padding: 2 * scale,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 1 * scale,
+            }}
+          >
+            {/* Simplified keyboard - just 3 main rows, no function keys */}
+            {['QWERTYUIOP', 'ASDFGHJKL', 'ZXCVBNM'].map((row, rowIdx) => (
+              <Box
+                key={rowIdx}
+                style={{
+                  display: 'flex',
+                  gap: Math.max(0.5, 1 * scale),
+                  justifyContent: 'center',
+                  paddingLeft: rowIdx === 1 ? Math.max(4, 8 * scale) : rowIdx === 2 ? Math.max(8, 16 * scale) : 0,
+                }}
+              >
+                {Array.from({ length: row.length }).map((_, i) => (
+                  <Box
+                    key={i}
+                    style={{
+                      width: Math.max(3, 6 * scale),
+                      height: Math.max(2, 4 * scale),
+                      background: '#0a0a0a',
+                      borderRadius: Math.max(0.5, 1 * scale),
+                      boxShadow: 'inset 0 0.5px 1px rgba(0,0,0,0.5)',
+                      border: `0.5px solid rgba(255,255,255,0.08)`,
+                    }}
+                  />
+                ))}
+              </Box>
+            ))}
+            {/* Space bar row - thinner */}
+            <Box style={{ display: 'flex', gap: Math.max(0.5, 1 * scale), justifyContent: 'center', marginTop: 0.5 * scale }}>
+              <Box
+                style={{
+                  width: Math.max(40, 80 * scale),
+                  height: Math.max(2, 4 * scale),
+                  background: '#0a0a0a',
+                  borderRadius: Math.max(0.5, 1 * scale),
+                  boxShadow: 'inset 0 0.5px 1px rgba(0,0,0,0.5)',
+                  border: `0.5px solid rgba(255,255,255,0.08)`,
+                }}
+              />
+            </Box>
+          </Box>
+          {/* Trackpad area - smaller */}
+          <Box
+            style={{
+              width: 50 * scale,
+              height: 5 * scale,
+              background: '#1a1a1a',
+              borderRadius: 2 * scale,
+              margin: '0 auto',
+              boxShadow: 'inset 0 0.5px 1px rgba(0,0,0,0.3)',
             }}
           />
         </Box>
       );
     }
-    if (config.type === 'monitor') {
+    // Check if it's a monitor/desktop (including frameless)
+    const isMonitor = config.type === 'monitor' || deviceType === 'frameless-desktop';
+    if (isMonitor) {
+      // Desktop monitor stand and base - thinner and sleeker
+      const standHeight = 50 * scale;
+      const baseWidth = 160 * scale;
+      const baseHeight = 12 * scale;
+      const standWidth = 20 * scale;
+      
       return (
         <Box
           style={{
             position: 'absolute',
-            bottom: -40 * scale,
+            top: '100%', // Position directly below the frame wrapper
             left: '50%',
             transform: 'translateX(-50%)',
-            width: 120 * scale,
-            height: 60 * scale, // Stand height + base
+            width: baseWidth,
+            height: standHeight + baseHeight,
             display: 'flex',
-            alignItems: 'flex-end',
-            justifyContent: 'center',
+            flexDirection: 'column',
+            alignItems: 'center',
+            zIndex: 0, // Behind selection rings
           }}
         >
+          {/* Stand */}
           <Box
             style={{
-              width: 40 * scale,
-              height: '100%',
-              background: '#d1d1d1',
+              width: standWidth,
+              height: standHeight,
+              background: 'linear-gradient(180deg, #c0c0c0 0%, #a0a0a0 100%)',
+              borderRadius: `${standWidth / 2}px ${standWidth / 2}px 0 0`,
+              boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
             }}
           />
+          {/* Base */}
           <Box
             style={{
-              position: 'absolute',
-              bottom: 0,
-              width: 140 * scale,
-              height: 10 * scale,
-              background: '#d1d1d1',
-              borderRadius: 4 * scale,
+              width: baseWidth,
+              height: baseHeight,
+              background: 'linear-gradient(180deg, #d0d0d0 0%, #b0b0b0 100%)',
+              borderRadius: 8 * scale,
+              boxShadow: '0 4px 12px rgba(0,0,0,0.25)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
             }}
-          />
+          >
+            {/* Base accent line */}
+            <Box
+              style={{
+                width: baseWidth * 0.6,
+                height: 2 * scale,
+                background: 'rgba(0,0,0,0.1)',
+                borderRadius: 1 * scale,
+              }}
+            />
+          </Box>
         </Box>
-      )
+      );
     }
     return null;
   };
+
+  // Calculate extra height needed for base/stand (laptops and monitors, including frameless)
+  const isLaptop = config.type === 'laptop' || deviceType === 'frameless-laptop';
+  const isMonitor = config.type === 'monitor' || deviceType === 'frameless-desktop';
+  const baseHeight = isLaptop
+    ? 22 * scale 
+    : isMonitor
+    ? 50 * scale + 12 * scale // stand + base
+    : 0;
 
   return (
     <Box
       data-frame-drop-zone="true"
       data-frame-index={frameIndex}
-      style={{ position: 'relative' }}
+      style={{ 
+        position: 'relative',
+        paddingBottom: baseHeight, // Reserve space for base/stand
+      }}
       onMouseEnter={() => {
         if (isLocked && gestureOwnerKey && !isOwnerActive(gestureOwnerKey)) return;
         if (!isDragging && !isFrameDragging) setIsHovered(true);
@@ -910,8 +1039,9 @@ export function DeviceFrame({
           </Popover>
         )}
 
+        {/* Base/Stand (laptops and monitors) */}
+        {renderBase()}
       </Box>
-      {renderBase()}
     </Box>
   );
 }

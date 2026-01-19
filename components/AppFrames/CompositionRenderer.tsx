@@ -505,15 +505,7 @@ export function CompositionRenderer({
       const isClearedTriple2 = images[2]?.cleared === true || images[2]?.deviceFrame === '';
       return (
         <Box style={{ height: '100%', perspective: '2000px', perspectiveOrigin: 'center center' }}>
-          <Center
-            style={{
-              height: '100%',
-              gap: 12,
-              flexWrap: 'wrap',
-              alignContent: 'center',
-              padding: 12,
-            }}
-          >
+          <Center style={{ height: '100%', gap: 12 }}>
             <DraggableFrame
               frameX={tripleOffset0.frameX}
               frameY={tripleOffset0.frameY}

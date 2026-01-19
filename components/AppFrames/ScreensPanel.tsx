@@ -6,6 +6,7 @@ import { IconPlus, IconX, IconCheck } from '@tabler/icons-react';
 import { Screen, CanvasSettings } from './AppFrames';
 import { CompositionRenderer } from './CompositionRenderer';
 import { getCanvasSizeLabel } from './FramesContext';
+import { getBackgroundStyle } from './Sidebar';
 
 interface ScreensPanelProps {
   screens: Screen[];
@@ -43,7 +44,7 @@ const ScreenThumbnail = memo(function ScreenThumbnail({
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: screen.settings.backgroundColor,
+        ...getBackgroundStyle(screen.settings.backgroundColor),
         padding: 2,
         overflow: 'hidden',
         position: 'relative',

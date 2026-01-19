@@ -7,6 +7,7 @@ import { useMediaImage } from '@/hooks/useMediaImage';
 import { MantineProvider } from '@mantine/core';
 import { theme } from '@/theme';
 import { InteractionLockProvider } from '@/components/AppFrames/InteractionLockContext';
+import { getBackgroundStyle } from '@/components/AppFrames/Sidebar';
 
 export type ExportFormat = 'png' | 'jpg';
 
@@ -170,7 +171,7 @@ function ExportSurface({
       style={{
         width,
         height,
-        backgroundColor: screenSettings.backgroundColor,
+        ...getBackgroundStyle(screenSettings.backgroundColor),
         position: 'relative',
         overflow: 'hidden',
       }}

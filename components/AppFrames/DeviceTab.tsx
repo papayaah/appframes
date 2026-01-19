@@ -13,8 +13,13 @@ interface DeviceOption {
 }
 
 const devices: DeviceOption[] = [
+  // NO BEZEL (generic, not tied to any device type)
+  { id: 'frameless-phone', name: 'Frameless Phone', dimensions: 'No bezel', category: 'NO BEZEL' },
+  { id: 'frameless-tablet', name: 'Frameless Tablet', dimensions: 'No bezel', category: 'NO BEZEL' },
+  { id: 'frameless-laptop', name: 'Frameless Laptop', dimensions: 'No bezel', category: 'NO BEZEL' },
+  { id: 'frameless-desktop', name: 'Frameless Desktop', dimensions: 'No bezel', category: 'NO BEZEL' },
+  
   // PHONES - iOS
-  { id: 'iphone-frameless', name: 'Frameless', dimensions: 'No bezel', category: 'PHONES', subcategory: 'iOS' },
   { id: 'iphone-14-pro', name: 'iPhone 14 Pro', dimensions: 'Dynamic Island', category: 'PHONES', subcategory: 'iOS' },
   { id: 'iphone-14', name: 'iPhone 14', dimensions: 'Notch', category: 'PHONES', subcategory: 'iOS' },
   { id: 'iphone-13', name: 'iPhone 13', dimensions: 'Notch', category: 'PHONES', subcategory: 'iOS' },
@@ -68,30 +73,10 @@ const DeviceButton = ({
       transition: 'all 0.2s',
       display: 'flex',
       alignItems: 'center',
+      justifyContent: 'space-between',
       gap: 12,
     }}
   >
-    <Box
-      style={{
-        width: 32,
-        height: 32,
-        borderRadius: 6,
-        backgroundColor: selected ? '#667eea' : '#e9ecef',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        flexShrink: 0,
-      }}
-    >
-      <Box
-        style={{
-          width: 16,
-          height: 22,
-          border: `2px solid ${selected ? 'white' : '#868e96'}`,
-          borderRadius: 3,
-        }}
-      />
-    </Box>
     <Box style={{ flex: 1 }}>
       <Text size="sm" fw={500} c={selected ? 'dark' : 'dimmed'}>
         {device.name}
@@ -110,6 +95,7 @@ const DeviceButton = ({
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
+          flexShrink: 0,
         }}
       >
         <Text size="xs" c="white">
@@ -131,7 +117,7 @@ export function DeviceTab({
     addFrameSlot,
     selectTextElement,
   } = useFrames();
-  const categories = ['PHONES', 'TABLETS', 'LAPTOPS', 'DESKTOPS'];
+  const categories = ['NO BEZEL', 'PHONES', 'TABLETS', 'LAPTOPS', 'DESKTOPS'];
 
   // Get current screen and its images
   const currentScreen = screens[primarySelectedIndex];
@@ -201,7 +187,7 @@ export function DeviceTab({
           const categoryDevices = devices.filter((d) => d.category === category);
           if (categoryDevices.length === 0) return null;
 
-          // Group devices by subcategory
+          // Group devices by subcategory (if they have one)
           const subcategories = Array.from(new Set(categoryDevices.map((d) => d.subcategory).filter(Boolean)));
 
           return (
@@ -210,27 +196,42 @@ export function DeviceTab({
                 {category.toLowerCase()}
               </Text>
               <Stack gap="lg">
-                {subcategories.map((subcategory) => {
-                  const subcategoryDevices = categoryDevices.filter((d) => d.subcategory === subcategory);
-                  
-                  return (
-                    <Box key={subcategory}>
-                      <Text size="xs" fw={600} c="dimmed" mb="xs" pl="xs">
-                        {subcategory}
-                      </Text>
-                      <Stack gap="xs">
-                        {subcategoryDevices.map((device) => (
-                          <DeviceButton
-                            key={device.id}
-                            device={device}
-                            selected={currentDeviceFrame === device.id}
-                            onClick={() => handleDeviceSelect(device.id)}
-                          />
-                        ))}
-                      </Stack>
-                    </Box>
-                  );
-                })}
+                {subcategories.length > 0 ? (
+                  // Categories with subcategories (PHONES, TABLETS, etc.)
+                  subcategories.map((subcategory) => {
+                    const subcategoryDevices = categoryDevices.filter((d) => d.subcategory === subcategory);
+                    
+                    return (
+                      <Box key={subcategory}>
+                        <Text size="xs" fw={600} c="dimmed" mb="xs" pl="xs">
+                          {subcategory}
+                        </Text>
+                        <Stack gap="xs">
+                          {subcategoryDevices.map((device) => (
+                            <DeviceButton
+                              key={device.id}
+                              device={device}
+                              selected={currentDeviceFrame === device.id}
+                              onClick={() => handleDeviceSelect(device.id)}
+                            />
+                          ))}
+                        </Stack>
+                      </Box>
+                    );
+                  })
+                ) : (
+                  // Categories without subcategories (NO BEZEL)
+                  <Stack gap="xs">
+                    {categoryDevices.map((device) => (
+                      <DeviceButton
+                        key={device.id}
+                        device={device}
+                        selected={currentDeviceFrame === device.id}
+                        onClick={() => handleDeviceSelect(device.id)}
+                      />
+                    ))}
+                  </Stack>
+                )}
               </Stack>
             </Box>
           );
