@@ -242,6 +242,7 @@ interface FramesContextType {
   deleteTextElement: (screenId: string, textId: string) => void;
   reorderTextElements: (screenId: string, fromIndex: number, toIndex: number) => void;
   selectTextElement: (textId: string | null) => void;
+  selectTextElementOnScreen: (screenIndex: number, textId: string | null) => void;
   duplicateTextElement: (screenId: string, textId: string) => void;
   // Frame/background convenience (for meaningful history labels)
   setCanvasBackgroundMedia: (screenIndex: number, mediaId: number | undefined) => void;
@@ -696,6 +697,29 @@ export function FramesProvider({ children }: { children: ReactNode }) {
   const selectTextElement = useCallback((textId: string | null) => {
     updateSelectedScreenSettings({ selectedTextId: textId ?? undefined });
   }, [updateSelectedScreenSettings]);
+
+  const selectTextElementOnScreen = useCallback((screenIndex: number, textId: string | null) => {
+    // Update a specific screen's selectedTextId (for multi-select scenarios)
+    // When selecting text on one screen, clear selection on all other screens
+    mutateDoc((draft) => {
+      const size = currentCanvasSizeRef.current;
+      const list = draft.screensByCanvasSize[size] || [];
+      
+      // If selecting text (not clearing), clear selection on all other screens first
+      if (textId) {
+        list.forEach((screen, idx) => {
+          if (idx !== screenIndex && screen.settings.selectedTextId) {
+            screen.settings = { ...screen.settings, selectedTextId: undefined };
+          }
+        });
+      }
+      
+      // Update the target screen's selection
+      const screen = list[screenIndex];
+      if (!screen) return;
+      screen.settings = { ...screen.settings, selectedTextId: textId ?? undefined };
+    });
+  }, []);
 
   const duplicateTextElement = useCallback((screenId: string, textId: string) => {
     commitCurrentScreens('Duplicate text', (list) => {
@@ -1290,6 +1314,7 @@ export function FramesProvider({ children }: { children: ReactNode }) {
         deleteTextElement,
         reorderTextElements,
         selectTextElement,
+        selectTextElementOnScreen,
         duplicateTextElement,
         setCanvasBackgroundMedia,
         clearFrameSlot,

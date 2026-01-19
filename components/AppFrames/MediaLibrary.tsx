@@ -39,7 +39,7 @@ import {
   IconX,
   IconZoomIn,
 } from '@tabler/icons-react';
-import type { AIGenerateSidebarProps, ComponentPreset, MediaAIGenerator, MediaAsset, MediaPexelsProvider, PexelsImagePickerProps } from '@reactkits.dev/react-media-library';
+import type { AIGenerateSidebarProps, ComponentPreset, MediaAIGenerator, MediaAsset, MediaPexelsProvider, PexelsImagePickerProps, MediaFreepikProvider, FreepikContentPickerProps } from '@reactkits.dev/react-media-library';
 import { MediaGrid, MediaLibraryProvider, useMediaLibraryContext } from '@reactkits.dev/react-media-library';
 
 interface MediaLibraryProps {
@@ -567,6 +567,194 @@ const mantinePreset: ComponentPreset = {
       </Box>
     </Modal>
   ),
+
+  FreepikContentPicker: ({
+    isOpen,
+    onClose,
+    content,
+    loading,
+    searchQuery,
+    onSearchQueryChange,
+    onSearch,
+    selected,
+    onToggleSelect,
+    onSelectAll,
+    onDeselectAll,
+    importing,
+    onImport,
+    order,
+    onOrderChange,
+  }: FreepikContentPickerProps) => (
+    <Modal
+      opened={isOpen}
+      onClose={onClose}
+      title={
+        <Group gap="xs">
+          <Text fw={600}>Freepik Icons</Text>
+        </Group>
+      }
+      size="lg"
+      styles={{
+        body: { padding: 0 },
+      }}
+    >
+      {/* Search & Filters */}
+      <Box p="md" style={{ borderBottom: '1px solid #e9ecef' }}>
+        <Group gap="sm" mb="sm">
+          <TextInput
+            placeholder="Search icons..."
+            value={searchQuery}
+            onChange={(e) => onSearchQueryChange(e.target.value)}
+            style={{ flex: 1 }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') onSearch();
+            }}
+          />
+          <Select
+            value={order}
+            onChange={(val) => onOrderChange((val as 'relevance' | 'popularity' | 'date') || 'relevance')}
+            data={[
+              { value: 'relevance', label: 'Relevance' },
+              { value: 'popularity', label: 'Popular' },
+              { value: 'date', label: 'Newest' },
+            ]}
+            style={{ width: 120 }}
+          />
+          <Button onClick={onSearch} disabled={loading}>
+            Search
+          </Button>
+        </Group>
+        <Group justify="space-between">
+          <Text size="sm" c="dimmed">
+            {content.length} icons found • {selected.size} selected
+          </Text>
+          <Group gap="xs">
+            <Button
+              variant="subtle"
+              size="xs"
+              onClick={selected.size === content.length && content.length > 0 ? onDeselectAll : onSelectAll}
+              disabled={content.length === 0}
+            >
+              {selected.size === content.length && content.length > 0 ? 'Deselect All' : 'Select All'}
+            </Button>
+          </Group>
+        </Group>
+      </Box>
+
+      {/* Content Grid */}
+      <Box p="md" style={{ maxHeight: 400, overflowY: 'auto' }}>
+        {loading ? (
+          <Center p="xl">
+            <Loader size="sm" />
+          </Center>
+        ) : content.length === 0 ? (
+          <Center p="xl">
+            <Text c="dimmed">No icons found. Try a different search term.</Text>
+          </Center>
+        ) : (
+          <SimpleGrid cols={4} spacing="sm">
+            {content.map((item) => (
+              <Box
+                key={item.id}
+                style={{
+                  position: 'relative',
+                  aspectRatio: '1',
+                  borderRadius: 8,
+                  overflow: 'hidden',
+                  cursor: 'pointer',
+                  border: selected.has(item.id) ? '3px solid #667eea' : '1px solid #dee2e6',
+                  transition: 'all 0.15s',
+                  backgroundColor: '#f8f9fa',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: 8,
+                }}
+                onClick={() => onToggleSelect(item.id)}
+              >
+                <img
+                  src={item.thumbnailUrl}
+                  alt={item.name}
+                  style={{
+                    maxWidth: '80%',
+                    maxHeight: '80%',
+                    objectFit: 'contain',
+                  }}
+                />
+                <Checkbox
+                  checked={selected.has(item.id)}
+                  onChange={() => onToggleSelect(item.id)}
+                  style={{
+                    position: 'absolute',
+                    top: 6,
+                    left: 6,
+                  }}
+                  styles={{
+                    input: {
+                      backgroundColor: selected.has(item.id) ? '#667eea' : 'rgba(255,255,255,0.9)',
+                      borderColor: selected.has(item.id) ? '#667eea' : '#dee2e6',
+                    },
+                  }}
+                />
+                {item.isFree && (
+                  <Badge
+                    size="xs"
+                    color="green"
+                    style={{
+                      position: 'absolute',
+                      top: 6,
+                      right: 6,
+                    }}
+                  >
+                    Free
+                  </Badge>
+                )}
+                <Box
+                  style={{
+                    position: 'absolute',
+                    bottom: 0,
+                    left: 0,
+                    right: 0,
+                    padding: 4,
+                    background: 'linear-gradient(to top, rgba(0,0,0,0.6), transparent)',
+                  }}
+                >
+                  <Text
+                    size="xs"
+                    c="white"
+                    style={{
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                      fontSize: 10,
+                    }}
+                  >
+                    {item.name}
+                  </Text>
+                </Box>
+              </Box>
+            ))}
+          </SimpleGrid>
+        )}
+      </Box>
+
+      {/* Footer */}
+      <Box p="md" style={{ borderTop: '1px solid #e9ecef' }}>
+        <Group justify="flex-end" gap="sm">
+          <Button variant="subtle" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button
+            onClick={onImport}
+            loading={importing}
+            disabled={selected.size === 0}
+          >
+            Import {selected.size > 0 ? `(${selected.size})` : ''}
+          </Button>
+        </Group>
+      </Box>
+    </Modal>
+  ),
 };
 
 function MediaLibraryContent({ onSelectMedia, selectedSlot }: MediaLibraryProps) {
@@ -711,8 +899,41 @@ export function MediaLibrary(props: MediaLibraryProps) {
     []
   );
 
+  const freepik = useMemo<MediaFreepikProvider>(
+    () => ({
+      async searchIcons(options) {
+        const params = new URLSearchParams();
+        if (options.query) params.set('term', options.query);
+        if (options.order) params.set('order', options.order);
+        if (options.page) params.set('page', String(options.page));
+        if (options.perPage) params.set('per_page', String(options.perPage));
+
+        const res = await fetch(`/api/freepik/icons?${params}`);
+        if (!res.ok) {
+          throw new Error('Failed to search Freepik icons');
+        }
+        const data = await res.json();
+        return data.content || [];
+      },
+
+      async downloadContent(content) {
+        // Use the thumbnail URL directly instead of calling the download API
+        // This is faster and doesn't consume API quota
+        const res = await fetch(content.thumbnailUrl);
+        if (!res.ok) {
+          throw new Error('Failed to download Freepik icon');
+        }
+        const blob = await res.blob();
+        const ext = content.thumbnailUrl.includes('.svg') ? 'svg' : 'png';
+        const filename = `${content.name.replace(/[^a-z0-9]/gi, '-').toLowerCase()}.${ext}`;
+        return new File([blob], filename, { type: blob.type || `image/${ext === 'svg' ? 'svg+xml' : 'png'}` });
+      },
+    }),
+    []
+  );
+
   return (
-    <MediaLibraryProvider enableDragDrop={true} ai={ai} pexels={pexels}>
+    <MediaLibraryProvider enableDragDrop={true} ai={ai} pexels={pexels} freepik={freepik}>
       <MediaLibraryContent {...props} />
     </MediaLibraryProvider>
   );

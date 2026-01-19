@@ -57,6 +57,7 @@ export function AppFrames() {
     updateTextElement,
     deleteTextElement,
     selectTextElement,
+    selectTextElementOnScreen,
     reorderScreens,
     mediaCache,
     undo,
@@ -558,12 +559,10 @@ export function AppFrames() {
             zoom={zoom}
             onZoomChange={setZoom}
             onSelectTextElement={(screenIndex, textId) => {
-              // Only allow text selection on primary selected screen
-              if (screenIndex !== primarySelectedIndex) return;
-              selectTextElement(textId);
-              if (textId) {
-                router.push('/text', { scroll: false });
-              }
+              // Allow text selection on any selected screen
+              if (!selectedScreenIndices.includes(screenIndex)) return;
+              selectTextElementOnScreen(screenIndex, textId);
+              // Removed auto-activation of text tab for performance
             }}
             onUpdateTextElement={(screenIndex, textId, updates) => {
               const screen = screens[screenIndex];

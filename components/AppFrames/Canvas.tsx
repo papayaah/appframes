@@ -336,22 +336,28 @@ export function Canvas({
           cursor: isPanning ? 'grabbing' : undefined,
         }}
       >
-        {selectedScreenIndices.map((screenIndex) => {
-          const screen = screens[screenIndex];
-          if (!screen) {
-            return null;
-          }
+        {(() => {
+          // Sort indices to maintain the same order as ScreensPanel
+          const sortedIndices = [...selectedScreenIndices].sort((a, b) => a - b);
+          // Primary screen is the last one selected (last in original array, not sorted)
+          const primaryScreenIndex = selectedScreenIndices[selectedScreenIndices.length - 1];
+          
+          return sortedIndices.map((screenIndex) => {
+            const screen = screens[screenIndex];
+            if (!screen) {
+              return null;
+            }
 
-          const screenSettings = {
-            ...screen.settings,
-            selectedScreenIndex: screenIndex,
-          };
+            const screenSettings = {
+              ...screen.settings,
+              selectedScreenIndex: screenIndex,
+            };
 
-          const canvasDimensions = getCanvasDimensions(screenSettings.canvasSize, screenSettings.orientation);
-          const aspectRatio = canvasDimensions.width / canvasDimensions.height;
+            const canvasDimensions = getCanvasDimensions(screenSettings.canvasSize, screenSettings.orientation);
+            const aspectRatio = canvasDimensions.width / canvasDimensions.height;
 
-          // Only show selection for the primary selected screen (last one)
-          const isPrimaryScreen = screenIndex === selectedScreenIndices[selectedScreenIndices.length - 1];
+            // Only show selection for the primary selected screen (last one selected)
+            const isPrimaryScreen = screenIndex === primaryScreenIndex;
           // Only show *one* set of handles at a time:
           // - If a text element is selected, suppress frame selection/handles.
           const effectiveSelectedFrameIndex =
@@ -473,8 +479,8 @@ export function Canvas({
                     <CanvasTextElement
                       key={t.id}
                       element={t}
-                      selected={!!isPrimaryScreen && screenSettings.selectedTextId === t.id}
-                      disabled={!isPrimaryScreen}
+                      selected={screenSettings.selectedTextId === t.id}
+                      disabled={false}
                       onSelect={() => onSelectTextElement?.(screenIndex, t.id)}
                       onUpdate={(updates) => onUpdateTextElement?.(screenIndex, t.id, updates)}
                       onDelete={() => onDeleteTextElement?.(screenIndex, t.id)}
@@ -532,7 +538,8 @@ export function Canvas({
               })()}
             </Box>
           );
-        })}
+          });
+        })()}
       </Box>
     </Box>
   );
