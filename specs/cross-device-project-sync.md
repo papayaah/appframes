@@ -41,6 +41,11 @@ When a user signs in for the first time on a device:
   - **Auto-claim** (recommended): silently enqueue background push for all local projects.
   - **Prompt**: “Sync your local projects to your account?” with confirm/cancel.
 
+
+**What gets claimed:**
+- **Project data**: The full project payload (including all screens, frames, images, text elements, settings, etc.) is pushed to the server. Since projects use UUIDs (`crypto.randomUUID()`), there's no risk of ID collisions between devices.
+- **Associated media**: Media files referenced by projects (via `mediaId` in screen images) should also be synced. See media sync details in `specs/offline-first-persistence.md`.
+
 If the account already has server projects, the local list is merged with the server list (details below).
 
 ### Sign-out

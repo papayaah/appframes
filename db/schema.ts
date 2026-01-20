@@ -70,8 +70,8 @@ export const session = pgTable(
     expiresAt: timestamp('expires_at', { mode: 'date' }).notNull(),
     ipAddress: text('ip_address'),
     userAgent: text('user_agent'),
-    createdAt: timestamp('created_at', { mode: 'date' }).notNull().defaultNow(),
-    updatedAt: timestamp('updated_at', { mode: 'date' }).notNull().defaultNow(),
+    createdAt: timestamp('created_at', { mode: 'string' }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { mode: 'string' }).notNull().defaultNow(),
   },
   (t) => ({
     tokenUnique: uniqueIndex('session_token_unique').on(t.token),
@@ -84,10 +84,11 @@ export const verification = pgTable(
   {
     id: text('id').primaryKey(),
     identifier: text('identifier').notNull(),
-    token: text('token').notNull(),
+    token: text('token'),
+    value: text('value').notNull(),
     expiresAt: timestamp('expires_at', { mode: 'date' }).notNull(),
-    createdAt: timestamp('created_at', { mode: 'date' }).notNull().defaultNow(),
-    updatedAt: timestamp('updated_at', { mode: 'date' }).notNull().defaultNow(),
+    createdAt: timestamp('created_at', { mode: 'string' }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { mode: 'string' }).notNull().defaultNow(),
   },
   (t) => ({
     identifierIdx: index('verification_identifier_idx').on(t.identifier),

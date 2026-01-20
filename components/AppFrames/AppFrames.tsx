@@ -117,8 +117,10 @@ export function AppFrames() {
   const currentScreen = screens[activeFrameScreenIndex];
   const currentFrameData = currentScreen?.images?.[selectedFrameIndex ?? 0];
 
-  // Check if a text element is selected (hide frame panels when text is selected)
-  const hasTextSelected = currentScreen?.settings?.selectedTextId != null;
+  // Check if a text element is selected on the PRIMARY screen (hide frame panels when text is selected)
+  // We check primarySelectedIndex because that's where text editing happens, not activeFrameScreenIndex
+  const primaryScreen = screens[primarySelectedIndex];
+  const hasTextSelected = primaryScreen?.settings?.selectedTextId != null;
 
   // Check if frame has a valid device frame (for frame settings panel)
   // Hide when text is selected
