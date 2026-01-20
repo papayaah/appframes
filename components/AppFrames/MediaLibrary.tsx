@@ -917,16 +917,18 @@ export function MediaLibrary(props: MediaLibraryProps) {
       },
 
       async downloadContent(content) {
-        // Use the thumbnail URL directly instead of calling the download API
-        // This is faster and doesn't consume API quota
-        const res = await fetch(content.thumbnailUrl);
+        // Use the thumbnail URL but swap to 512px for better quality
+        // Freepik CDN URLs follow pattern: https://cdn-icons-png.freepik.com/{size}/...
+        // Preview uses 128, we want 512 for import
+        const highResUrl = content.thumbnailUrl.replace(/\/128\//, '/512/');
+
+        const res = await fetch(highResUrl);
         if (!res.ok) {
           throw new Error('Failed to download Freepik icon');
         }
         const blob = await res.blob();
-        const ext = content.thumbnailUrl.includes('.svg') ? 'svg' : 'png';
-        const filename = `${content.name.replace(/[^a-z0-9]/gi, '-').toLowerCase()}.${ext}`;
-        return new File([blob], filename, { type: blob.type || `image/${ext === 'svg' ? 'svg+xml' : 'png'}` });
+        const filename = `${content.name.replace(/[^a-z0-9]/gi, '-').toLowerCase()}.png`;
+        return new File([blob], filename, { type: 'image/png' });
       },
     }),
     []

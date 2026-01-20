@@ -78,11 +78,82 @@ This remains the **authoritative working copy** for the user’s editing session
 
 ### Media
 
-Keep current **OPFS/IndexedDB** for local assets.
+**Current state**: Media files are stored locally via **OPFS/IndexedDB** in `packages/media-library`:
+- **Metadata** (asset records): IndexedDB (`MediaLibrary` database)
+- **File blobs**: OPFS (Origin Private File System)
 
-If we want cross-device media later:
-- store originals in object storage (S3/R2)
-- store references in Postgres (URL + metadata)
+**For cross-device sync**, we'll use a hybrid local + cloud approach:
+- **Local**: Keep OPFS/IndexedDB for fast offline access (authoritative for UX)
+- **Cloud**: Store originals in object storage (S3/R2) and references in Postgres
+
+#### Media Asset Data Model
+
+```typescript
+// Client-side (packages/media-library/src/types.ts)
+export interface MediaAsset {
+    // Local-only fields (for offline support)
+    id?: number; // Local IndexedDB ID (temporary until synced)
+    
+    // Cloud fields (synced)
+    cloudId?: string; // UUID from backend (primary key in cloud)
+    userId?: string; // User who owns this asset
+    
+    // File storage
+    handleName: string; // OPFS filename (local cache)
+    cloudUrl?: string; // CDN/object storage URL (if synced)
+    
+    // Metadata
+    fileName: string;
+    fileType: MediaType; // 'image' | 'video' | 'audio' | 'document' | 'other'
+    mimeType: string;
+    size: number;
+    width?: number;
+    height?: number;
+    
+    // Timestamps
+    createdAt: number; // Local creation time
+    updatedAt: number; // Last modification time
+    syncedAt?: number; // Last successful sync timestamp
+    cloudCreatedAt?: string; // ISO timestamp from backend
+    
+    // Sync state
+    syncStatus?: 'pending' | 'syncing' | 'synced' | 'error';
+    syncError?: string;
+}
+```
+
+#### Server-side Schema
+
+```prisma
+model MediaAsset {
+  id          String   @id @default(uuid())
+  userId      String
+  fileName    String
+  fileType    String   // 'image' | 'video' | 'audio' | etc.
+  mimeType    String
+  size        Int
+  width       Int?
+  height      Int?
+  url         String   // S3/R2 URL
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user        User     @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([createdAt])
+}
+```
+
+#### Media Sync Service
+
+The `packages/media-library` package will provide a `MediaSyncService` class that handles:
+- **Upload**: Upload new assets to S3/R2 and save metadata to Postgres
+- **Download**: Pull cloud assets to local OPFS/IndexedDB
+- **Background sync**: Auto-sync pending assets in background
+- **Conflict resolution**: Last-write-wins (v1)
+
+See implementation details in the "Media Sync Implementation" section below.
 
 ## API layer (Next.js App Router)
 
@@ -94,6 +165,12 @@ We’ll add Route Handlers under `app/api/*`:
 - `GET /api/projects/:id` — fetch full project
 - `PUT /api/projects/:id` — upsert project with optimistic concurrency
 - `POST /api/sync` (optional convenience endpoint) — batch push/pull
+
+**Media endpoints**:
+- `POST /api/media/assets` — upload new media asset (multipart form)
+- `GET /api/media/assets` — list user's media assets
+- `GET /api/media/assets/:id` — fetch asset metadata
+- `DELETE /api/media/assets/:id` — delete asset (from S3 + Postgres)
 
 ### Auth requirements
 
@@ -181,3 +258,85 @@ If local has pending unsynced edits:
 5) Add client sync queue + background worker (IndexedDB-backed)
 6) Add UI status (synced/syncing/error) + manual “Sync now”
 
+
+### Media Sync Implementation
+
+**Phase 1: Add Cloud Fields (Non-Breaking)**
+- Add optional `cloudId`, `cloudUrl`, `syncStatus` fields to `MediaAsset` type in `packages/media-library`
+- Existing local-only assets continue to work
+- New uploads can optionally sync
+
+**Phase 2: Sync Service & Backend**
+- Create `packages/media-library/src/services/sync.ts` with `MediaSyncService` class
+- Add media API routes (`app/api/media/assets/*`)
+- Set up S3/R2 bucket and credentials
+- Add `MediaAsset` table to Postgres schema
+
+**Phase 3: Background Sync**
+- Update `useMediaLibrary` hook to accept optional `syncConfig`
+- Enable auto-sync for new uploads (background, non-blocking)
+- Existing assets remain local-only until manually synced
+
+**Phase 4: Pull on Login**
+- On app load/login, pull cloud assets via `MediaSyncService.pullCloudAssets()`
+- Merge with local assets (dedupe by `cloudId`)
+- Show sync status in UI (pending/syncing/synced/error badges)
+
+**Phase 5: Full Sync**
+- Sync deletions
+- Conflict resolution UI (v1: last-write-wins)
+- Manual sync trigger button
+
+#### Media Sync Service API
+
+```typescript
+// packages/media-library/src/services/sync.ts
+
+export class MediaSyncService {
+    async uploadAsset(asset: MediaAsset, file: File): Promise<MediaAsset>
+    async fetchAssetMetadata(cloudId: string): Promise<MediaAsset>
+    async downloadAssetFile(cloudUrl: string): Promise<File>
+    async deleteAsset(cloudId: string): Promise<void>
+    async syncPendingAssets(...): Promise<void> // Background sync
+    async pullCloudAssets(...): Promise<void> // Pull on login
+}
+```
+
+#### Media Sync Configuration
+
+```typescript
+// Consumer app provides sync config
+const syncConfig: MediaSyncConfig = {
+    apiBaseUrl: '/api',
+    getUserId: async () => session?.user?.id || null,
+    getAuthToken: async () => session?.token || null,
+    autoSync: true,
+    syncInterval: 30000, // 30 seconds
+};
+
+<MediaLibraryProvider syncConfig={syncConfig} ...>
+```
+
+#### Environment Variables
+
+```env
+# Object Storage (S3/R2)
+S3_BUCKET=your-bucket-name
+S3_REGION=us-east-1
+AWS_ACCESS_KEY_ID=...
+AWS_SECRET_ACCESS_KEY=...
+
+# Or for Cloudflare R2
+R2_ACCOUNT_ID=...
+R2_ACCESS_KEY_ID=...
+R2_SECRET_ACCESS_KEY=...
+R2_BUCKET_NAME=...
+```
+
+#### Security
+
+- All media API routes require Better Auth session
+- Users can only access their own assets (`WHERE userId = session.user.id`)
+- File URLs: Use signed/expiring URLs for S3 access
+- Rate limiting: Prevent abuse of upload endpoints
+- File size limits: Enforce max file size on backend
