@@ -1,5 +1,6 @@
 import postgres from 'postgres';
 import { drizzle } from 'drizzle-orm/postgres-js';
+import { wrapPostgresForBetterAuth } from '@reactkits.dev/better-auth-connect/server/drizzle';
 
 import * as schema from './schema';
 
@@ -10,12 +11,15 @@ declare global {
 
 const connectionString = process.env.DATABASE_URL;
 if (!connectionString) {
-  // We throw at import-time because server routes need a DB for auth sessions.
-  // (If you want to boot the app without DB, we can lazily init, but Better Auth routes will fail anyway.)
   throw new Error('DATABASE_URL is not set');
 }
 
-export const dbClient = globalThis.__appframes_db_client ?? postgres(connectionString, { max: 10 });
+// Wrap postgres client for Better Auth compatibility (Date serialization)
+const createClient = () => wrapPostgresForBetterAuth(
+  postgres(connectionString, { max: 10 })
+);
+
+export const dbClient = globalThis.__appframes_db_client ?? createClient();
 
 if (process.env.NODE_ENV !== 'production') {
   globalThis.__appframes_db_client = dbClient;

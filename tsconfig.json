@@ -16,7 +16,9 @@
     "jsx": "react-jsx",
     "incremental": true,
     "paths": {
-      "@/*": ["./*"]
+      "@/*": ["./*"],
+      "@reactkits.dev/better-auth-connect": ["./packages/better-auth-connect/src/index.ts"],
+      "@reactkits.dev/better-auth-connect/*": ["./packages/better-auth-connect/src/*", "./packages/better-auth-connect/*"]
     },
     "plugins": [
       {
