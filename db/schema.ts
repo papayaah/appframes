@@ -29,7 +29,7 @@ export {
 };
 
 // App-specific tables
-import { pgTable, text, integer, timestamp, uuid } from 'drizzle-orm/pg-core';
+import { pgTable, text, integer, timestamp, uuid, index } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
 
 /**
@@ -46,11 +46,14 @@ export const mediaAssets = pgTable('media_assets', {
   size: integer('size').notNull(), // bytes
   width: integer('width'), // pixels (for images/videos)
   height: integer('height'), // pixels (for images/videos)
-  path: text('path').notNull(), // Local filesystem path relative to MEDIA_STORAGE_PATH
+  path: text('path').notNull(), // Local filesystem path relative to MEDIA_STORAGE_PATH (replaces S3/R2 URL from spec)
   thumbnailPath: text('thumbnail_path'), // Optional thumbnail path
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
-});
+}, (table) => ({
+  userIdIdx: index('media_assets_user_id_idx').on(table.userId),
+  createdAtIdx: index('media_assets_created_at_idx').on(table.createdAt),
+}));
 
 export const mediaAssetsRelations = relations(mediaAssets, ({ one }) => ({
   user: one(user, {
