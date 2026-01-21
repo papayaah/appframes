@@ -57,20 +57,32 @@ This remains the **authoritative working copy** for the user’s editing session
 
 ## Data model (server-side)
 
-### Minimal tables (v1 sync)
+### Better Auth tables (from `@reactkits.dev/better-auth-connect`)
 
-- `users`
-  - `id` (string/uuid)
-  - `email`, `name`, `image`
-  - `createdAt`, `updatedAt`
+The app uses Better Auth's standard tables (defined in `packages/better-auth-connect/src/server/drizzle/schema.ts`):
+
+- `user` (singular)
+  - `id` (text, primary key)
+  - `name`, `email`, `image`
+  - `emailVerified` (boolean)
+  - `createdAt`, `updatedAt` (timestamps)
+
+- `account` — OAuth provider accounts linked to users
+- `session` — user sessions
+- `verification` — verification tokens
+
+**Important**: Do **not** create a separate `users` table. Use Better Auth's `user` table and reference `user.id` from app tables.
+
+### App-specific tables (v1 sync)
 
 - `projects`
   - `id` (uuid) — same as local `Project.id`
-  - `userId` (fk → users.id)
-  - `name`
+  - `userId` (text, fk → `user.id`)
+  - `name` (text)
   - `data` (jsonb) — the full project payload (screensByCanvasSize, selections, zoom, etc.)
   - `revision` (bigint) — increments on each accepted write
-  - `updatedAt`, `createdAt`
+  - `deletedAt` (timestamp, nullable) — tombstone for deletion
+  - `createdAt`, `updatedAt` (timestamps)
 
 **Why jsonb first?**
 - Fast to ship and iterate while the client model is still evolving.
@@ -125,9 +137,10 @@ export interface MediaAsset {
 #### Server-side Schema
 
 ```prisma
+// Conceptual schema (actual implementation uses Drizzle)
 model MediaAsset {
   id          String   @id @default(uuid())
-  userId      String
+  userId      String   // FK to Better Auth user.id (text)
   fileName    String
   fileType    String   // 'image' | 'video' | 'audio' | etc.
   mimeType    String
@@ -138,11 +151,17 @@ model MediaAsset {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
+  // References Better Auth's user table (not a separate users table)
   user        User     @relation(fields: [userId], references: [id])
 
   @@index([userId])
   @@index([createdAt])
 }
+```
+
+**Note**: The `User` model here refers to Better Auth's `user` table from `@reactkits.dev/better-auth-connect`. In Drizzle, this would be:
+```typescript
+userId: text('user_id').notNull().references(() => user.id, { onDelete: 'cascade' })
 ```
 
 #### Media Sync Service
@@ -171,6 +190,85 @@ We’ll add Route Handlers under `app/api/*`:
 - `GET /api/media/assets` — list user's media assets
 - `GET /api/media/assets/:id` — fetch asset metadata
 - `DELETE /api/media/assets/:id` — delete asset (from S3 + Postgres)
+
+### File upload flow (media assets)
+
+**Upload process**:
+
+1. **Client uploads to Next.js API** (`POST /api/media/assets`):
+   - Request: `multipart/form-data` with:
+     - `file`: The actual file (File/Blob)
+     - `fileName`: Original filename
+     - `fileType`: Media type ('image', 'video', etc.)
+     - `mimeType`: MIME type
+     - Optional: `width`, `height` (if image)
+   
+2. **Server processes upload**:
+   - Validates file size (enforce max limit, e.g., 10MB for images, 100MB for videos)
+   - Validates MIME type (whitelist allowed types)
+   - Generates unique filename: `${userId}/${uuid()}-${sanitizedOriginalName}`
+   - Uploads file to S3/R2 bucket
+   - Saves metadata to Postgres `MediaAsset` table
+   - Returns: `{ id, cloudId, cloudUrl, ...metadata }`
+
+3. **File organization in bucket**:
+   - Structure: `{userId}/{assetId}-{originalFileName}`
+   - Example: `user_abc123/550e8400-e29b-41d4-a716-446655440000-screenshot.png`
+   - Benefits: Easy to list/delete by user, unique filenames prevent collisions
+
+4. **Alternative: Direct S3 upload (future optimization)**:
+   - Server generates presigned POST URL for client
+   - Client uploads directly to S3 (bypasses Next.js server)
+   - Client notifies server on completion
+   - Server saves metadata to Postgres
+   - Benefits: Reduces server load, faster uploads for large files
+
+**Download process**:
+- `GET /api/media/assets/:id` returns metadata with `cloudUrl`
+- For private buckets: Server generates signed/expiring URL (valid for 1 hour)
+- Client downloads file and caches in OPFS
+
+**Request/Response format**:
+
+```typescript
+// POST /api/media/assets
+// Request: multipart/form-data
+{
+  file: File,
+  fileName: string,
+  fileType: 'image' | 'video' | 'audio' | 'document' | 'other',
+  mimeType: string,
+  width?: number,  // if image
+  height?: number  // if image
+}
+
+// Response: 201 Created
+{
+  id: string,           // UUID (cloudId)
+  userId: string,
+  fileName: string,
+  fileType: string,
+  mimeType: string,
+  size: number,
+  width?: number,
+  height?: number,
+  cloudUrl: string,     // S3/R2 URL (or signed URL if private)
+  createdAt: string,    // ISO timestamp
+  updatedAt: string
+}
+
+// Error responses:
+// 400 Bad Request - Invalid file type/size
+// 401 Unauthorized - No session
+// 413 Payload Too Large - File exceeds limit
+// 500 Internal Server Error - Upload failed
+```
+
+**Error handling**:
+- File size validation: Reject files exceeding limits (configurable per type)
+- MIME type validation: Whitelist allowed types (images: jpeg, png, webp, gif; videos: mp4, webm)
+- Retry logic: Client should retry failed uploads (exponential backoff)
+- Partial uploads: For large files, consider chunked uploads (future enhancement)
 
 ### Auth requirements
 

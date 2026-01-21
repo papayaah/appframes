@@ -43,6 +43,78 @@ yarn build
 yarn start
 ```
 
+## Database
+
+### Database Console (Rails-like REPL)
+
+Query the database interactively using Node.js REPL with your database connection loaded:
+
+```bash
+# Using tsx for TypeScript support (recommended)
+npx tsx -r dotenv/config -e "
+import { db } from './db/index';
+import * as schema from './db/schema';
+import { eq, and, or, desc, asc, sql } from 'drizzle-orm';
+const repl = require('repl');
+const r = repl.start('db> ');
+r.context.db = db;
+r.context.schema = schema;
+r.context.eq = eq;
+r.context.and = and;
+r.context.or = or;
+r.context.desc = desc;
+r.context.asc = asc;
+r.context.sql = sql;
+"
+```
+
+**Example queries:**
+```javascript
+// Get all users
+await db.select().from(schema.user);
+
+// Get user by email
+await db.select().from(schema.user).where(eq(schema.user.email, 'user@example.com'));
+
+// Get all accounts for a user
+await db.select().from(schema.account).where(eq(schema.account.userId, 'user-id'));
+
+// Get all sessions with user info
+await db.select().from(schema.session).innerJoin(schema.user, eq(schema.session.userId, schema.user.id));
+
+// Count users
+const result = await db.select({ count: sql\`count(*)\` }).from(schema.user);
+```
+
+### Drizzle Studio (Database UI)
+
+Launch Drizzle Studio to visually browse and edit your database:
+
+```bash
+npx drizzle-kit studio
+```
+
+This will:
+- Open a web UI at `http://localhost:4983` (default port)
+- Show all tables from your schema
+- Allow you to browse, filter, and edit data
+- Support running SQL queries
+
+**Note:** Make sure `DATABASE_URL` is set in your `.env` file before running Studio.
+
+### Database Migrations
+
+```bash
+# Generate migration files from schema changes
+npx drizzle-kit generate
+
+# Apply migrations to database
+npx drizzle-kit migrate
+
+# Push schema changes directly (use with caution in production)
+npx drizzle-kit push
+```
+
 ### Quick Start
 
 See [QUICKSTART.md](./QUICKSTART.md) for a detailed guide on using the app.

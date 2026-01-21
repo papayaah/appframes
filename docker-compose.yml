@@ -9,8 +9,11 @@ services:
       NEXT_TELEMETRY_DISABLED: "1"
       PORT: "3000"
       HOSTNAME: "0.0.0.0"
+      MEDIA_STORAGE_PATH: /srv/appframes/media
     ports:
       - "127.0.0.1:${APP_PORT:-3000}:3000"
+    volumes:
+      - media_storage:/srv/appframes/media
 
   postgres:
     image: postgres:16-alpine
@@ -26,4 +29,5 @@ services:
 
 volumes:
   pgdata:
+  media_storage:
 
