@@ -39,8 +39,14 @@ import {
   IconX,
   IconZoomIn,
 } from '@tabler/icons-react';
-import type { AIGenerateSidebarProps, ComponentPreset, MediaAIGenerator, MediaAsset, MediaPexelsProvider, PexelsImagePickerProps, MediaFreepikProvider, FreepikContentPickerProps } from '@reactkits.dev/react-media-library';
+import { createAuthClient } from 'better-auth/client';
+import type { AIGenerateSidebarProps, ComponentPreset, MediaAIGenerator, MediaAsset, MediaPexelsProvider, PexelsImagePickerProps, MediaFreepikProvider, FreepikContentPickerProps, MediaSyncConfig } from '@reactkits.dev/react-media-library';
 import { MediaGrid, MediaLibraryProvider, useMediaLibraryContext } from '@reactkits.dev/react-media-library';
+
+// Auth client for getting user ID (sync purposes)
+const authClient = createAuthClient({
+  baseURL: process.env.NEXT_PUBLIC_BETTER_AUTH_URL,
+});
 
 interface MediaLibraryProps {
   onSelectMedia: (mediaId: number) => void;
@@ -934,8 +940,24 @@ export function MediaLibrary(props: MediaLibraryProps) {
     []
   );
 
+  // Sync configuration for server-side media storage
+  const sync = useMemo<MediaSyncConfig>(
+    () => ({
+      apiBaseUrl: '',
+      getUserId: async () => {
+        try {
+          const result: any = await authClient.getSession();
+          return result?.data?.user?.id || null;
+        } catch {
+          return null;
+        }
+      },
+    }),
+    []
+  );
+
   return (
-    <MediaLibraryProvider enableDragDrop={true} ai={ai} pexels={pexels} freepik={freepik}>
+    <MediaLibraryProvider enableDragDrop={true} ai={ai} pexels={pexels} freepik={freepik} sync={sync}>
       <MediaLibraryContent {...props} />
     </MediaLibraryProvider>
   );
