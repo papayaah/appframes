@@ -5,6 +5,7 @@ import { Screen, ScreenImage, CanvasSettings, DEFAULT_TEXT_STYLE, TextElement, T
 import { persistenceDB, Project } from '@/lib/PersistenceDB';
 import { usePersistence } from '@/hooks/usePersistence';
 import { usePatchHistory, type PatchHistoryEntry } from '@/hooks/usePatchHistory';
+import { useProjectSync, type UseProjectSyncResult } from '@/hooks/useProjectSync';
 
 // Canvas dimensions helper (App Store requirements)
 export const getCanvasDimensions = (canvasSize: string, orientation: string) => {
@@ -236,6 +237,10 @@ interface FramesContextType {
   deleteProject: (projectId: string) => Promise<void>;
   renameProject: (newName: string) => Promise<void>;
   getAllProjects: () => Promise<Project[]>;
+  // Sync status (for signed-in users)
+  syncStatus: UseProjectSyncResult['syncStatus'];
+  isSignedIn: boolean;
+  syncAll: () => Promise<void>;
   // Text elements
   addTextElement: (screenId: string) => void;
   updateTextElement: (screenId: string, textId: string, updates: Omit<Partial<TextElement>, 'style'> & { style?: Partial<TextStyle> }) => void;
@@ -342,6 +347,9 @@ export function FramesProvider({ children }: { children: ReactNode }) {
 
   // Track save status
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+
+  // Initialize project sync hook (handles auth state, background sync)
+  const { syncStatus, isSignedIn, syncProject, syncAll } = useProjectSync();
 
   // Initialize persistence hook with error handling
   const { debouncedSave } = usePersistence({
@@ -1023,7 +1031,7 @@ export function FramesProvider({ children }: { children: ReactNode }) {
     if (!currentProjectId || !hasLoadedInitialState.current) {
       return;
     }
-    
+
     debouncedSave(async () => {
       await persistenceDB.saveProject({
         id: currentProjectId,
@@ -1038,6 +1046,8 @@ export function FramesProvider({ children }: { children: ReactNode }) {
         updatedAt: new Date(),
         lastAccessedAt: new Date(),
       });
+      // Enqueue for server sync (if signed in)
+      syncProject(currentProjectId);
     });
   };
 
@@ -1199,15 +1209,27 @@ export function FramesProvider({ children }: { children: ReactNode }) {
    */
   const deleteProject = useCallback(async (projectId: string) => {
     try {
-      // Delete the project from database
+      // Delete the project from local database
       await persistenceDB.deleteProject(projectId);
-      
+      // Remove from sync queue if pending
+      await persistenceDB.dequeueSyncProject(projectId);
+
+      // Try to delete on server (if signed in) - fire and forget
+      if (isSignedIn) {
+        const baseRevision = await persistenceDB.getSyncedRevision(projectId);
+        fetch(`/api/projects/${projectId}`, {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ baseRevision }),
+        }).catch(console.error);
+      }
+
       // If deleting current project, switch to another or create new
       if (projectId === currentProjectId) {
         const projects = await persistenceDB.getAllProjects();
         if (projects.length > 0) {
           // Switch to the most recently accessed project
-          const recent = projects.sort((a, b) => 
+          const recent = projects.sort((a, b) =>
             b.lastAccessedAt.getTime() - a.lastAccessedAt.getTime()
           )[0];
           await switchProject(recent.id);
@@ -1220,7 +1242,7 @@ export function FramesProvider({ children }: { children: ReactNode }) {
       console.error('Failed to delete project:', error);
       throw error;
     }
-  }, [currentProjectId, switchProject, createNewProject]);
+  }, [currentProjectId, switchProject, createNewProject, isSignedIn]);
 
   /**
    * Rename the current project
@@ -1309,6 +1331,9 @@ export function FramesProvider({ children }: { children: ReactNode }) {
         deleteProject,
         renameProject,
         getAllProjects,
+        syncStatus,
+        isSignedIn,
+        syncAll,
         addTextElement,
         updateTextElement,
         deleteTextElement,

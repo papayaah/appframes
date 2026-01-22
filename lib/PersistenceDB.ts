@@ -41,6 +41,21 @@ export interface MediaFile {
   updatedAt: Date;
 }
 
+// Sync queue entry - tracks projects pending sync to server
+export interface SyncQueueEntry {
+  projectId: string;
+  enqueuedAt: number; // Timestamp when added to queue
+}
+
+// Sync state - tracks sync metadata for offline-first sync
+export interface SyncState {
+  id: string; // Always 'current'
+  lastSyncedRevisionByProjectId: Record<string, number>; // Server revision per project
+  syncQueue: SyncQueueEntry[]; // Projects pending push to server
+  syncErrorsByProjectId: Record<string, { message: string; at: number }>; // Errors per project
+  updatedAt: Date;
+}
+
 // Database schema definition for idb
 interface AppFramesDBSchema extends DBSchema {
   projects: {
@@ -57,6 +72,10 @@ interface AppFramesDBSchema extends DBSchema {
     value: MediaFile;
     indexes: { name: string; createdAt: Date };
   };
+  syncState: {
+    key: string;
+    value: SyncState;
+  };
 }
 
 /**
@@ -68,7 +87,8 @@ class PersistenceDB {
   private initPromise: Promise<void> | null = null;
 
   /**
-   * Initialize the database with version 1 schema
+   * Initialize the database with schema
+   * Version 2 adds syncState store for offline-first sync
    */
   async init(): Promise<void> {
     // Return existing initialization promise if already initializing
@@ -78,28 +98,38 @@ class PersistenceDB {
 
     this.initPromise = (async () => {
       try {
-        this.db = await openDB<AppFramesDBSchema>('AppFrames', 1, {
-          upgrade(db) {
-            // Create mediaFiles object store
-            const mediaStore = db.createObjectStore('mediaFiles', {
-              keyPath: 'id',
-              autoIncrement: true,
-            });
-            mediaStore.createIndex('name', 'name');
-            mediaStore.createIndex('createdAt', 'createdAt');
+        this.db = await openDB<AppFramesDBSchema>('AppFrames', 2, {
+          upgrade(db, oldVersion) {
+            // Version 1: Create base stores
+            if (oldVersion < 1) {
+              // Create mediaFiles object store
+              const mediaStore = db.createObjectStore('mediaFiles', {
+                keyPath: 'id',
+                autoIncrement: true,
+              });
+              mediaStore.createIndex('name', 'name');
+              mediaStore.createIndex('createdAt', 'createdAt');
 
-            // Create projects object store with indexes
-            const projectsStore = db.createObjectStore('projects', {
-              keyPath: 'id',
-            });
-            projectsStore.createIndex('updatedAt', 'updatedAt');
-            projectsStore.createIndex('lastAccessedAt', 'lastAccessedAt');
-            projectsStore.createIndex('name', 'name');
+              // Create projects object store with indexes
+              const projectsStore = db.createObjectStore('projects', {
+                keyPath: 'id',
+              });
+              projectsStore.createIndex('updatedAt', 'updatedAt');
+              projectsStore.createIndex('lastAccessedAt', 'lastAccessedAt');
+              projectsStore.createIndex('name', 'name');
 
-            // Create appState object store
-            db.createObjectStore('appState', {
-              keyPath: 'id',
-            });
+              // Create appState object store
+              db.createObjectStore('appState', {
+                keyPath: 'id',
+              });
+            }
+
+            // Version 2: Add syncState store for offline-first sync
+            if (oldVersion < 2) {
+              db.createObjectStore('syncState', {
+                keyPath: 'id',
+              });
+            }
           },
         });
       } catch (error) {
@@ -310,6 +340,156 @@ class PersistenceDB {
       await this.db!.delete('mediaFiles', id);
     } catch (error) {
       console.error('Failed to delete media file:', error);
+      throw error;
+    }
+  }
+
+  // ============================================
+  // Sync State Methods (for offline-first sync)
+  // ============================================
+
+  /**
+   * Get the current sync state
+   */
+  async getSyncState(): Promise<SyncState | null> {
+    try {
+      if (!this.db) await this.init();
+      return await this.db!.get('syncState', 'current') || null;
+    } catch (error) {
+      console.error('Failed to get sync state:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Save sync state
+   */
+  async saveSyncState(state: Partial<SyncState>): Promise<void> {
+    try {
+      if (!this.db) await this.init();
+
+      const existing = await this.getSyncState();
+      const updated: SyncState = {
+        id: 'current',
+        lastSyncedRevisionByProjectId: state.lastSyncedRevisionByProjectId ?? existing?.lastSyncedRevisionByProjectId ?? {},
+        syncQueue: state.syncQueue ?? existing?.syncQueue ?? [],
+        syncErrorsByProjectId: state.syncErrorsByProjectId ?? existing?.syncErrorsByProjectId ?? {},
+        updatedAt: new Date(),
+      };
+
+      await this.db!.put('syncState', updated);
+    } catch (error) {
+      console.error('Failed to save sync state:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Add a project to the sync queue (deduped by projectId)
+   */
+  async enqueueSyncProject(projectId: string): Promise<void> {
+    try {
+      if (!this.db) await this.init();
+
+      const state = await this.getSyncState();
+      const queue = state?.syncQueue ?? [];
+
+      // Dedupe: only add if not already in queue
+      if (!queue.some(entry => entry.projectId === projectId)) {
+        queue.push({ projectId, enqueuedAt: Date.now() });
+        await this.saveSyncState({ syncQueue: queue });
+      }
+    } catch (error) {
+      console.error('Failed to enqueue sync project:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Remove a project from the sync queue (after successful sync)
+   */
+  async dequeueSyncProject(projectId: string): Promise<void> {
+    try {
+      if (!this.db) await this.init();
+
+      const state = await this.getSyncState();
+      const queue = state?.syncQueue ?? [];
+      const filtered = queue.filter(entry => entry.projectId !== projectId);
+
+      if (filtered.length !== queue.length) {
+        await this.saveSyncState({ syncQueue: filtered });
+      }
+    } catch (error) {
+      console.error('Failed to dequeue sync project:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Update the last synced revision for a project
+   */
+  async updateSyncedRevision(projectId: string, revision: number): Promise<void> {
+    try {
+      if (!this.db) await this.init();
+
+      const state = await this.getSyncState();
+      const revisions = state?.lastSyncedRevisionByProjectId ?? {};
+      revisions[projectId] = revision;
+
+      await this.saveSyncState({ lastSyncedRevisionByProjectId: revisions });
+    } catch (error) {
+      console.error('Failed to update synced revision:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get the last synced revision for a project
+   */
+  async getSyncedRevision(projectId: string): Promise<number> {
+    try {
+      if (!this.db) await this.init();
+
+      const state = await this.getSyncState();
+      return state?.lastSyncedRevisionByProjectId?.[projectId] ?? 0;
+    } catch (error) {
+      console.error('Failed to get synced revision:', error);
+      return 0;
+    }
+  }
+
+  /**
+   * Set a sync error for a project
+   */
+  async setSyncError(projectId: string, message: string): Promise<void> {
+    try {
+      if (!this.db) await this.init();
+
+      const state = await this.getSyncState();
+      const errors = state?.syncErrorsByProjectId ?? {};
+      errors[projectId] = { message, at: Date.now() };
+
+      await this.saveSyncState({ syncErrorsByProjectId: errors });
+    } catch (error) {
+      console.error('Failed to set sync error:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Clear a sync error for a project
+   */
+  async clearSyncError(projectId: string): Promise<void> {
+    try {
+      if (!this.db) await this.init();
+
+      const state = await this.getSyncState();
+      const errors = state?.syncErrorsByProjectId ?? {};
+      delete errors[projectId];
+
+      await this.saveSyncState({ syncErrorsByProjectId: errors });
+    } catch (error) {
+      console.error('Failed to clear sync error:', error);
       throw error;
     }
   }

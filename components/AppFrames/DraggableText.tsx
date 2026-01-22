@@ -70,6 +70,10 @@ export function DraggableText({
   const containerRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
+  // Visual position during drag (doesn't trigger React state updates)
+  const visualPosRef = useRef<{ x: number; y: number } | null>(null);
+  const rafRef = useRef<number | null>(null);
+
   // Sync edit text when prop changes
   useEffect(() => {
     if (!isEditing) {
@@ -84,6 +88,14 @@ export function DraggableText({
       textareaRef.current.select();
     }
   }, [isEditing]);
+
+  // Apply visual position directly to DOM (no React re-render)
+  const applyVisualPosition = (x: number, y: number) => {
+    if (containerRef.current) {
+      containerRef.current.style.left = `${x}%`;
+      containerRef.current.style.top = `${y}%`;
+    }
+  };
 
   const handleMouseDown = (e: React.MouseEvent) => {
     if (isEditing) {
@@ -114,11 +126,37 @@ export function DraggableText({
       const newX = Math.max(0, Math.min(100, startPosX + deltaX));
       const newY = Math.max(0, Math.min(100, startPosY + deltaY));
 
-      onPositionChange(newX, newY);
+      // Store visual position for RAF update (no React state change)
+      visualPosRef.current = { x: newX, y: newY };
+
+      // Schedule RAF to update DOM directly
+      if (!rafRef.current) {
+        rafRef.current = requestAnimationFrame(() => {
+          rafRef.current = null;
+          const pos = visualPosRef.current;
+          if (pos) {
+            applyVisualPosition(pos.x, pos.y);
+          }
+        });
+      }
     };
 
     const handleEnd = () => {
       setIsDragging(false);
+
+      // Cancel any pending RAF
+      if (rafRef.current) {
+        cancelAnimationFrame(rafRef.current);
+        rafRef.current = null;
+      }
+
+      // Commit final position to React state (only on mouseup)
+      const finalPos = visualPosRef.current;
+      if (finalPos) {
+        onPositionChange(finalPos.x, finalPos.y);
+      }
+      visualPosRef.current = null;
+
       document.removeEventListener('mousemove', handleMove);
       document.removeEventListener('mouseup', handleEnd);
     };
