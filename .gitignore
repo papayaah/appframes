@@ -125,3 +125,6 @@ next-env.d.ts
 .claude
 .vercel
 .env*.local
+
+# Local media storage (uploaded files for dev)
+media/

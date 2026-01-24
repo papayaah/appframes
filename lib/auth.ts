@@ -24,6 +24,14 @@ export const auth = betterAuth({
     },
   }),
 
+  account: {
+    accountLinking: {
+      enabled: true,
+      // Auto-link accounts with same verified email from these providers
+      trustedProviders: ['google'],
+    },
+  },
+
   socialProviders: {
     google: {
       clientId: process.env.GOOGLE_CLIENT_ID as string,
