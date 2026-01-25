@@ -88,6 +88,23 @@ The app uses Better Auth's standard tables (defined in `packages/better-auth-con
 - Fast to ship and iterate while the client model is still evolving.
 - We can later normalize to `screens`, `frames`, `textElements` if needed.
 
+**Single row, single jsonb — is that OK?**
+- Yes. One project = one row; `data` holds the full payload (all screens, frames, text, settings, etc.).
+
+**Media is not in the DB.**  
+- **Local**: Media lives in **OPFS** (blobs) and media-library **IndexedDB** (metadata). Project `data` / jsonb only stores **references** (e.g. `mediaId`).  
+- **Server**: Media lives in **object storage** (S3/R2) or server file system. Project `data` stores only **references** (`mediaId`, `cloudId`, etc.).  
+- We do **not** embed images/blobs into the SQL DB or `data` jsonb. Ruled out.
+
+**Structure-only JSON growth — will we be OK?**  
+- `data` is **plain JSON**: screens, frames, text elements, settings, IDs. No base64, no blobs.  
+- Rough scale: each screen is on the order of ~1–2 KB (structure only). Hundreds of screens → low single-digit MB. Thousands → tens of MB.  
+- **IndexedDB**: Single put/get of a few MB is fine. Debounced saves keep write frequency reasonable.  
+- **Postgres**: jsonb handles multi‑MB payloads; TOAST kicks in for larger values. Transfer and parse for low‑MB JSON are acceptable.  
+- **When it might bite**: Only at **very** large scale (e.g. thousands of screens, or very deep/complex structure). Until then, structure-only growth is acceptable.  
+- **Optional safeguard**: Size-limit `data` on `PUT /api/projects/:id` (e.g. reject > 5–10 MB) if you want a hard cap.  
+- **Later**: If needed, normalize to `screens` / `frames` / `textElements` tables and do partial updates. Not required for typical usage.
+
 ### Media
 
 **Current state**: Media files are stored locally via **OPFS/IndexedDB** in `packages/media-library`:
@@ -346,6 +363,23 @@ If local has pending unsynced edits:
 
 - Postgres runs in Docker Compose (optional `--profile db`), and is **not exposed** to the host by default.
 - Secrets (`POSTGRES_PASSWORD`, etc.) live in `/srv/{app_name}/.env` (not in git).
+
+### Deploy and migrations
+
+**`deploy.sh` does not run migrations.** It syncs code, uploads `docker-compose.yml`, writes `.env`, and runs `docker compose up -d --build`. Migrations are **not** created or applied during deploy.
+
+- **Generate migrations** locally (after schema changes):
+  - `npm run db:generate` or `npx drizzle-kit generate`
+  - Creates SQL in `drizzle/`. Commit these files.
+- **Apply migrations** before the app can use Postgres:
+  - Locally: `npm run db:migrate` or `npx drizzle-kit migrate` (uses `DATABASE_URL` from `.env` / `.env.local`).
+  - On the server: run the same **after** deploy, e.g. SSH in and `cd /srv/{app_name}/app && npm run db:migrate`, **or** add a migration step to `deploy.sh` (see below).
+- **Postgres must be running** and **`DATABASE_URL`** must be set (e.g. `postgresql://{user}:{password}@postgres:5432/{db}` when using Docker Compose). The deploy `.env` today sets `POSTGRES_*`; the app needs `DATABASE_URL` derived from those (or set explicitly) for migrations and runtime.
+
+**Optional: run migrations as part of deploy**
+
+- Ensure Postgres is started (e.g. `docker compose --profile db up -d postgres`), then run migrations (e.g. a one-off `docker compose run --rm web npm run db:migrate` or an explicit `ssh_cmd "cd ... && npm run db:migrate"` in `deploy.sh`) before `docker compose up -d --build` for the web app.
+- The image (or host) must have `drizzle/`, `drizzle.config.ts`, and `db/schema` available, and `DATABASE_URL` in the environment.
 
 ## Implementation plan (high level)
 
