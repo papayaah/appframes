@@ -47,21 +47,10 @@ const DEFAULT_CONFIG: Required<Omit<ProjectSyncConfig, 'onSyncStatusChange' | 'o
 };
 
 /**
- * Convert a File/Blob to base64 data URL
+ * Upload a local media file to the server and return the server path
+ * Returns undefined if upload fails
  */
-async function fileToBase64(file: File | Blob): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
-}
-
-/**
- * Resolve a mediaId to base64 image data
- */
-async function resolveMediaIdToBase64(mediaId: number): Promise<string | undefined> {
+async function uploadMediaToServer(mediaId: number, apiBaseUrl: string): Promise<string | undefined> {
   try {
     const db = await initDB();
     const asset = await db.get('assets', mediaId);
@@ -70,48 +59,75 @@ async function resolveMediaIdToBase64(mediaId: number): Promise<string | undefin
     const file = await getFileFromOpfs(asset.handleName);
     if (!file) return undefined;
 
-    return await fileToBase64(file);
+    // Upload to server media API
+    const formData = new FormData();
+    formData.append('file', file, asset.fileName || 'media-file');
+
+    const response = await fetch(`${apiBaseUrl}/media/assets`, {
+      method: 'POST',
+      body: formData,
+    });
+
+    if (!response.ok) {
+      console.error(`Failed to upload media ${mediaId}: ${response.status}`);
+      return undefined;
+    }
+
+    const result = await response.json();
+    return result.path; // Server storage path (e.g., "userId/timestamp-filename.jpg")
   } catch (error) {
-    console.error(`Failed to resolve mediaId ${mediaId}:`, error);
+    console.error(`Failed to upload mediaId ${mediaId}:`, error);
     return undefined;
   }
 }
 
 /**
- * Resolve all mediaId references in a ScreenImage to base64
- * Returns a new ScreenImage with image data instead of mediaId
+ * Resolve a ScreenImage for sync - uploads media to server and returns server path
+ * Returns a new ScreenImage with serverMediaPath instead of mediaId/image
  */
-async function resolveScreenImage(img: ScreenImage): Promise<ScreenImage> {
-  if (img.mediaId && !img.image) {
-    const base64 = await resolveMediaIdToBase64(img.mediaId);
-    if (base64) {
-      // Return new image with base64 data, remove mediaId
-      const { mediaId: _, ...rest } = img;
-      return { ...rest, image: base64 };
+async function resolveScreenImage(img: ScreenImage, apiBaseUrl: string): Promise<ScreenImage> {
+  // If already has a server path, keep it
+  if ((img as ScreenImage & { serverMediaPath?: string }).serverMediaPath) {
+    return img;
+  }
+
+  // If has mediaId, upload to server and get server path
+  if (img.mediaId) {
+    const serverPath = await uploadMediaToServer(img.mediaId, apiBaseUrl);
+    if (serverPath) {
+      // Return image with server path, remove local-only fields
+      const { mediaId: _, image: __, ...rest } = img;
+      return { ...rest, serverMediaPath: serverPath } as ScreenImage;
     }
   }
+
+  // Strip any base64 image data - we don't want to store it in the DB
+  if (img.image) {
+    const { image: _, ...rest } = img;
+    return rest;
+  }
+
   return img;
 }
 
 /**
- * Resolve all mediaId references in a Screen to base64
- * Returns a deep copy with all images embedded
+ * Resolve all media references in a Screen for sync
+ * Uploads local media to server and stores server paths
  */
-async function resolveScreenMedia(screen: Screen): Promise<Screen> {
+async function resolveScreenMedia(screen: Screen, apiBaseUrl: string): Promise<Screen> {
   // Resolve images array
   const resolvedImages = await Promise.all(
-    screen.images.map(img => resolveScreenImage(img))
+    screen.images.map(img => resolveScreenImage(img, apiBaseUrl))
   );
 
   // Resolve canvas background if present
   let resolvedSettings = { ...screen.settings };
   if (screen.settings.canvasBackgroundMediaId) {
-    const bgBase64 = await resolveMediaIdToBase64(screen.settings.canvasBackgroundMediaId);
-    if (bgBase64) {
-      // Store background as embedded data, keep the mediaId for local reference
+    const serverPath = await uploadMediaToServer(screen.settings.canvasBackgroundMediaId, apiBaseUrl);
+    if (serverPath) {
       resolvedSettings = {
         ...resolvedSettings,
-        canvasBackgroundImage: bgBase64,
+        canvasBackgroundServerPath: serverPath,
       } as typeof resolvedSettings;
     }
   }
@@ -124,17 +140,18 @@ async function resolveScreenMedia(screen: Screen): Promise<Screen> {
 }
 
 /**
- * Resolve all mediaId references in project data for sync
- * Converts local OPFS references to embedded base64 for cross-device compatibility
+ * Resolve all media references in project data for sync
+ * Uploads local OPFS files to server and stores server paths
  */
 async function resolveProjectMedia(
-  screensByCanvasSize: Record<string, Screen[]>
+  screensByCanvasSize: Record<string, Screen[]>,
+  apiBaseUrl: string
 ): Promise<Record<string, Screen[]>> {
   const resolved: Record<string, Screen[]> = {};
 
   for (const [canvasSize, screens] of Object.entries(screensByCanvasSize)) {
     resolved[canvasSize] = await Promise.all(
-      screens.map(screen => resolveScreenMedia(screen))
+      screens.map(screen => resolveScreenMedia(screen, apiBaseUrl))
     );
   }
 
@@ -307,13 +324,14 @@ export class ProjectSyncService {
 
     const baseRevision = await persistenceDB.getSyncedRevision(projectId);
 
-    // Resolve all mediaId references to base64 for cross-device sync
-    // This embeds images in the project data so they work on any device
+    // Upload local media to server and get server paths
+    // This stores lightweight references instead of base64 blobs
     const resolvedScreens = await resolveProjectMedia(
-      project.screensByCanvasSize as Record<string, Screen[]>
+      project.screensByCanvasSize as Record<string, Screen[]>,
+      this.config.apiBaseUrl
     );
 
-    // Prepare project data for server (with embedded images)
+    // Prepare project data for server (with server media paths)
     const projectData = {
       screensByCanvasSize: resolvedScreens,
       currentCanvasSize: project.currentCanvasSize,
@@ -336,6 +354,14 @@ export class ProjectSyncService {
 
       if (response.ok) {
         const result = await response.json();
+
+        // Save resolved media paths back to IndexedDB to prevent re-uploads
+        // This ensures serverMediaPath is persisted locally
+        await persistenceDB.saveProject({
+          ...project,
+          screensByCanvasSize: resolvedScreens as Project['screensByCanvasSize'],
+        });
+
         await persistenceDB.updateSyncedRevision(projectId, result.revision);
         await persistenceDB.dequeueSyncProject(projectId);
         await persistenceDB.clearSyncError(projectId);
@@ -369,9 +395,10 @@ export class ProjectSyncService {
     // v1 policy: Client-wins last-write-wins
     // Retry the push with the server's current revision
 
-    // Resolve all mediaId references to base64 for cross-device sync
+    // Upload local media to server and get server paths
     const resolvedScreens = await resolveProjectMedia(
-      localProject.screensByCanvasSize as Record<string, Screen[]>
+      localProject.screensByCanvasSize as Record<string, Screen[]>,
+      this.config.apiBaseUrl
     );
 
     const projectData = {

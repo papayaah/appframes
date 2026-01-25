@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { AppShell, Box } from '@mantine/core';
+import { AppShell, Box, Center, Loader } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { Header } from './Header';
 import { SidebarTabs } from './SidebarTabs';
@@ -80,6 +80,7 @@ export function AppFrames() {
     downloadJpegQuality,
     setDownloadFormat,
     setDownloadJpegQuality,
+    isInitializing,
   } = useFrames();
 
   const [navWidth, setNavWidth] = useState(360); // Rail (80) + Panel (~280)
@@ -542,6 +543,11 @@ export function AppFrames() {
       </AppShell.Navbar>
 
       <AppShell.Main>
+        {isInitializing ? (
+          <Center style={{ height: 'calc(100vh - 45px)', backgroundColor: '#F9FAFB' }}>
+            <Loader size="lg" color="gray" />
+          </Center>
+        ) : (
         <Box style={{ height: 'calc(100vh - 40px)', display: 'flex', flexDirection: 'column' }}>
           <Canvas
             settings={settings}
@@ -731,6 +737,7 @@ export function AppFrames() {
             onMediaUpload={handleMediaUpload}
           />
         </Box>
+        )}
       </AppShell.Main>
 
       <AppShell.Aside p={0} style={{ borderLeft: '1px solid #E5E7EB' }}>

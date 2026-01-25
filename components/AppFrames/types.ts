@@ -1,6 +1,7 @@
 export interface ScreenImage {
-  image?: string; // Base64 image (legacy support)
-  mediaId?: number; // Reference to media library
+  image?: string; // Base64 image (legacy support - not used for sync)
+  mediaId?: number; // Reference to local media library (OPFS)
+  serverMediaPath?: string; // Server-side media path (for cross-device sync)
   deviceFrame?: string; // Device frame type for this specific frame
   /** If true, this slot is intentionally cleared (render nothing). */
   cleared?: boolean;

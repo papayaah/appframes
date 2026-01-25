@@ -241,6 +241,8 @@ interface FramesContextType {
   syncStatus: UseProjectSyncResult['syncStatus'];
   isSignedIn: boolean;
   syncAll: () => Promise<void>;
+  // Initial loading state
+  isInitializing: boolean;
   // Text elements
   addTextElement: (screenId: string) => void;
   updateTextElement: (screenId: string, textId: string, updates: Omit<Partial<TextElement>, 'style'> & { style?: Partial<TextStyle> }) => void;
@@ -278,6 +280,9 @@ export function FramesProvider({ children }: { children: ReactNode }) {
   // Flag to track if initial state has been loaded
   const hasLoadedInitialState = useRef(false);
   const hasStartedInitialLoad = useRef(false);
+
+  // Loading state for initial load (exposed to consumers for loading indicator)
+  const [isInitializing, setIsInitializing] = useState(true);
 
   // Project state
   const [currentProjectId, setCurrentProjectId] = useState<string | null>(null);
@@ -1012,6 +1017,7 @@ export function FramesProvider({ children }: { children: ReactNode }) {
     } finally {
       // Mark that initial state has been loaded
       hasLoadedInitialState.current = true;
+      setIsInitializing(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
@@ -1334,6 +1340,7 @@ export function FramesProvider({ children }: { children: ReactNode }) {
         syncStatus,
         isSignedIn,
         syncAll,
+        isInitializing,
         addTextElement,
         updateTextElement,
         deleteTextElement,
