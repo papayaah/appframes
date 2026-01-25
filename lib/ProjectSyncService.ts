@@ -86,9 +86,11 @@ async function uploadMediaToServer(mediaId: number, apiBaseUrl: string): Promise
  * Returns a new ScreenImage with serverMediaPath instead of mediaId/image
  */
 async function resolveScreenImage(img: ScreenImage, apiBaseUrl: string): Promise<ScreenImage> {
-  // If already has a server path, keep it
+  // If already has a server path, keep it (but strip any base64 that might be present)
   if ((img as ScreenImage & { serverMediaPath?: string }).serverMediaPath) {
-    return img;
+    // Strip base64 and mediaId - only keep serverMediaPath
+    const { image: _, mediaId: __, ...rest } = img;
+    return rest;
   }
 
   // If has mediaId, upload to server and get server path
@@ -423,6 +425,13 @@ export class ProjectSyncService {
 
       if (response.ok) {
         const result = await response.json();
+
+        // Save resolved media paths back to IndexedDB to prevent re-uploads
+        await persistenceDB.saveProject({
+          ...localProject,
+          screensByCanvasSize: resolvedScreens as Project['screensByCanvasSize'],
+        });
+
         await persistenceDB.updateSyncedRevision(projectId, result.revision);
         await persistenceDB.dequeueSyncProject(projectId);
         await persistenceDB.clearSyncError(projectId);
