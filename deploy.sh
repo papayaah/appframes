@@ -222,6 +222,9 @@ fi
 echo "Building + starting container on server (docker compose up -d --build) ..."
 run "ssh_cmd \"cd '$REMOTE_BASE' && docker compose up -d --build\""
 
+echo "Running database migrations ..."
+run "ssh_cmd \"cd '$REMOTE_BASE' && docker compose exec -T web npm run db:migrate\""
+
 echo
 echo "Done."
 echo "URL: http://${DOMAIN}"

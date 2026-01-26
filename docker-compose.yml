@@ -17,7 +17,7 @@ services:
 
   postgres:
     image: postgres:16-alpine
-    profiles: ["db"]
+    pr 
     restart: unless-stopped
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-appframes}

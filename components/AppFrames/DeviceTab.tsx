@@ -28,8 +28,8 @@ const devices: DeviceOption[] = [
   // PHONES - Android
   { id: 'pixel-7', name: 'Pixel 7', dimensions: 'Punch Hole', category: 'PHONES', subcategory: 'Android' },
   { id: 'samsung-s23', name: 'Samsung S23', dimensions: 'Punch Hole', category: 'PHONES', subcategory: 'Android' },
-  { id: 'galaxy-z-flip-5', name: 'Galaxy Z Flip 5', dimensions: 'Foldable', category: 'PHONES', subcategory: 'Android' },
-  { id: 'galaxy-z-fold-5', name: 'Galaxy Z Fold 5', dimensions: 'Foldable', category: 'PHONES', subcategory: 'Android' },
+  { id: 'galaxy-z-flip-5', name: 'Flip', dimensions: 'Foldable', category: 'PHONES', subcategory: 'Android' },
+  { id: 'galaxy-z-fold-5', name: 'Fold', dimensions: 'Foldable', category: 'PHONES', subcategory: 'Android' },
   
   // TABLETS - iOS
   { id: 'ipad-pro', name: 'iPad Pro', dimensions: 'Rounded', category: 'TABLETS', subcategory: 'iOS' },

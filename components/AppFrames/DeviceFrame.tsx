@@ -56,7 +56,7 @@ interface DeviceConfig {
   radius: number;
   frameColor: string;
   screenRadius: number;
-  type: 'notch' | 'punch-hole' | 'tablet' | 'laptop' | 'monitor' | 'home-button' | 'dynamic-island' | 'frameless';
+  type: 'notch' | 'punch-hole' | 'tablet' | 'laptop' | 'monitor' | 'home-button' | 'dynamic-island' | 'frameless' | 'flip' | 'fold';
   notchWidth?: number;
   bezelWidth?: number;
 }
@@ -143,6 +143,32 @@ export const getDeviceConfig = (deviceId: string = 'iphone-14-pro'): DeviceConfi
       screenRadius: 2,
       type: 'home-button',
       bezelWidth: 15, // Thicker top/bottom bezel simulated in render
+    };
+  }
+
+  // Foldable devices
+  if (deviceId === 'galaxy-z-flip-5') {
+    // Flip: tall and narrow, folds vertically (horizontal crease)
+    return {
+      width: 260,
+      height: 640,
+      radius: 28,
+      frameColor: '#1a1a1a',
+      screenRadius: 24,
+      type: 'flip',
+      bezelWidth: 8,
+    };
+  }
+  if (deviceId === 'galaxy-z-fold-5') {
+    // Fold: wider, folds horizontally (vertical crease)
+    return {
+      width: 380,
+      height: 480,
+      radius: 24,
+      frameColor: '#1a1a1a',
+      screenRadius: 20,
+      type: 'fold',
+      bezelWidth: 10,
     };
   }
 
@@ -567,6 +593,74 @@ export function DeviceFrame({
             }}
           />
         );
+      case 'flip':
+        // Flip: horizontal crease in the middle (folds vertically)
+        return (
+          <>
+            {/* Punch hole camera */}
+            <Box
+              style={{
+                position: 'absolute',
+                top: padding + 8 * scale,
+                left: '50%',
+                transform: 'translateX(-50%)',
+                width: 12 * scale,
+                height: 12 * scale,
+                borderRadius: '50%',
+                background: '#000',
+                zIndex: 10,
+              }}
+            />
+            {/* Horizontal crease/hinge in the middle */}
+            <Box
+              style={{
+                position: 'absolute',
+                top: '50%',
+                left: padding,
+                right: padding,
+                transform: 'translateY(-50%)',
+                height: 2 * scale,
+                background: 'linear-gradient(90deg, transparent 0%, rgba(0,0,0,0.3) 10%, rgba(0,0,0,0.5) 50%, rgba(0,0,0,0.3) 90%, transparent 100%)',
+                zIndex: 10,
+                boxShadow: '0 0 4px rgba(0,0,0,0.4)',
+              }}
+            />
+          </>
+        );
+      case 'fold':
+        // Fold: vertical crease in the middle (folds horizontally)
+        return (
+          <>
+            {/* Punch hole camera */}
+            <Box
+              style={{
+                position: 'absolute',
+                top: padding + 8 * scale,
+                left: '50%',
+                transform: 'translateX(-50%)',
+                width: 12 * scale,
+                height: 12 * scale,
+                borderRadius: '50%',
+                background: '#000',
+                zIndex: 10,
+              }}
+            />
+            {/* Vertical crease/hinge in the middle */}
+            <Box
+              style={{
+                position: 'absolute',
+                top: padding,
+                bottom: padding,
+                left: '50%',
+                transform: 'translateX(-50%)',
+                width: 2 * scale,
+                background: 'linear-gradient(180deg, transparent 0%, rgba(0,0,0,0.3) 10%, rgba(0,0,0,0.5) 50%, rgba(0,0,0,0.3) 90%, transparent 100%)',
+                zIndex: 10,
+                boxShadow: '0 0 4px rgba(0,0,0,0.4)',
+              }}
+            />
+          </>
+        );
       case 'home-button':
         return (
           <Box
@@ -961,7 +1055,7 @@ export function DeviceFrame({
         </Box>
 
         {/* Buttons (only for phones/tablets) */}
-        {['notch', 'punch-hole', 'tablet', 'home-button', 'dynamic-island'].includes(config.type) && (
+        {['notch', 'punch-hole', 'tablet', 'home-button', 'dynamic-island', 'flip', 'fold'].includes(config.type) && (
           <>
             <Box
               style={{
