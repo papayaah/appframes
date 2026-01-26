@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Box, Text, SimpleGrid, Button, Popover, ColorPicker, Stack } from '@mantine/core';
+import { Box, Text, SimpleGrid, Button, Popover, ColorPicker, Stack, Slider } from '@mantine/core';
 import { IconPlus } from '@tabler/icons-react';
 
 // Frame color presets
@@ -34,17 +34,33 @@ export interface FrameSettingsPanelProps {
   defaultFrameColor: string;
   /** Callback when frame color changes */
   onFrameColorChange: (color: string | undefined) => void;
+  /** Current frame rotation in degrees (-180 to 180) */
+  frameRotation?: number;
+  /** Callback when frame rotation changes */
+  onFrameRotationChange?: (rotation: number) => void;
+  /** Current frame scale percentage (20 to 200) */
+  frameScale?: number;
+  /** Callback when frame scale changes */
+  onFrameScaleChange?: (scale: number) => void;
+  /** Callback to reset frame transforms to defaults */
+  onResetTransforms?: () => void;
 }
 
 export function FrameSettingsPanel({
   frameColor,
   defaultFrameColor,
   onFrameColorChange,
+  frameRotation = 0,
+  onFrameRotationChange,
+  frameScale = 100,
+  onFrameScaleChange,
+  onResetTransforms,
 }: FrameSettingsPanelProps) {
   const [customColorOpen, setCustomColorOpen] = useState(false);
   const [customColor, setCustomColor] = useState(frameColor || defaultFrameColor);
 
   const effectiveColor = frameColor ?? defaultFrameColor;
+  const hasTransforms = frameRotation !== 0 || frameScale !== 100;
 
   return (
     <>
@@ -146,6 +162,63 @@ export function FrameSettingsPanel({
       >
         Reset to Default
       </Button>
+
+      {/* Frame Transform Controls */}
+      {(onFrameRotationChange || onFrameScaleChange) && (
+        <>
+          <Text size="xs" c="dimmed" mb="xs" mt="lg" tt="uppercase">
+            Rotation
+          </Text>
+          {onFrameRotationChange && (
+            <Slider
+              value={frameRotation}
+              onChange={onFrameRotationChange}
+              min={-180}
+              max={180}
+              label={(value) => `${value}°`}
+              marks={[
+                { value: -180, label: '-180°' },
+                { value: -90, label: '-90°' },
+                { value: 0, label: '0°' },
+                { value: 90, label: '90°' },
+                { value: 180, label: '180°' },
+              ]}
+            />
+          )}
+
+          <Text size="xs" c="dimmed" mb="xs" mt="md" tt="uppercase">
+            Scale
+          </Text>
+          {onFrameScaleChange && (
+            <Slider
+              value={frameScale}
+              onChange={onFrameScaleChange}
+              min={20}
+              max={200}
+              label={(value) => `${value}%`}
+              marks={[
+                { value: 20, label: '20%' },
+                { value: 50, label: '50%' },
+                { value: 100, label: '100%' },
+                { value: 150, label: '150%' },
+                { value: 200, label: '200%' },
+              ]}
+            />
+          )}
+
+          {onResetTransforms && hasTransforms && (
+            <Button
+              size="xs"
+              variant="light"
+              fullWidth
+              mt="md"
+              onClick={onResetTransforms}
+            >
+              Reset Rotation & Scale
+            </Button>
+          )}
+        </>
+      )}
     </>
   );
 }

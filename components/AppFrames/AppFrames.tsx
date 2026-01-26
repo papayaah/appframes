@@ -808,6 +808,21 @@ export function AppFrames() {
             if (selectedFrameIndex === null || selectedFrameIndex === undefined) return;
             setFrameColor(activeFrameScreenIndex, selectedFrameIndex, color);
           }}
+          frameRotation={currentFrameData?.rotateZ ?? 0}
+          onFrameRotationChange={(rotation) => {
+            if (selectedFrameIndex === null || selectedFrameIndex === undefined) return;
+            setFrameRotate(activeFrameScreenIndex, selectedFrameIndex, clampFrameTransform(rotation, 'rotateZ'));
+          }}
+          frameScale={currentFrameData?.frameScale ?? 100}
+          onFrameScaleChange={(scale) => {
+            if (selectedFrameIndex === null || selectedFrameIndex === undefined) return;
+            setFrameScale(activeFrameScreenIndex, selectedFrameIndex, clampFrameTransform(scale, 'frameScale'));
+          }}
+          onResetTransforms={() => {
+            if (selectedFrameIndex === null || selectedFrameIndex === undefined) return;
+            setFrameRotate(activeFrameScreenIndex, selectedFrameIndex, 0);
+            setFrameScale(activeFrameScreenIndex, selectedFrameIndex, 100);
+          }}
         />
       </FloatingSettingsPanel>
       </AppShell>

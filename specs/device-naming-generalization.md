@@ -1,260 +1,212 @@
-# Device Naming Generalization
+# Device Frame System: Modular DIY Approach
 
 ## Overview
 
-This spec defines a generalized naming scheme for device frames that removes specific model numbers and focuses on device categories, sizes, and key distinguishing features. This approach makes the app more maintainable and avoids the need to add every new model release.
+This spec defines a modular, DIY approach to device frames where users start with base frame types and customize them with modular features. This eliminates the need to maintain hundreds of similar phone models while still providing preset templates for quick selection.
 
-## Principles
+## Core Philosophy
 
-1. **Remove model numbers**: No "14", "15", "S23", etc.
-2. **Focus on size categories**: Small, Standard, Large, Extra Large
-3. **Distinguish by key features**: Dynamic Island vs Notch, Home Button, etc.
-4. **Use manufacturer product lines**: iPhone Pro, iPad Pro, MacBook Pro, etc.
-5. **Keep foldable names simple**: Flip, Fold (already done)
+Instead of maintaining separate configs for every phone model (iPhone 14, iPhone 15, Samsung S23, Pixel 7, etc.), we provide:
+1. **Base frame types** - Generic foundations (phone, tablet, laptop, desktop)
+2. **Modular features** - Components that can be added/removed (bezels, notches, home buttons, etc.)
+3. **Preset templates** - Quick-select combinations that match popular devices (iPhone, Samsung, etc.)
+4. **Distinct devices** - Unique devices that can't be replicated with modular parts (Surface Laptop, iMac, etc.)
 
-## iOS Phones
+## Base Frame Types
 
-### Current Devices
-- iPhone 14 Pro → **iPhone Pro** (Dynamic Island, standard size)
-- iPhone 14 → **iPhone** (Notch, standard size)
-- iPhone 13 → **iPhone** (Notch, standard size) - *duplicate, can be merged*
-- iPhone SE → **iPhone SE** (Home Button, small size)
+These are the foundational frame categories that users start with:
 
-### Proposed Generalized Names
+### 1. **Phone**
+- Generic phone frame
+- Standard aspect ratio
+- Can be customized with features
 
-1. **iPhone SE**
-   - Small size
-   - Home Button
-   - Dimensions: Compact
+### 2. **Tablet**
+- Generic tablet frame
+- Standard aspect ratio
+- Can be customized with features
 
-2. **iPhone**
-   - Standard size
-   - Notch
-   - Dimensions: Standard
+### 3. **Laptop**
+- Generic laptop frame
+- Standard aspect ratio
+- Can be customized with features
 
-3. **iPhone Pro**
-   - Standard size
-   - Dynamic Island
-   - Dimensions: Standard (Pro features)
+### 4. **Desktop**
+- Generic desktop/monitor frame
+- Standard aspect ratio
+- Can be customized with features
 
-4. **iPhone Pro Max** *(new - for extra large)*
-   - Large size
-   - Dynamic Island
-   - Dimensions: Extra large
+### 5. **Frameless Phone**
+- No bezels, edge-to-edge
+- Already generic ✓
 
-### Recommendation
-- Keep: iPhone SE, iPhone, iPhone Pro
-- Add: iPhone Pro Max (for large size variant)
-- Remove: Model number distinctions (14, 13, etc.)
+### 6. **Frameless Tablet**
+- No bezels, edge-to-edge
+- Already generic ✓
 
-## Android Phones
+### 7. **Frameless Laptop**
+- No bezels, edge-to-edge
+- Already generic ✓
 
-### Current Devices
-- Pixel 7 → **Pixel** (Punch Hole)
-- Samsung S23 → **Galaxy S** (Punch Hole)
-- Flip → **Flip** (Foldable) ✓
-- Fold → **Fold** (Foldable) ✓
+### 8. **Frameless Desktop**
+- No bezels, edge-to-edge
+- Already generic ✓
 
-### Proposed Generalized Names
+## Modular Features
 
-1. **Pixel**
-   - Standard Android phone
-   - Punch Hole camera
-   - Dimensions: Standard
+Users can add/remove these features on base frames:
 
-2. **Galaxy S**
-   - Samsung flagship
-   - Punch Hole camera
-   - Dimensions: Standard
+### Phone Features
+- **Bezel Style**: None, Thin, Standard, Thick
+- **Top Notch**: None, Notch, Dynamic Island, Punch Hole (center), Punch Hole (left)
+- **Bottom Home Button**: None, Home Button, Gesture Bar
+- **Size**: Small, Standard, Large, Extra Large
+- **Corner Radius**: Sharp, Rounded, Very Rounded
 
-3. **Flip**
-   - Foldable (vertical fold)
-   - Punch Hole camera
-   - Dimensions: Tall, narrow
+### Tablet Features
+- **Bezel Style**: None, Thin, Standard, Thick
+- **Top Notch**: None, Notch, Punch Hole
+- **Bottom Home Button**: None, Home Button, Gesture Bar
+- **Size**: Small, Standard, Large
+- **Corner Radius**: Sharp, Rounded, Very Rounded
 
-4. **Fold**
-   - Foldable (horizontal fold)
-   - Punch Hole camera
-   - Dimensions: Wide
+### Laptop Features
+- **Bezel Style**: None, Thin, Standard, Thick
+- **Top Notch**: None, Notch (like MacBook Pro)
+- **Keyboard**: None, Visible, Hidden
+- **Size**: Standard, Large
+- **Corner Radius**: Sharp, Rounded
 
-### Recommendation
-- Keep: Pixel, Galaxy S, Flip, Fold
-- Remove: Model numbers (7, S23, etc.)
+### Desktop Features
+- **Bezel Style**: None, Thin, Standard, Thick
+- **Stand**: None, Simple Stand, Apple Stand, VESA Mount
+- **Size**: Standard, Large, Extra Large
+- **Corner Radius**: Sharp, Rounded
 
-## iOS Tablets
+## Preset Templates
 
-### Current Devices
-- iPad Pro → **iPad Pro** ✓
-- iPad Air → **iPad Air** ✓
-- iPad Mini → **iPad Mini** ✓
+Quick-select combinations that match popular devices. These are just saved configurations of base frames + features:
 
-### Proposed Generalized Names
+### Phone Presets
+- **iPhone** - Phone + Notch + Standard Size
+- **iPhone Pro** - Phone + Dynamic Island + Standard Size
+- **iPhone SE** - Phone + Home Button + Small Size
+- **Samsung Galaxy** - Phone + Punch Hole (center) + Standard Size
+- **Pixel** - Phone + Punch Hole (left) + Standard Size
+- **Flip** - Foldable (vertical) - *keep as distinct*
+- **Fold** - Foldable (horizontal) - *keep as distinct*
 
-1. **iPad Mini**
-   - Small tablet
-   - Rounded corners
-   - Dimensions: Compact
+### Tablet Presets
+- **iPad** - Tablet + Standard Bezel + Standard Size
+- **iPad Pro** - Tablet + Thin Bezel + Large Size
+- **iPad Mini** - Tablet + Standard Bezel + Small Size
+- **Galaxy Tab** - Tablet + Standard Bezel + Standard Size
 
-2. **iPad Air**
-   - Standard tablet
-   - Rounded corners
-   - Dimensions: Standard
+### Laptop Presets
+- **MacBook Air** - Laptop + No Notch + Standard Size
+- **MacBook Pro** - Laptop + Notch + Standard Size
+- **Generic Laptop** - Laptop + Standard Bezel + Standard Size
 
-3. **iPad Pro**
-   - Large tablet
-   - Rounded corners
-   - Dimensions: Large
+### Desktop Presets
+- **Generic Monitor** - Desktop + Simple Stand + Standard Size
+- **Studio Display** - Desktop + Apple Stand + Standard Size
 
-### Recommendation
-- Keep all as-is (already generalized)
+## Distinct Devices (Keep As-Is)
 
-## Android Tablets
-
-### Current Devices
-- Galaxy Tab S9 → **Galaxy Tab** (remove model number)
-
-### Proposed Generalized Names
-
-1. **Galaxy Tab**
-   - Standard Android tablet
-   - Rounded corners
-   - Dimensions: Standard
-
-### Recommendation
-- Rename: Galaxy Tab S9 → **Galaxy Tab**
-
-## macOS Laptops
-
-### Current Devices
-- MacBook Pro 16" → **MacBook Pro** (Large)
-- MacBook Pro 14" → **MacBook Pro** (Standard)
-- MacBook Air → **MacBook Air** ✓
-
-### Proposed Generalized Names
-
-1. **MacBook Air**
-   - Thin and light
-   - No notch
-   - Dimensions: Standard
-
-2. **MacBook Pro**
-   - Professional
-   - Notch
-   - Dimensions: Standard (can represent both 14" and 16" as they're visually similar)
-
-### Recommendation
-- Keep: MacBook Air
-- Merge: MacBook Pro 14" and 16" → **MacBook Pro** (use standard size, notch indicates Pro)
-
-## Windows Laptops
-
-### Current Devices
-- Surface Laptop → **Surface Laptop** ✓
-
-### Proposed Generalized Names
-
-1. **Surface Laptop**
-   - Standard Windows laptop
-   - No notch
-   - Dimensions: Standard
-
-### Recommendation
-- Keep as-is (already generalized)
-
-## macOS Desktops
-
-### Current Devices
-- iMac 24" → **iMac** (remove size)
-- Studio Display → **Studio Display** ✓
-- Pro Display XDR → **Pro Display XDR** ✓
-
-### Proposed Generalized Names
-
-1. **iMac**
-   - All-in-one desktop
-   - Color-matched stand
-   - Dimensions: Standard (24" is typical)
-
-2. **Studio Display**
-   - Monitor
-   - Stand/base
-   - Dimensions: Standard
-
-3. **Pro Display XDR**
-   - Professional monitor
-   - Stand/base
-   - Dimensions: Large
-
-### Recommendation
-- Rename: iMac 24" → **iMac**
-- Keep: Studio Display, Pro Display XDR
-
-## No Bezel Devices
-
-### Current Devices
-- Frameless Phone → **Frameless Phone** ✓
-- Frameless Tablet → **Frameless Tablet** ✓
-- Frameless Laptop → **Frameless Laptop** ✓
-- Frameless Desktop → **Frameless Desktop** ✓
-
-### Recommendation
-- Keep all as-is (already generic)
-
-## Summary of Changes
-
-### Rename
-- `iphone-14-pro` → `iphone-pro` (name: "iPhone Pro")
-- `iphone-14` → `iphone` (name: "iPhone")
-- `iphone-13` → `iphone` (name: "iPhone") - *merge with above*
-- `pixel-7` → `pixel` (name: "Pixel")
-- `samsung-s23` → `galaxy-s` (name: "Galaxy S")
-- `galaxy-tab-s9` → `galaxy-tab` (name: "Galaxy Tab")
-- `macbook-pro-16` → `macbook-pro` (name: "MacBook Pro")
-- `macbook-pro-14` → `macbook-pro` (name: "MacBook Pro") - *merge with above*
-- `imac-24` → `imac` (name: "iMac")
-
-### Add
-- `iphone-pro-max` (name: "iPhone Pro Max") - for large size variant
-
-### Keep As-Is
-- `iphone-se` → "iPhone SE"
-- `galaxy-z-flip-5` → "Flip"
-- `galaxy-z-fold-5` → "Fold"
-- `ipad-pro` → "iPad Pro"
-- `ipad-air` → "iPad Air"
-- `ipad-mini` → "iPad Mini"
-- `macbook-air` → "MacBook Air"
-- `surface-laptop` → "Surface Laptop"
-- `studio-display` → "Studio Display"
-- `pro-display-xdr` → "Pro Display XDR"
-- All frameless devices
-
-## Implementation Notes
-
-1. **Backward Compatibility**: Old device IDs should still work (map old IDs to new ones)
-2. **Device Config**: Update `getDeviceConfig()` to handle both old and new IDs
-3. **Name Mapping**: Update `DeviceTab.tsx` and `LayersTab.tsx` with new names
-4. **Visual Differences**: Ensure device configs maintain appropriate size differences (e.g., Pro Max larger than Pro)
-
-## Device Size Hierarchy
-
-### Phones (iOS)
-- Small: iPhone SE
-- Standard: iPhone, iPhone Pro
-- Large: iPhone Pro Max
-
-### Phones (Android)
-- Standard: Pixel, Galaxy S
-- Foldable: Flip (tall), Fold (wide)
-
-### Tablets
-- Small: iPad Mini
-- Standard: iPad Air, Galaxy Tab
-- Large: iPad Pro
+These devices are unique enough that they can't be replicated with modular parts. Keep them as separate, distinct device configs:
 
 ### Laptops
-- Standard: MacBook Air, MacBook Pro, Surface Laptop
+- **Surface Laptop** - Unique design, distinctive look
 
 ### Desktops
-- Standard: iMac, Studio Display
-- Large: Pro Display XDR
+- **iMac** - All-in-one with color-matched stand, unique design
+- **Studio Display** - Distinctive Apple design
+- **Pro Display XDR** - Professional monitor with unique stand
+
+### Tablets
+- **iPad Pro** - Distinctive design (if we want to keep it separate from generic tablet)
+- **iPad Air** - Distinctive design (if we want to keep it separate)
+- **iPad Mini** - Distinctive size (if we want to keep it separate)
+
+*Note: We can decide whether to keep iPad variants as distinct devices or convert them to presets of the generic tablet.*
+
+## Implementation Architecture
+
+### Data Structure
+
+```typescript
+interface BaseFrame {
+  type: 'phone' | 'tablet' | 'laptop' | 'desktop' | 'frameless-phone' | 'frameless-tablet' | 'frameless-laptop' | 'frameless-desktop';
+  features: {
+    bezelStyle?: 'none' | 'thin' | 'standard' | 'thick';
+    topNotch?: 'none' | 'notch' | 'dynamic-island' | 'punch-hole-center' | 'punch-hole-left';
+    bottomHomeButton?: 'none' | 'home-button' | 'gesture-bar';
+    size?: 'small' | 'standard' | 'large' | 'extra-large';
+    cornerRadius?: 'sharp' | 'rounded' | 'very-rounded';
+    // ... other features
+  };
+}
+
+interface PresetTemplate {
+  id: string; // e.g., 'iphone', 'samsung-galaxy'
+  name: string; // e.g., "iPhone", "Samsung Galaxy"
+  baseFrame: BaseFrame;
+}
+
+interface DistinctDevice {
+  id: string; // e.g., 'surface-laptop', 'imac'
+  name: string; // e.g., "Surface Laptop", "iMac"
+  // Full device config (not modular)
+}
+```
+
+### User Flow
+
+1. **Start with base frame**: User selects "Phone", "Tablet", "Laptop", or "Desktop"
+2. **Customize features**: User adds/removes features (notch, bezel, home button, etc.)
+3. **Or use preset**: User can select a preset template (iPhone, Samsung, etc.) which applies a saved configuration
+4. **Save custom preset**: User can save their custom configuration as a new preset
+5. **Select distinct device**: User can also select a distinct device (Surface Laptop, iMac, etc.)
+
+### UI Components
+
+1. **Base Frame Selector**: Choose phone/tablet/laptop/desktop
+2. **Feature Customization Panel**: Toggle/modify features
+3. **Preset Template Selector**: Quick-select popular combinations
+4. **Distinct Device Selector**: Choose unique devices (Surface, iMac, etc.)
+
+## Migration Strategy
+
+### Phase 1: Add Modular System
+- Implement base frames and feature system
+- Keep existing device configs working (backward compatibility)
+- Add preset templates that map to existing devices
+
+### Phase 2: Convert Phones to Presets
+- Convert all phone devices (iPhone 14, iPhone 15, Samsung S23, Pixel 7, etc.) to preset templates
+- Each preset uses base "Phone" frame + appropriate features
+- Old device IDs still work (map to presets)
+
+### Phase 3: Convert Generic Tablets/Laptops
+- Convert generic tablets/laptops to presets
+- Keep distinct devices (Surface, iMac) as separate configs
+
+### Phase 4: Cleanup
+- Remove redundant device configs
+- Keep only base frames, presets, and distinct devices
+
+## Benefits
+
+1. **Maintainability**: No need to add every new phone model - just create a preset
+2. **Flexibility**: Users can create any combination they want
+3. **Scalability**: Easy to add new features without creating new device configs
+4. **User Experience**: DIY approach is more engaging, presets provide quick access
+5. **Reduced Complexity**: Fewer device configs to maintain
+
+## Summary
+
+- **Base Frames**: Phone, Tablet, Laptop, Desktop (plus frameless variants)
+- **Modular Features**: Bezels, notches, home buttons, sizes, corner radius, etc.
+- **Preset Templates**: Quick-select combinations (iPhone, Samsung, etc.)
+- **Distinct Devices**: Keep unique devices (Surface Laptop, iMac, Studio Display, Pro Display XDR)
+- **Foldables**: Keep Flip and Fold as distinct (can't be replicated with modular parts)
