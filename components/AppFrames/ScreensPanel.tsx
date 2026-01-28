@@ -92,7 +92,7 @@ const ScreenThumbnail = memo(function ScreenThumbnail({
       return (
         prevImg?.image !== nextImg?.image ||
         prevImg?.mediaId !== nextImg?.mediaId ||
-        prevImg?.deviceFrame !== nextImg?.deviceFrame ||
+        prevImg?.diyOptions !== nextImg?.diyOptions ||
         prevImg?.cleared !== nextImg?.cleared ||
         prevImg?.panX !== nextImg?.panX ||
         prevImg?.panY !== nextImg?.panY ||

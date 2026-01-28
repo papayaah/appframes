@@ -1,8 +1,13 @@
+import type { DIYOptions } from './diy-frames/types';
+
 export interface ScreenImage {
   image?: string; // Base64 image (legacy support - not used for sync)
   mediaId?: number; // Reference to local media library (OPFS)
   serverMediaPath?: string; // Server-side media path (for cross-device sync)
-  deviceFrame?: string; // Device frame type for this specific frame
+  /** DIY device options for this frame */
+  diyOptions?: DIYOptions;
+  /** Template ID that was used (for UI display) */
+  diyTemplateId?: string;
   /** If true, this slot is intentionally cleared (render nothing). */
   cleared?: boolean;
   // Per-frame image pan (position of image inside the frame)

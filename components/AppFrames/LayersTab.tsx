@@ -4,38 +4,30 @@ import { useMemo, useState, useEffect } from 'react';
 import { ActionIcon, Box, Divider, Group, ScrollArea, Stack, Text, TextInput } from '@mantine/core';
 import { IconCopy, IconEye, IconEyeOff, IconTrash } from '@tabler/icons-react';
 import { useFrames, getCompositionFrameCount } from './FramesContext';
+import type { DIYOptions } from './diy-frames/types';
+import { getTemplateById } from './diy-frames/templates';
 
-// Device frame name mapping (from DeviceTab)
-const getDeviceFrameName = (deviceFrame?: string): string => {
-  if (!deviceFrame || deviceFrame === '') return 'No frame';
-  
-  const deviceMap: Record<string, string> = {
-    'frameless-phone': 'Frameless Phone',
-    'frameless-tablet': 'Frameless Tablet',
-    'frameless-laptop': 'Frameless Laptop',
-    'frameless-desktop': 'Frameless Desktop',
-    'iphone-14-pro': 'iPhone 14 Pro',
-    'iphone-14': 'iPhone 14',
-    'iphone-13': 'iPhone 13',
-    'iphone-se': 'iPhone SE',
-    'pixel-7': 'Pixel 7',
-    'samsung-s23': 'Samsung S23',
-    'galaxy-z-flip-5': 'Flip',
-    'galaxy-z-fold-5': 'Fold',
-    'ipad-pro': 'iPad Pro',
-    'ipad-air': 'iPad Air',
-    'ipad-mini': 'iPad Mini',
-    'galaxy-tab-s9': 'Galaxy Tab S9',
-    'macbook-pro-16': 'MacBook Pro 16"',
-    'macbook-pro-14': 'MacBook Pro 14"',
-    'macbook-air': 'MacBook Air',
-    'surface-laptop': 'Surface Laptop',
-    'imac-24': 'iMac 24"',
-    'studio-display': 'Studio Display',
-    'pro-display-xdr': 'Pro Display XDR',
+// Get display name for a DIY frame
+const getFrameDisplayName = (diyOptions?: DIYOptions, templateId?: string): string => {
+  if (!diyOptions) return 'No frame';
+
+  // If using a template, show the template name
+  if (templateId) {
+    const template = getTemplateById(templateId);
+    if (template) return template.name;
+  }
+
+  // Otherwise show the base type with capitalized name
+  const typeNames: Record<string, string> = {
+    phone: 'Phone',
+    flip: 'Flip Phone',
+    foldable: 'Foldable',
+    tablet: 'Tablet',
+    laptop: 'Laptop',
+    desktop: 'Desktop',
   };
-  
-  return deviceMap[deviceFrame] || deviceFrame;
+
+  return typeNames[diyOptions.type] || diyOptions.type;
 };
 
 export function LayersTab() {
@@ -185,7 +177,7 @@ export function LayersTab() {
               {Array.from({ length: frameCount }).map((_, frameIndex) => {
                 const frame = screen?.images?.[frameIndex];
                 const hasMedia = !!(frame?.image || frame?.mediaId);
-                const deviceFrameName = getDeviceFrameName(frame?.deviceFrame);
+                const deviceFrameName = getFrameDisplayName(frame?.diyOptions, frame?.diyTemplateId);
                 const isSelected = isFrameSelected(frameIndex);
 
                 return (

@@ -18,7 +18,7 @@ import { useUndoRedoHotkeys } from '@/hooks/useUndoRedoHotkeys';
 import { FloatingSettingsPanel } from './FloatingSettingsPanel';
 import { ImageSettingsPanel } from './ImageSettingsPanel';
 import { FrameSettingsPanel } from './FrameSettingsPanel';
-import { getDeviceConfig } from './DeviceFrame';
+import type { DIYOptions } from './diy-frames/types';
 
 // Re-export types for compatibility
 export type { Screen, CanvasSettings, ScreenImage, AppFramesActions };
@@ -69,7 +69,7 @@ export function AppFrames() {
     goToHistory,
     setCanvasBackgroundMedia,
     clearFrameSlot,
-    setFrameDevice,
+    setFrameDIYOptions,
     setFramePan,
     addFramePositionDelta,
     setFrameScale,
@@ -123,14 +123,14 @@ export function AppFrames() {
   const primaryScreen = screens[primarySelectedIndex];
   const hasTextSelected = primaryScreen?.settings?.selectedTextId != null;
 
-  // Check if frame has a valid device frame (for frame settings panel)
+  // Check if frame has valid DIY options (for frame settings panel)
   // Hide when text is selected
   const hasValidFrame = currentScreen &&
     selectedFrameIndex !== null &&
     selectedFrameIndex !== undefined &&
     currentFrameData &&
     !currentFrameData.cleared &&
-    currentFrameData.deviceFrame !== '' &&
+    currentFrameData.diyOptions &&
     !hasTextSelected;
 
   // Check if frame has an actual image (for image settings panel)
@@ -277,11 +277,6 @@ export function AppFrames() {
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [deleteTextElement, primarySelectedIndex, screens, selectedFrameIndex, setScreens]);
-
-  // Handle device frame change for a specific frame
-  const handleFrameDeviceChange = (frameIndex: number, deviceFrame: string) => {
-    setFrameDevice(primarySelectedIndex, frameIndex, deviceFrame);
-  };
 
   // Helper to convert canvas element to PNG blob
   // Download currently visible/selected screens individually
@@ -524,7 +519,6 @@ export function AppFrames() {
           setSettings={setSettings}
           screens={screens}
           selectedFrameIndex={selectedFrameIndex}
-          onFrameDeviceChange={handleFrameDeviceChange}
           onPanelToggle={(isOpen) => setNavWidth(isOpen ? 360 : 80)}
           downloadFormat={downloadFormat}
           onDownloadFormatChange={setDownloadFormat}
@@ -800,10 +794,11 @@ export function AppFrames() {
         anchorToElement={selectedFrameElement}
         positionKey="frame-settings-panel"
         anchorOffset={{ x: 20, y: hasImage ? 280 : 0 }} // Offset down if image panel is also open
+        maxHeight={500}
       >
         <FrameSettingsPanel
           frameColor={currentFrameData?.frameColor}
-          defaultFrameColor={getDeviceConfig(currentFrameData?.deviceFrame).frameColor}
+          defaultFrameColor="#1a1a1a"
           onFrameColorChange={(color) => {
             if (selectedFrameIndex === null || selectedFrameIndex === undefined) return;
             setFrameColor(activeFrameScreenIndex, selectedFrameIndex, color);
@@ -822,6 +817,11 @@ export function AppFrames() {
             if (selectedFrameIndex === null || selectedFrameIndex === undefined) return;
             setFrameRotate(activeFrameScreenIndex, selectedFrameIndex, 0);
             setFrameScale(activeFrameScreenIndex, selectedFrameIndex, 100);
+          }}
+          diyOptions={currentFrameData?.diyOptions}
+          onDIYOptionsChange={(options: DIYOptions) => {
+            if (selectedFrameIndex === null || selectedFrameIndex === undefined) return;
+            setFrameDIYOptions(activeFrameScreenIndex, selectedFrameIndex, options);
           }}
         />
       </FloatingSettingsPanel>

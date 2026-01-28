@@ -16,7 +16,6 @@ interface SidebarTabsProps {
   setSettings: (settings: CanvasSettings) => void;
   screens: Screen[];
   selectedFrameIndex?: number;
-  onFrameDeviceChange?: (frameIndex: number, deviceFrame: string) => void;
   onMediaSelect?: (mediaId: number) => void;
   onPanelToggle?: (isOpen: boolean) => void;
   downloadFormat: 'png' | 'jpg';
@@ -25,13 +24,12 @@ interface SidebarTabsProps {
   onDownloadJpegQualityChange: (quality: number) => void;
 }
 
-export function SidebarTabs({ 
-  settings, 
-  setSettings, 
-  screens, 
+export function SidebarTabs({
+  settings,
+  setSettings,
+  screens,
   selectedFrameIndex = 0,
-  onFrameDeviceChange,
-  onMediaSelect, 
+  onMediaSelect,
   onPanelToggle,
   downloadFormat,
   onDownloadFormatChange,

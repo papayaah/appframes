@@ -2,6 +2,8 @@
 
 import React, { createContext, useContext, useState, useRef, ReactNode, useCallback, useEffect, useMemo } from 'react';
 import { Screen, ScreenImage, CanvasSettings, DEFAULT_TEXT_STYLE, TextElement, TextStyle } from './types';
+import type { DIYOptions } from './diy-frames/types';
+import { getDefaultDIYOptions } from './diy-frames/types';
 import { persistenceDB, Project } from '@/lib/PersistenceDB';
 import { usePersistence } from '@/hooks/usePersistence';
 import { usePatchHistory, type PatchHistoryEntry } from '@/hooks/usePatchHistory';
@@ -254,7 +256,7 @@ interface FramesContextType {
   // Frame/background convenience (for meaningful history labels)
   setCanvasBackgroundMedia: (screenIndex: number, mediaId: number | undefined) => void;
   clearFrameSlot: (screenIndex: number, frameIndex: number) => void;
-  setFrameDevice: (screenIndex: number, frameIndex: number, deviceFrame: string) => void;
+  setFrameDIYOptions: (screenIndex: number, frameIndex: number, options: DIYOptions, templateId?: string) => void;
   setFramePan: (screenIndex: number, frameIndex: number, panX: number, panY: number) => void;
   addFramePositionDelta: (screenIndex: number, frameIndex: number, dx: number, dy: number) => void;
   setFrameScale: (screenIndex: number, frameIndex: number, frameScale: number) => void;
@@ -296,7 +298,7 @@ export function FramesProvider({ children }: { children: ReactNode }) {
     const initialScreen: Screen = {
       id: `screen-0`,
       name: 'Screen 1',
-      images: [{ deviceFrame: 'iphone-14-pro' }],
+      images: [{ diyOptions: getDefaultDIYOptions('phone') }],
       settings: getDefaultScreenSettings(),
       textElements: defaultTextElements,
     };
@@ -453,15 +455,15 @@ export function FramesProvider({ children }: { children: ReactNode }) {
 
     // Initialize images array based on composition type with default device frame
     const images: ScreenImage[] = Array(frameCount).fill(null).map(() => ({
-      deviceFrame: 'iphone-14-pro'
+      diyOptions: getDefaultDIYOptions('phone')
     }));
 
     // If an image was provided, add it to the first slot
     if (imageOrMediaId) {
       if (typeof imageOrMediaId === 'number') {
-        images[0] = { mediaId: imageOrMediaId, deviceFrame: 'iphone-14-pro' };
+        images[0] = { mediaId: imageOrMediaId, diyOptions: getDefaultDIYOptions('phone') };
       } else {
-        images[0] = { image: imageOrMediaId, deviceFrame: 'iphone-14-pro' };
+        images[0] = { image: imageOrMediaId, diyOptions: getDefaultDIYOptions('phone') };
       }
     }
 
@@ -527,7 +529,7 @@ export function FramesProvider({ children }: { children: ReactNode }) {
           frameX: 0,
           frameY: 0,
         }));
-        while (imgs.length < newFrameCount) imgs.push({ deviceFrame: 'iphone-14-pro', frameX: 0, frameY: 0 });
+        while (imgs.length < newFrameCount) imgs.push({ diyOptions: getDefaultDIYOptions('phone'), frameX: 0, frameY: 0 });
         screen.images = imgs.slice(0, newFrameCount);
       }
     });
@@ -552,7 +554,7 @@ export function FramesProvider({ children }: { children: ReactNode }) {
       if (!s) return;
       s.settings = { ...s.settings, composition: nextComposition };
       const imgs = [...(s.images || [])];
-      while (imgs.length < nextCount) imgs.push({ deviceFrame: 'iphone-14-pro', frameX: 0, frameY: 0 });
+      while (imgs.length < nextCount) imgs.push({ diyOptions: getDefaultDIYOptions('phone'), frameX: 0, frameY: 0 });
       s.images = imgs.slice(0, nextCount);
     });
 
@@ -616,7 +618,7 @@ export function FramesProvider({ children }: { children: ReactNode }) {
       if (!screen) return;
       const frameCount = getCompositionFrameCount(screen.settings.composition);
       if (!screen.images) screen.images = [];
-      while (screen.images.length < frameCount) screen.images.push({ deviceFrame: 'iphone-14-pro' });
+      while (screen.images.length < frameCount) screen.images.push({ diyOptions: getDefaultDIYOptions('phone') });
       if (imageSlotIndex < screen.images.length) {
         const existing = screen.images[imageSlotIndex] || {};
         screen.images[imageSlotIndex] =
@@ -773,7 +775,8 @@ export function FramesProvider({ children }: { children: ReactNode }) {
       // Preserve position and transform when clearing media
       screen.images[frameIndex] = {
         ...existing,
-        deviceFrame: existing.deviceFrame || '', // Keep device frame if it exists
+        diyOptions: existing.diyOptions, // Keep DIY options if they exist
+        diyTemplateId: existing.diyTemplateId,
         cleared: true,
         image: undefined,
         mediaId: undefined,
@@ -790,15 +793,20 @@ export function FramesProvider({ children }: { children: ReactNode }) {
     });
   }, [commitCurrentScreens]);
 
-  const setFrameDevice = useCallback((screenIndex: number, frameIndex: number, deviceFrame: string) => {
-    commitCurrentScreens('Change device frame', (list) => {
+  const setFrameDIYOptions = useCallback((screenIndex: number, frameIndex: number, options: DIYOptions, templateId?: string) => {
+    commitCurrentScreens('Change device type', (list) => {
       const screen = list[screenIndex];
       if (!screen) return;
       if (!screen.images) screen.images = [];
       const frameCount = getCompositionFrameCount(screen.settings.composition);
       while (screen.images.length < frameCount) screen.images.push({});
       if (frameIndex < screen.images.length) {
-        screen.images[frameIndex] = { ...(screen.images[frameIndex] || {}), deviceFrame, cleared: false };
+        screen.images[frameIndex] = {
+          ...(screen.images[frameIndex] || {}),
+          diyOptions: options,
+          diyTemplateId: templateId,
+          cleared: false
+        };
       }
     });
   }, [commitCurrentScreens]);
@@ -1350,7 +1358,7 @@ export function FramesProvider({ children }: { children: ReactNode }) {
         duplicateTextElement,
         setCanvasBackgroundMedia,
         clearFrameSlot,
-        setFrameDevice,
+        setFrameDIYOptions,
         setFramePan,
         addFramePositionDelta,
         setFrameScale,

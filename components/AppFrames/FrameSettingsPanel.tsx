@@ -1,8 +1,11 @@
 'use client';
 
 import { useState } from 'react';
-import { Box, Text, SimpleGrid, Button, Popover, ColorPicker, Stack, Slider } from '@mantine/core';
+import { Box, Text, SimpleGrid, Button, Popover, ColorPicker, Stack, Divider } from '@mantine/core';
 import { IconPlus } from '@tabler/icons-react';
+import type { DIYOptions } from './diy-frames/types';
+import { DIYSettingsPanel } from './diy-frames/DIYSettingsPanel';
+import { TransformControls } from './TransformControls';
 
 // Frame color presets
 const FRAME_COLOR_PRESETS = [
@@ -44,6 +47,10 @@ export interface FrameSettingsPanelProps {
   onFrameScaleChange?: (scale: number) => void;
   /** Callback to reset frame transforms to defaults */
   onResetTransforms?: () => void;
+  /** Current DIY options */
+  diyOptions?: DIYOptions;
+  /** Callback when DIY options change */
+  onDIYOptionsChange?: (options: DIYOptions) => void;
 }
 
 export function FrameSettingsPanel({
@@ -55,12 +62,11 @@ export function FrameSettingsPanel({
   frameScale = 100,
   onFrameScaleChange,
   onResetTransforms,
+  diyOptions,
+  onDIYOptionsChange,
 }: FrameSettingsPanelProps) {
   const [customColorOpen, setCustomColorOpen] = useState(false);
   const [customColor, setCustomColor] = useState(frameColor || defaultFrameColor);
-
-  const effectiveColor = frameColor ?? defaultFrameColor;
-  const hasTransforms = frameRotation !== 0 || frameScale !== 100;
 
   return (
     <>
@@ -164,59 +170,29 @@ export function FrameSettingsPanel({
       </Button>
 
       {/* Frame Transform Controls */}
-      {(onFrameRotationChange || onFrameScaleChange) && (
+      {onFrameRotationChange && onFrameScaleChange && (
+        <Box mt="md">
+          <TransformControls
+            rotation={frameRotation}
+            scale={frameScale}
+            onRotationChange={onFrameRotationChange}
+            onScaleChange={onFrameScaleChange}
+            onReset={onResetTransforms}
+          />
+        </Box>
+      )}
+
+      {/* DIY Options */}
+      {diyOptions && onDIYOptionsChange && (
         <>
-          <Text size="xs" c="dimmed" mb="xs" mt="lg" tt="uppercase">
-            Rotation
+          <Divider my="lg" />
+          <Text size="xs" c="dimmed" mb="xs" tt="uppercase">
+            Frame Options
           </Text>
-          {onFrameRotationChange && (
-            <Slider
-              value={frameRotation}
-              onChange={onFrameRotationChange}
-              min={-180}
-              max={180}
-              label={(value) => `${value}°`}
-              marks={[
-                { value: -180, label: '-180°' },
-                { value: -90, label: '-90°' },
-                { value: 0, label: '0°' },
-                { value: 90, label: '90°' },
-                { value: 180, label: '180°' },
-              ]}
-            />
-          )}
-
-          <Text size="xs" c="dimmed" mb="xs" mt="md" tt="uppercase">
-            Scale
-          </Text>
-          {onFrameScaleChange && (
-            <Slider
-              value={frameScale}
-              onChange={onFrameScaleChange}
-              min={20}
-              max={200}
-              label={(value) => `${value}%`}
-              marks={[
-                { value: 20, label: '20%' },
-                { value: 50, label: '50%' },
-                { value: 100, label: '100%' },
-                { value: 150, label: '150%' },
-                { value: 200, label: '200%' },
-              ]}
-            />
-          )}
-
-          {onResetTransforms && hasTransforms && (
-            <Button
-              size="xs"
-              variant="light"
-              fullWidth
-              mt="md"
-              onClick={onResetTransforms}
-            >
-              Reset Rotation & Scale
-            </Button>
-          )}
+          <DIYSettingsPanel
+            options={diyOptions}
+            onChange={onDIYOptionsChange}
+          />
         </>
       )}
     </>

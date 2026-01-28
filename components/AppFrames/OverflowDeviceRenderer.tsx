@@ -3,6 +3,7 @@
 import { Box } from '@mantine/core';
 import { DeviceFrame } from './DeviceFrame';
 import { Screen, CanvasSettings } from './AppFrames';
+import { getDefaultDIYOptions } from './diy-frames/types';
 
 // Must match CompositionRenderer baseline to preserve old default sizing.
 const BASE_COMPOSITION_SCALE = 0.85;
@@ -30,7 +31,7 @@ export function OverflowDeviceRenderer({
   const effectiveScale = BASE_COMPOSITION_SCALE * ((image?.frameScale ?? 100) / 100);
 
   // We render even without an image to show the device frame itself
-  if (image?.cleared === true || image?.deviceFrame === '') return null;
+  if (image?.cleared === true || !image?.diyOptions) return null;
 
   return (
     <Box
@@ -46,7 +47,7 @@ export function OverflowDeviceRenderer({
       }}
     >
       <DeviceFrame
-        deviceType={image?.deviceFrame || 'iphone-14-pro'}
+        diyOptions={image?.diyOptions ?? getDefaultDIYOptions('phone')}
         image={image?.image}
         mediaId={image?.mediaId}
         scale={effectiveScale}

@@ -722,17 +722,19 @@ function validateScreenImage(image: any): Screen['images'][0] {
 
   const validated: Screen['images'][0] = {};
 
-  // deviceFrame: optional string (allow empty string to represent "no selection")
-  if (typeof image.deviceFrame === 'string') {
-    validated.deviceFrame = image.deviceFrame;
+  // diyOptions: optional object with DIY frame options
+  if (image.diyOptions && typeof image.diyOptions === 'object') {
+    validated.diyOptions = image.diyOptions;
+  }
+
+  // diyTemplateId: optional string
+  if (typeof image.diyTemplateId === 'string') {
+    validated.diyTemplateId = image.diyTemplateId;
   }
 
   // cleared: optional boolean
-  // Also treat legacy deviceFrame === '' as cleared.
   if (typeof image.cleared === 'boolean') {
     validated.cleared = image.cleared;
-  } else if (image.deviceFrame === '') {
-    validated.cleared = true;
   }
 
   // image: optional string (base64)

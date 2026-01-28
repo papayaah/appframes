@@ -181,7 +181,7 @@ export function Sidebar({ settings, setSettings, screens }: SidebarProps) {
 
   const currentScreen = screens[settings.selectedScreenIndex];
   const hasAnyFrames =
-    (currentScreen?.images ?? []).some((img) => !(img?.cleared === true || img?.deviceFrame === ''));
+    (currentScreen?.images ?? []).some((img) => !(img?.cleared === true) && img?.diyOptions);
   const effectiveComposition = hasAnyFrames ? settings.composition : undefined;
 
   return (

@@ -6,6 +6,7 @@ import { CanvasSettings, Screen } from './AppFrames';
 import { DeviceFrame } from './DeviceFrame';
 import { ResizeHandles, ResizeHandle } from './ResizeHandles';
 import { clampFrameTransform } from './types';
+import { getDefaultDIYOptions } from './diy-frames/types';
 import { useInteractionLock } from './InteractionLockContext';
 
 interface CompositionRendererProps {
@@ -333,7 +334,7 @@ export function CompositionRenderer({
     // We use a threshold of -100 pixels to trigger bottom handle
     const handlePosition = frameY < -100 ? 0 : 50;
     return {
-      deviceType: images[index]?.deviceFrame || 'iphone-14-pro',
+      diyOptions: images[index]?.diyOptions ?? getDefaultDIYOptions('phone'),
       image: images[index]?.image,
       mediaId: images[index]?.mediaId,
       // The base size for layout (single/dual/stack/etc). Per-frame resizing is applied via wrapper transforms.
@@ -366,7 +367,7 @@ export function CompositionRenderer({
     case 'single':
       const offset0 = getFrameOffset(0);
       const t0 = getFrameTransforms(0);
-      const isCleared0 = images[0]?.cleared === true || images[0]?.deviceFrame === '';
+      const isCleared0 = images[0]?.cleared === true;
       return (
         <Box style={{ height: '100%', perspective: '2000px', perspectiveOrigin: 'center center' }}>
           <Center style={{ height: '100%' }}>
@@ -399,8 +400,8 @@ export function CompositionRenderer({
       const dualOffset1 = getFrameOffset(1);
       const dt0 = getFrameTransforms(0);
       const dt1 = getFrameTransforms(1);
-      const isClearedDual0 = images[0]?.cleared === true || images[0]?.deviceFrame === '';
-      const isClearedDual1 = images[1]?.cleared === true || images[1]?.deviceFrame === '';
+      const isClearedDual0 = images[0]?.cleared === true;
+      const isClearedDual1 = images[1]?.cleared === true;
       return (
         <Box style={{ height: '100%', perspective: '2000px', perspectiveOrigin: 'center center' }}>
           <Center style={{ height: '100%', gap: 20 }}>
@@ -445,8 +446,8 @@ export function CompositionRenderer({
       const stackOffset1 = getFrameOffset(1);
       const st0 = getFrameTransforms(0);
       const st1 = getFrameTransforms(1);
-      const isClearedStack0 = images[0]?.cleared === true || images[0]?.deviceFrame === '';
-      const isClearedStack1 = images[1]?.cleared === true || images[1]?.deviceFrame === '';
+      const isClearedStack0 = images[0]?.cleared === true;
+      const isClearedStack1 = images[1]?.cleared === true;
       return (
         <Box style={{ height: '100%', perspective: '2000px', perspectiveOrigin: 'center center' }}>
           <Center style={{ height: '100%', position: 'relative' }}>
@@ -503,9 +504,9 @@ export function CompositionRenderer({
       const tt0 = getFrameTransforms(0);
       const tt1 = getFrameTransforms(1);
       const tt2 = getFrameTransforms(2);
-      const isClearedTriple0 = images[0]?.cleared === true || images[0]?.deviceFrame === '';
-      const isClearedTriple1 = images[1]?.cleared === true || images[1]?.deviceFrame === '';
-      const isClearedTriple2 = images[2]?.cleared === true || images[2]?.deviceFrame === '';
+      const isClearedTriple0 = images[0]?.cleared === true;
+      const isClearedTriple1 = images[1]?.cleared === true;
+      const isClearedTriple2 = images[2]?.cleared === true;
       return (
         <Box style={{ height: '100%', perspective: '2000px', perspectiveOrigin: 'center center' }}>
           <Center style={{ height: '100%', gap: 12 }}>
@@ -568,9 +569,9 @@ export function CompositionRenderer({
       const ft0 = getFrameTransforms(0);
       const ft1 = getFrameTransforms(1);
       const ft2 = getFrameTransforms(2);
-      const isClearedFan0 = images[0]?.cleared === true || images[0]?.deviceFrame === '';
-      const isClearedFan1 = images[1]?.cleared === true || images[1]?.deviceFrame === '';
-      const isClearedFan2 = images[2]?.cleared === true || images[2]?.deviceFrame === '';
+      const isClearedFan0 = images[0]?.cleared === true;
+      const isClearedFan1 = images[1]?.cleared === true;
+      const isClearedFan2 = images[2]?.cleared === true;
       return (
         <Box style={{ height: '100%', perspective: '2000px', perspectiveOrigin: 'center center' }}>
           <Center style={{ height: '100%', position: 'relative' }}>

@@ -175,6 +175,16 @@ interface DistinctDevice {
 3. **Preset Template Selector**: Quick-select popular combinations
 4. **Distinct Device Selector**: Choose unique devices (Surface, iMac, etc.)
 
+### Device Selector: No Preview
+
+The device selector should remain a simple list without a device frame preview. Reasons:
+
+1. **Simplicity**: The list format is clean and scannable
+2. **Performance**: No need to render frame previews for each device option
+3. **Space efficiency**: List items are compact; previews would require significantly more vertical space
+4. **Clarity**: Device names and subtitles (e.g., "Rounded", "Notch", "No Notch") provide sufficient information for selection
+5. **Immediate feedback**: Users see the actual frame on the canvas immediately after selection, which is the real preview
+
 ## Migration Strategy
 
 ### Phase 1: Add Modular System

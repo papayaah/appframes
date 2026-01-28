@@ -1,25 +1,31 @@
 'use client';
 
 import { useEffect, useState, useRef, useCallback } from 'react';
-import { Box, Text, ActionIcon, Popover } from '@mantine/core';
-import { IconUpload, IconPhoto, IconGripVertical } from '@tabler/icons-react';
+import { Box, Popover } from '@mantine/core';
+import { IconGripVertical } from '@tabler/icons-react';
 import { useMediaImage } from '../../hooks/useMediaImage';
 import { QuickMediaPicker } from './QuickMediaPicker';
 import { useInteractionLock } from './InteractionLockContext';
+import type { DIYOptions } from './diy-frames/types';
+import { getDefaultDIYOptions, BEZEL_WIDTHS, CORNER_RADII, BASE_DIMENSIONS } from './diy-frames/types';
+import {
+  PhoneRenderer,
+  TabletRenderer,
+  FlipRenderer,
+  FoldableRenderer,
+  LaptopRenderer,
+  DesktopRenderer,
+} from './diy-frames/DeviceRenderers';
 
 interface DeviceFrameProps {
-  deviceType?: string;
+  diyOptions?: DIYOptions;
   image?: string;
   mediaId?: number;
   screenIndex?: number;
   scale: number;
-  // Scale applied by the outer canvas (e.g. zoom). Used to normalize drag deltas.
   viewportScale?: number;
-  /** Rotation around Z (degrees) applied by the parent wrapper. Used to keep drag direction intuitive when rotated. */
   dragRotateZ?: number;
-  /** Total scale applied by the parent wrapper. Used to keep drag distance 1:1 when scaled. */
   dragScale?: number;
-  /** Unique key for global interaction locking (prevents other indicators while manipulating). */
   gestureOwnerKey?: string;
   screenScale: number;
   panX: number;
@@ -37,10 +43,8 @@ interface DeviceFrameProps {
   onFramePositionChange?: (frameX: number, frameY: number) => void;
   onFrameMove?: (deltaX: number, deltaY: number) => void;
   onFrameMoveEnd?: () => void;
-  frameY?: number; // The frame's Y position percentage (0-100)
-  /** Custom frame color (overrides device default) */
+  frameY?: number;
   frameColor?: string;
-  /** Image rotation inside the frame (0-360 degrees) */
   imageRotation?: number;
 }
 
@@ -50,195 +54,18 @@ const isInteractiveTarget = (target: EventTarget | null): boolean => {
   return !!target.closest('button, [role="button"], a, input, textarea, select, [data-no-frame-drag="true"]');
 };
 
-interface DeviceConfig {
-  width: number;
-  height: number;
-  radius: number;
-  frameColor: string;
-  screenRadius: number;
-  type: 'notch' | 'punch-hole' | 'tablet' | 'laptop' | 'monitor' | 'home-button' | 'dynamic-island' | 'frameless' | 'flip' | 'fold';
-  notchWidth?: number;
-  bezelWidth?: number;
-}
-
-export const getDeviceConfig = (deviceId: string = 'iphone-14-pro'): DeviceConfig => {
-  // Frameless devices (no visible bezel / black border)
-  if (deviceId === 'iphone-frameless' || deviceId === 'frameless-phone') {
-    return {
-      width: 280,
-      height: 575,
-      radius: 52,
-      frameColor: 'transparent',
-      screenRadius: 52,
-      type: 'frameless',
-      bezelWidth: 0,
-    };
-  }
-  if (deviceId === 'frameless-tablet') {
-    return {
-      width: 440,
-      height: 580,
-      radius: 24,
-      frameColor: 'transparent',
-      screenRadius: 24,
-      type: 'frameless',
-      bezelWidth: 0,
-    };
-  }
-  if (deviceId === 'frameless-laptop') {
-    return {
-      width: 600,
-      height: 380,
-      radius: 16,
-      frameColor: 'transparent',
-      screenRadius: 16,
-      type: 'frameless',
-      bezelWidth: 0,
-    };
-  }
-  if (deviceId === 'frameless-desktop') {
-    return {
-      width: 640,
-      height: 360,
-      radius: 12,
-      frameColor: 'transparent',
-      screenRadius: 12,
-      type: 'frameless',
-      bezelWidth: 0,
-    };
-  }
-
-  // iPhone 14 Pro (Dynamic Island)
-  if (deviceId === 'iphone-14-pro') {
-    return {
-      width: 280,
-      height: 575,
-      radius: 45,
-      frameColor: '#2a2a2a',
-      screenRadius: 40,
-      type: 'dynamic-island',
-      bezelWidth: 10,
-    };
-  }
-
-  // Phones - Apple
-  if (deviceId.includes('iphone-14') || deviceId.includes('iphone-13')) {
-    return {
-      width: 280,
-      height: 570,
-      radius: 40,
-      frameColor: '#2a2a2a',
-      screenRadius: 32,
-      type: 'notch',
-      notchWidth: 100,
-      bezelWidth: 12,
-    };
-  }
-  if (deviceId === 'iphone-se') {
-    return {
-      width: 280,
-      height: 500,
-      radius: 36,
-      frameColor: '#1a1a1a',
-      screenRadius: 2,
-      type: 'home-button',
-      bezelWidth: 15, // Thicker top/bottom bezel simulated in render
-    };
-  }
-
-  // Foldable devices
-  if (deviceId === 'galaxy-z-flip-5') {
-    // Flip: tall and narrow, folds vertically (horizontal crease)
-    return {
-      width: 260,
-      height: 640,
-      radius: 28,
-      frameColor: '#1a1a1a',
-      screenRadius: 24,
-      type: 'flip',
-      bezelWidth: 8,
-    };
-  }
-  if (deviceId === 'galaxy-z-fold-5') {
-    // Fold: wider, folds horizontally (vertical crease)
-    return {
-      width: 380,
-      height: 480,
-      radius: 24,
-      frameColor: '#1a1a1a',
-      screenRadius: 20,
-      type: 'fold',
-      bezelWidth: 10,
-    };
-  }
-
-  // Phones - Android
-  if (deviceId.includes('pixel') || deviceId.includes('samsung') || deviceId.includes('galaxy')) {
-    return {
-      width: 270,
-      height: 580,
-      radius: 32,
-      frameColor: '#1a1a1a',
-      screenRadius: 28,
-      type: 'punch-hole',
-      bezelWidth: 10,
-    };
-  }
-
-  // Tablets
-  if (deviceId.includes('ipad') || deviceId.includes('tablet') || deviceId.includes('tab-s9')) {
-    return {
-      width: 440,
-      height: 580,
-      radius: 24,
-      frameColor: '#2a2a2a',
-      screenRadius: 16,
-      type: 'tablet',
-      bezelWidth: 16,
-    };
-  }
-
-  // Laptops
-  if (deviceId.includes('macbook') || deviceId.includes('laptop') || deviceId.includes('surface')) {
-    return {
-      width: 600,
-      height: 380, // Screen height (excluding base)
-      radius: 16,
-      frameColor: '#2a2a2a',
-      screenRadius: 8,
-      type: 'laptop',
-      bezelWidth: 12,
-    };
-  }
-
-  // Monitors
-  if (deviceId.includes('imac') || deviceId.includes('display')) {
-    return {
-      width: 640,
-      height: 360,
-      radius: 12,
-      frameColor: deviceId.includes('imac') ? '#e0e0e0' : '#1a1a1a',
-      screenRadius: 8,
-      type: 'monitor',
-      bezelWidth: 16,
-    };
-  }
-
-  // Default fallback
-  return {
-    width: 280,
-    height: 570,
-    radius: 40,
-    frameColor: '#2a2a2a',
-    screenRadius: 32,
-    type: 'notch',
-    notchWidth: 100,
-    bezelWidth: 12,
-  };
+// Default frame color for each device type
+const DEFAULT_FRAME_COLORS: Record<string, string> = {
+  phone: '#2a2a2a',
+  flip: '#1a1a1a',
+  foldable: '#1a1a1a',
+  tablet: '#2a2a2a',
+  laptop: '#2a2a2a',
+  desktop: '#1a1a1a',
 };
 
 export function DeviceFrame({
-  deviceType,
+  diyOptions,
   image,
   mediaId,
   screenIndex,
@@ -267,8 +94,7 @@ export function DeviceFrame({
   frameColor: customFrameColor,
   imageRotation = 0,
 }: DeviceFrameProps) {
-  const isExporting =
-    typeof document !== 'undefined' && document.body?.dataset?.appframesExporting === 'true';
+  const isExporting = typeof document !== 'undefined' && document.body?.dataset?.appframesExporting === 'true';
   const effectiveSelected = isExporting ? false : isSelected;
   const effectiveHighlighted = isExporting ? false : isHighlighted;
   const { isLocked, isOwnerActive, begin, end } = useInteractionLock();
@@ -283,20 +109,18 @@ export function DeviceFrame({
   const panRafRef = useRef<number | null>(null);
   const pendingPanRef = useRef<{ x: number; y: number } | null>(null);
   const isPanningRef = useRef(false);
-
-  // Local frame-drag visual transform (avoid rerendering whole canvas during drag)
   const frameWrapperRef = useRef<HTMLDivElement>(null);
   const frameDragRafRef = useRef<number | null>(null);
-  // Commit delta (screen-space px) and visual delta (local-space px inside rotated/scaled wrapper)
   const pendingFrameOffsetRef = useRef<{ x: number; y: number } | null>(null);
   const pendingFrameVisualOffsetRef = useRef<{ x: number; y: number } | null>(null);
   const isFrameDraggingRef = useRef(false);
   const moveModifierPressedRef = useRef(false);
   const gestureTokenRef = useRef<string | null>(null);
 
-  const config = getDeviceConfig(deviceType);
-  // Use custom frame color if provided, otherwise use device default
-  const effectiveFrameColor = customFrameColor ?? config.frameColor;
+  // Use default options if not provided
+  const options = diyOptions ?? getDefaultDIYOptions('phone');
+  const deviceType = options.type;
+  const effectiveFrameColor = customFrameColor ?? DEFAULT_FRAME_COLORS[deviceType] ?? '#2a2a2a';
 
   const applyPanVisual = useCallback((x: number, y: number) => {
     const el = imageLayerRef.current;
@@ -330,14 +154,12 @@ export function DeviceFrame({
     });
   }, [applyFrameDragVisual]);
 
-  // Keep visual pan in sync when props change (but don't fight the user mid-drag)
   useEffect(() => {
     if (isPanningRef.current) return;
     if (!displayImage) return;
     applyPanVisual(panX, panY);
   }, [panX, panY, displayImage, applyPanVisual]);
 
-  // Cleanup any pending RAFs on unmount
   useEffect(() => {
     return () => {
       if (panRafRef.current != null) cancelAnimationFrame(panRafRef.current);
@@ -345,7 +167,6 @@ export function DeviceFrame({
     };
   }, []);
 
-  // Hold Space to drag the whole frame (even when starting on the screen).
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.code === 'Space') moveModifierPressedRef.current = true;
@@ -361,8 +182,53 @@ export function DeviceFrame({
     };
   }, []);
 
+  const handleFrameDragStart = (e: React.MouseEvent) => {
+    setIsFrameDragging(true);
+    isFrameDraggingRef.current = true;
+    pendingFrameOffsetRef.current = { x: 0, y: 0 };
+    pendingFrameVisualOffsetRef.current = { x: 0, y: 0 };
+
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const radians = (dragRotateZ * Math.PI) / 180;
+    const cos = Math.cos(-radians);
+    const sin = Math.sin(-radians);
+    const totalScale = viewportScale * dragScale;
+
+    const handleMove = (moveEvent: MouseEvent) => {
+      const rawDx = (moveEvent.clientX - startX) / totalScale;
+      const rawDy = (moveEvent.clientY - startY) / totalScale;
+      const localDx = rawDx * cos - rawDy * sin;
+      const localDy = rawDx * sin + rawDy * cos;
+      pendingFrameOffsetRef.current = { x: rawDx, y: rawDy };
+      pendingFrameVisualOffsetRef.current = { x: localDx, y: localDy };
+      scheduleFrameDragVisual();
+    };
+
+    const handleEnd = () => {
+      setIsFrameDragging(false);
+      isFrameDraggingRef.current = false;
+      const pending = pendingFrameOffsetRef.current;
+      if (pending && (pending.x !== 0 || pending.y !== 0)) {
+        onFrameMove?.(pending.x, pending.y);
+      }
+      onFrameMoveEnd?.();
+      applyFrameDragVisual(0, 0);
+      pendingFrameOffsetRef.current = null;
+      pendingFrameVisualOffsetRef.current = null;
+      document.removeEventListener('mousemove', handleMove);
+      document.removeEventListener('mouseup', handleEnd);
+      if (gestureTokenRef.current) {
+        end(gestureTokenRef.current);
+        gestureTokenRef.current = null;
+      }
+    };
+
+    document.addEventListener('mousemove', handleMove);
+    document.addEventListener('mouseup', handleEnd);
+  };
+
   const handleMouseDown = (e: React.MouseEvent) => {
-    // Space = always move frame (like a “hand tool”).
     if (moveModifierPressedRef.current) {
       if (isInteractiveTarget(e.target)) return;
       if (!(onFramePositionChange || onFrameMove)) return;
@@ -376,13 +242,12 @@ export function DeviceFrame({
       return;
     }
 
-    // If we have an image and pan handler, handle panning
     if (displayImage && onPanChange && screenRef.current) {
       e.preventDefault();
       e.stopPropagation();
       setIsDragging(true);
       isPanningRef.current = true;
-      setIsHovered(false); // Hide icons immediately when drag starts
+      setIsHovered(false);
       if (gestureOwnerKey && !gestureTokenRef.current) {
         gestureTokenRef.current = begin(gestureOwnerKey, 'image-pan');
       }
@@ -396,11 +261,8 @@ export function DeviceFrame({
       const handleMove = (moveEvent: MouseEvent) => {
         const deltaX = ((moveEvent.clientX - startX) / rect.width) * 100;
         const deltaY = ((moveEvent.clientY - startY) / rect.height) * 100;
-
         const newPanX = Math.max(0, Math.min(100, startPanX + deltaX));
         const newPanY = Math.max(0, Math.min(100, startPanY + deltaY));
-
-        // Update visuals locally to avoid rerendering parents during drag
         pendingPanRef.current = { x: newPanX, y: newPanY };
         schedulePanVisual();
       };
@@ -408,17 +270,13 @@ export function DeviceFrame({
       const handleEnd = () => {
         setIsDragging(false);
         isPanningRef.current = false;
-
-        // Commit final pan to React state once (reduces flicker)
         const pending = pendingPanRef.current;
         if (pending) {
           onPanChange(pending.x, pending.y);
         }
         pendingPanRef.current = null;
-
         document.removeEventListener('mousemove', handleMove);
         document.removeEventListener('mouseup', handleEnd);
-
         if (gestureTokenRef.current) {
           end(gestureTokenRef.current);
           gestureTokenRef.current = null;
@@ -427,12 +285,10 @@ export function DeviceFrame({
 
       document.addEventListener('mousemove', handleMove);
       document.addEventListener('mouseup', handleEnd);
-      // Also trigger selection
       onClick?.();
       return;
     }
 
-    // No pan available -> dragging the screen should move the frame (easier UX).
     if (onFramePositionChange || onFrameMove) {
       if (isInteractiveTarget(e.target)) return;
       e.preventDefault();
@@ -445,720 +301,208 @@ export function DeviceFrame({
       return;
     }
 
-    // Fallback selection
     onClick?.();
   };
 
-  // Frame drag handle handlers
-  const handleFrameDragStart = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
+  const showDragHandle = onFrameMove && isHovered && !isDragging && !isFrameDragging && !isExporting;
+  const showMediaPicker = (onMediaSelect || onPexelsSelect) && isHovered && !isDragging && !isFrameDragging && !isExporting;
+  const showGuides = !isLocked || (gestureOwnerKey && isOwnerActive(gestureOwnerKey));
 
-    if (onFramePositionChange || onFrameMove) {
-      // Notify parent wrapper (CompositionRenderer) to hide resize/rotate handles during frame drag.
-      // This avoids “ghost” handles while the DOM is being moved imperatively.
-      frameWrapperRef.current?.dispatchEvent(new CustomEvent('appframes:framedragstart', { bubbles: true }));
-
-      if (gestureOwnerKey && !gestureTokenRef.current) {
-        gestureTokenRef.current = begin(gestureOwnerKey, 'frame-move');
-      }
-
-      setIsFrameDragging(true);
-      isFrameDraggingRef.current = true;
-      setIsHovered(false); // Hide icons immediately when drag starts
-      const startX = e.clientX;
-      const startY = e.clientY;
-      let totalDeltaX = 0;
-      let totalDeltaY = 0;
-
-      const handleMove = (moveEvent: MouseEvent) => {
-        // Normalize by viewportScale so drag feels 1:1 regardless of zoom
-        totalDeltaX = (moveEvent.clientX - startX) / viewportScale;
-        totalDeltaY = (moveEvent.clientY - startY) / viewportScale;
-        // Commit delta in screen-space
-        pendingFrameOffsetRef.current = { x: totalDeltaX, y: totalDeltaY };
-
-        // Visual delta is applied inside a rotated/scaled wrapper, so compensate to keep cursor motion intuitive.
-        const scaleFactor = typeof dragScale === 'number' && isFinite(dragScale) && dragScale !== 0 ? dragScale : 1;
-        const theta = (typeof dragRotateZ === 'number' && isFinite(dragRotateZ) ? dragRotateZ : 0) * (Math.PI / 180);
-        const dx = totalDeltaX / scaleFactor;
-        const dy = totalDeltaY / scaleFactor;
-        const cos = Math.cos(theta);
-        const sin = Math.sin(theta);
-        // local = R^-1 * screen, where R is rotate(theta)
-        const localX = dx * cos + dy * sin;
-        const localY = -dx * sin + dy * cos;
-        pendingFrameVisualOffsetRef.current = { x: localX, y: localY };
-        scheduleFrameDragVisual();
-      };
-
-      const handleEnd = () => {
-        setIsFrameDragging(false);
-        isFrameDraggingRef.current = false;
-
-        // Commit final delta once to React state, then reset local transform
-        const pending = pendingFrameOffsetRef.current;
-        if (pending) {
-          if (onFrameMove) {
-            onFrameMove(pending.x, pending.y);
-          } else if (onFramePositionChange) {
-            onFramePositionChange(pending.x, pending.y);
-          }
-        }
-        pendingFrameOffsetRef.current = null;
-        pendingFrameVisualOffsetRef.current = null;
-        applyFrameDragVisual(0, 0);
-
-        if (onFrameMoveEnd) {
-          onFrameMoveEnd();
-        }
-
-        frameWrapperRef.current?.dispatchEvent(new CustomEvent('appframes:framedragend', { bubbles: true }));
-
-        if (gestureTokenRef.current) {
-          end(gestureTokenRef.current);
-          gestureTokenRef.current = null;
-        }
-
-        document.removeEventListener('mousemove', handleMove);
-        document.removeEventListener('mouseup', handleEnd);
-      };
-
-      document.addEventListener('mousemove', handleMove);
-      document.addEventListener('mouseup', handleEnd);
-    }
-  };
-
-  const width = config.width * scale;
-  const height = config.height * scale;
-  const padding = (config.bezelWidth || 12) * scale;
-
-  // Adjust padding for Home Button devices (top/bottom larger)
-  const topPadding = config.type === 'home-button' ? 60 * scale : padding;
-  const bottomPadding = config.type === 'home-button' ? 60 * scale : padding;
-  const sidePadding = padding;
-
-  // Adjust padding for iMac (chin)
-  const imacChin = config.type === 'monitor' && deviceType?.includes('imac') ? 40 * scale : 0;
-  const isFrameless = config.type === 'frameless';
-
-  const renderDecorations = () => {
-    switch (config.type) {
-      case 'notch':
-        return (
-          <Box
-            style={{
-              position: 'absolute',
-              top: padding,
-              left: '50%',
-              transform: 'translateX(-50%)',
-              width: (config.notchWidth || 100) * scale,
-              height: 25 * scale,
-              background: effectiveFrameColor,
-              borderBottomLeftRadius: 16 * scale,
-              borderBottomRightRadius: 16 * scale,
-              zIndex: 10,
-            }}
-          />
-        );
-      case 'dynamic-island':
-        return (
-          <Box
-            style={{
-              position: 'absolute',
-              top: padding + 10 * scale,
-              left: '50%',
-              transform: 'translateX(-50%)',
-              width: 80 * scale,
-              height: 24 * scale,
-              background: '#000',
-              borderRadius: 12 * scale,
-              zIndex: 10,
-            }}
-          />
-        );
-      case 'punch-hole':
-        return (
-          <Box
-            style={{
-              position: 'absolute',
-              top: padding + 8 * scale,
-              left: '50%',
-              transform: 'translateX(-50%)',
-              width: 12 * scale,
-              height: 12 * scale,
-              borderRadius: '50%',
-              background: '#000',
-              zIndex: 10,
-            }}
-          />
-        );
-      case 'flip':
-        // Flip: horizontal crease in the middle (folds vertically)
-        return (
-          <>
-            {/* Punch hole camera */}
-            <Box
-              style={{
-                position: 'absolute',
-                top: padding + 8 * scale,
-                left: '50%',
-                transform: 'translateX(-50%)',
-                width: 12 * scale,
-                height: 12 * scale,
-                borderRadius: '50%',
-                background: '#000',
-                zIndex: 10,
-              }}
-            />
-            {/* Horizontal crease/hinge in the middle */}
-            <Box
-              style={{
-                position: 'absolute',
-                top: '50%',
-                left: padding,
-                right: padding,
-                transform: 'translateY(-50%)',
-                height: 2 * scale,
-                background: 'linear-gradient(90deg, transparent 0%, rgba(0,0,0,0.3) 10%, rgba(0,0,0,0.5) 50%, rgba(0,0,0,0.3) 90%, transparent 100%)',
-                zIndex: 10,
-                boxShadow: '0 0 4px rgba(0,0,0,0.4)',
-              }}
-            />
-          </>
-        );
-      case 'fold':
-        // Fold: vertical crease in the middle (folds horizontally)
-        return (
-          <>
-            {/* Punch hole camera */}
-            <Box
-              style={{
-                position: 'absolute',
-                top: padding + 8 * scale,
-                left: '50%',
-                transform: 'translateX(-50%)',
-                width: 12 * scale,
-                height: 12 * scale,
-                borderRadius: '50%',
-                background: '#000',
-                zIndex: 10,
-              }}
-            />
-            {/* Vertical crease/hinge in the middle */}
-            <Box
-              style={{
-                position: 'absolute',
-                top: padding,
-                bottom: padding,
-                left: '50%',
-                transform: 'translateX(-50%)',
-                width: 2 * scale,
-                background: 'linear-gradient(180deg, transparent 0%, rgba(0,0,0,0.3) 10%, rgba(0,0,0,0.5) 50%, rgba(0,0,0,0.3) 90%, transparent 100%)',
-                zIndex: 10,
-                boxShadow: '0 0 4px rgba(0,0,0,0.4)',
-              }}
-            />
-          </>
-        );
-      case 'home-button':
-        return (
-          <Box
-            style={{
-              position: 'absolute',
-              bottom: 10 * scale,
-              left: '50%',
-              transform: 'translateX(-50%)',
-              width: 40 * scale,
-              height: 40 * scale,
-              borderRadius: '50%',
-              border: `${2 * scale}px solid #333`,
-              zIndex: 10,
-            }}
-          />
-        );
-      case 'laptop':
-        // Camera dot
-        return (
-          <Box
-            style={{
-              position: 'absolute',
-              top: padding / 2,
-              left: '50%',
-              transform: 'translateX(-50%)',
-              width: 6 * scale,
-              height: 6 * scale,
-              borderRadius: '50%',
-              background: '#444',
-              zIndex: 10,
-            }}
-          />
-        );
-      case 'monitor':
-        // Nothing special on screen, but maybe base?
-        return null;
-      default:
-        return null;
-    }
-  };
-
-  const renderBase = () => {
-    // Check if it's a laptop (including frameless)
-    const isLaptop = config.type === 'laptop' || deviceType === 'frameless-laptop';
-    if (isLaptop) {
-      // Laptop keyboard base - much thinner and sleeker
-      const keyboardHeight = 22 * scale;
-      const baseWidth = width + 12 * scale;
-      // Use frame color for laptop base (like MacBook color-matched design)
-      const laptopBaseColor = effectiveFrameColor;
-      return (
-        <Box
-          style={{
-            position: 'absolute',
-            top: '100%', // Position directly below the frame wrapper
-            left: '50%',
-            transform: 'translateX(-50%)',
-            width: baseWidth,
-            height: keyboardHeight,
-            background: `linear-gradient(180deg, ${laptopBaseColor} 0%, ${laptopBaseColor} 100%)`,
-            borderBottomLeftRadius: 10 * scale,
-            borderBottomRightRadius: 10 * scale,
-            boxShadow: '0 10px 30px rgba(0,0,0,0.3)',
-            display: 'flex',
-            flexDirection: 'column',
-            padding: 2 * scale,
-            gap: 1 * scale,
-            zIndex: 0, // Behind selection rings
-            filter: 'brightness(0.95)',
-          }}
-        >
-          {/* Keyboard area - simplified and thinner */}
-          <Box
-            style={{
-              flex: 1,
-              background: 'rgba(0,0,0,0.3)',
-              borderRadius: 2 * scale,
-              padding: 2 * scale,
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 1 * scale,
-            }}
-          >
-            {/* Simplified keyboard - just 3 main rows, no function keys */}
-            {['QWERTYUIOP', 'ASDFGHJKL', 'ZXCVBNM'].map((row, rowIdx) => (
-              <Box
-                key={rowIdx}
-                style={{
-                  display: 'flex',
-                  gap: Math.max(0.5, 1 * scale),
-                  justifyContent: 'center',
-                  paddingLeft: rowIdx === 1 ? Math.max(4, 8 * scale) : rowIdx === 2 ? Math.max(8, 16 * scale) : 0,
-                }}
-              >
-                {Array.from({ length: row.length }).map((_, i) => (
-                  <Box
-                    key={i}
-                    style={{
-                      width: Math.max(3, 6 * scale),
-                      height: Math.max(2, 4 * scale),
-                      background: '#0a0a0a',
-                      borderRadius: Math.max(0.5, 1 * scale),
-                      boxShadow: 'inset 0 0.5px 1px rgba(0,0,0,0.5)',
-                      border: `0.5px solid rgba(255,255,255,0.08)`,
-                    }}
-                  />
-                ))}
-              </Box>
-            ))}
-            {/* Space bar row - thinner */}
-            <Box style={{ display: 'flex', gap: Math.max(0.5, 1 * scale), justifyContent: 'center', marginTop: 0.5 * scale }}>
-              <Box
-                style={{
-                  width: Math.max(40, 80 * scale),
-                  height: Math.max(2, 4 * scale),
-                  background: '#0a0a0a',
-                  borderRadius: Math.max(0.5, 1 * scale),
-                  boxShadow: 'inset 0 0.5px 1px rgba(0,0,0,0.5)',
-                  border: `0.5px solid rgba(255,255,255,0.08)`,
-                }}
-              />
-            </Box>
-          </Box>
-          {/* Trackpad area - smaller */}
-          <Box
-            style={{
-              width: 50 * scale,
-              height: 5 * scale,
-              background: '#1a1a1a',
-              borderRadius: 2 * scale,
-              margin: '0 auto',
-              boxShadow: 'inset 0 0.5px 1px rgba(0,0,0,0.3)',
-            }}
-          />
-        </Box>
-      );
-    }
-    // Check if it's a monitor/desktop (including frameless)
-    const isMonitor = config.type === 'monitor' || deviceType === 'frameless-desktop';
-    if (isMonitor) {
-      // Desktop monitor stand and base - thinner and sleeker
-      const standHeight = 50 * scale;
-      const baseWidth = 160 * scale;
-      const baseHeight = 12 * scale;
-      const standWidth = 20 * scale;
-
-      // Use frame color for stand/base (like iMac color-matched design)
-      // Create lighter/darker variants for gradient effect
-      const standColor = effectiveFrameColor;
-
-      return (
-        <Box
-          style={{
-            position: 'absolute',
-            top: '100%', // Position directly below the frame wrapper
-            left: '50%',
-            transform: 'translateX(-50%)',
-            width: baseWidth,
-            height: standHeight + baseHeight,
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            zIndex: 0, // Behind selection rings
-          }}
-        >
-          {/* Stand */}
-          <Box
-            style={{
-              width: standWidth,
-              height: standHeight,
-              background: `linear-gradient(180deg, ${standColor} 0%, ${standColor} 100%)`,
-              borderRadius: `${standWidth / 2}px ${standWidth / 2}px 0 0`,
-              boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
-              filter: 'brightness(1.1)',
-            }}
-          />
-          {/* Base */}
-          <Box
-            style={{
-              width: baseWidth,
-              height: baseHeight,
-              background: `linear-gradient(180deg, ${standColor} 0%, ${standColor} 100%)`,
-              borderRadius: 8 * scale,
-              boxShadow: '0 4px 12px rgba(0,0,0,0.25)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              filter: 'brightness(1.15)',
-            }}
-          >
-            {/* Base accent line */}
-            <Box
-              style={{
-                width: baseWidth * 0.6,
-                height: 2 * scale,
-                background: 'rgba(0,0,0,0.1)',
-                borderRadius: 1 * scale,
-              }}
-            />
-          </Box>
-        </Box>
-      );
-    }
-    return null;
-  };
-
-  // Calculate extra height needed for base/stand (laptops and monitors, including frameless)
-  const isLaptop = config.type === 'laptop' || deviceType === 'frameless-laptop';
-  const isMonitor = config.type === 'monitor' || deviceType === 'frameless-desktop';
-  const baseHeight = isLaptop
-    ? 22 * scale 
-    : isMonitor
-    ? 50 * scale + 12 * scale // stand + base
-    : 0;
-
-  return (
+  // Render screen content (image layer)
+  const renderScreenContent = () => (
     <Box
-      data-frame-drop-zone="true"
-      data-frame-index={frameIndex}
-      data-screen-index={screenIndex}
+      ref={screenRef}
       style={{
-        position: 'relative',
-        paddingBottom: baseHeight, // Reserve space for base/stand
+        position: 'absolute',
+        inset: 0,
+        cursor: displayImage && onPanChange ? (isDragging ? 'grabbing' : 'grab') : 'default',
+        overflow: 'hidden',
+        borderRadius: 'inherit',
       }}
-      onMouseEnter={() => {
-        if (isLocked && gestureOwnerKey && !isOwnerActive(gestureOwnerKey)) return;
-        if (!isDragging && !isFrameDragging) setIsHovered(true);
-      }}
-      onMouseLeave={() => !isDragging && !isFrameDragging && setIsHovered(false)}
-      onDragOver={(e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        onDragOver?.();
-      }}
-      onDragLeave={(e) => {
-        // Only trigger if actually leaving the frame (not entering a child)
-        if (!e.currentTarget.contains(e.relatedTarget as Node)) {
-          onDragLeave?.();
-        }
-      }}
+      onMouseDown={handleMouseDown}
+      onMouseEnter={() => !isDragging && !isFrameDragging && setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
     >
-      <Box
-        ref={frameWrapperRef}
-        style={{
-          width,
-          height: height + imacChin, // Add chin height if iMac
-          borderRadius: config.radius * scale,
-          background: isFrameless ? 'transparent' : `linear-gradient(145deg, ${effectiveFrameColor}, ${effectiveFrameColor})`,
-          paddingTop: isFrameless ? 0 : topPadding,
-          paddingBottom: (isFrameless ? 0 : bottomPadding) + imacChin,
-          paddingLeft: isFrameless ? 0 : sidePadding,
-          paddingRight: isFrameless ? 0 : sidePadding,
-          // IMPORTANT: Keep the base frame shadow stable. Selection/highlight rings are rendered
-          // as separate overlay elements so exports can drop them via `data-export-hide` filtering.
-          boxShadow: isFrameless
-            ? '0 18px 40px -14px rgba(0, 0, 0, 0.35)'
-            : '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
-          position: 'relative',
-          display: 'flex',
-          flexDirection: 'column',
-          transition: (isDragging || isFrameDragging) ? 'none' : 'box-shadow 0.2s ease',
-          cursor: onClick ? 'pointer' : undefined,
-          willChange: isFrameDragging ? 'transform' : undefined,
-        }}
-        onMouseDown={(e) => {
-          // Dragging the bezel/background moves the frame (like dragging a text element).
-          // If the user started inside the screen, let the screen handler decide (pan vs move),
-          // unless Space is held (Space always moves frame).
-          if (!moveModifierPressedRef.current && screenRef.current?.contains(e.target as Node)) return;
-          if (isDragging || isFrameDragging) return;
-          if (isInteractiveTarget(e.target)) return;
-          if (!(onFramePositionChange || onFrameMove)) return;
-          e.preventDefault();
-          e.stopPropagation();
-          onClick?.();
-          handleFrameDragStart(e);
-        }}
-        onClick={onClick ? (e) => {
-          e.stopPropagation();
-          onClick();
-        } : undefined}
-      >
-        {/* Subtle inset border for non-frameless frames (part of the device look, keep in exports) */}
-        {!isFrameless && (
-          <Box
-            style={{
-              position: 'absolute',
-              inset: 0,
-              borderRadius: config.radius * scale,
-              pointerEvents: 'none',
-              boxShadow: 'inset 0 0 0 1px rgba(255, 255, 255, 0.1)',
-              zIndex: 1,
-            }}
-          />
-        )}
-
-        {/* Selection/highlight ring (UI only; excluded from exports) */}
-        {(effectiveHighlighted || effectiveSelected) && (
-          <Box
-            data-export-hide="true"
-            style={{
-              position: 'absolute',
-              inset: 0,
-              borderRadius: config.radius * scale,
-              pointerEvents: 'none',
-              zIndex: 2,
-              boxShadow: effectiveHighlighted
-                ? '0 0 0 3px rgba(102, 126, 234, 0.8), 0 0 20px rgba(102, 126, 234, 0.5)'
-                : '0 0 0 3px #667eea',
-            }}
-          />
-        )}
-
-        {renderDecorations()}
-
-        {/* Screen */}
+      {/* Image layer */}
+      {displayImage && (
         <Box
-          ref={screenRef}
+          ref={imageLayerRef}
           style={{
-            flex: 1,
-            width: '100%',
-            borderRadius: config.screenRadius * scale,
-            backgroundColor: '#000',
-            overflow: 'hidden',
-            position: 'relative',
-            boxShadow: isFrameless
-              ? '0 0 0 1px rgba(0, 0, 0, 0.08)'
-              : '0 0 0 1px rgba(255, 255, 255, 0.05) inset',
-            cursor: displayImage && onPanChange ? (isDragging ? 'grabbing' : 'grab') : 'pointer',
+            position: 'absolute',
+            inset: 0,
+            backgroundImage: `url(${displayImage})`,
+            backgroundSize: 'cover',
+            backgroundPosition: `${panX}% ${panY}%`,
+            backgroundRepeat: 'no-repeat',
+            transform: imageRotation !== 0 ? `rotate(${imageRotation}deg)` : undefined,
+            transformOrigin: 'center center',
+            scale: [90, 270].includes(imageRotation % 360) ? 1.42 : 1,
           }}
-          onMouseDown={handleMouseDown}
+        />
+      )}
+
+      {/* Frame drag handle */}
+      {showDragHandle && showGuides && (
+        <Box
+          style={{
+            position: 'absolute',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            ...(frameY >= 20 ? { top: 8 } : { bottom: 8 }),
+            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            borderRadius: 8,
+            padding: '4px 12px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 4,
+            cursor: 'move',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+            zIndex: 20,
+          }}
+          onMouseDown={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onClick?.();
+            if (gestureOwnerKey && !gestureTokenRef.current) {
+              gestureTokenRef.current = begin(gestureOwnerKey, 'frame-move');
+            }
+            handleFrameDragStart(e);
+          }}
         >
-          {displayImage ? (
-            <Box
-              ref={imageLayerRef}
-              style={{
-                width: '100%',
-                height: '100%',
-                backgroundImage: `url(${displayImage})`,
-                backgroundSize: `${screenScale}%`,
-                backgroundPosition: `${panX}% ${panY}%`,
-                backgroundRepeat: 'no-repeat',
-                pointerEvents: 'none',
-                willChange: isDragging ? 'background-position' : undefined,
-                transform: imageRotation ? `rotate(${imageRotation}deg)` : undefined,
-                // Scale up slightly when rotated to cover corners
-                ...(imageRotation && imageRotation % 90 !== 0 ? { scale: '1.42' } : {}),
-              }}
-            />
-          ) : showInstructions ? (
-            <Box
-              style={{
-                width: '100%',
-                height: '100%',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                flexDirection: 'column',
-                gap: 12 * scale,
-                padding: 20 * scale,
-              }}
-            >
-              <IconUpload size={32 * scale} color={isSelected ? "#667eea" : "#4a5568"} />
-              <Text
-                size="sm"
-                c="dimmed"
-                style={{
-                  fontSize: 12 * scale,
-                  textAlign: 'center',
-                  lineHeight: 1.4,
-                  color: isSelected ? "#667eea" : undefined
-                }}
-              >
-                {isSelected ? "Selected" : "Drop screenshot"}
-              </Text>
-            </Box>
-          ) : (
-            <Box
-              style={{
-                width: '100%',
-                height: '100%',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                flexDirection: 'column',
-                gap: 8 * scale,
-              }}
-            >
-              {/* Empty State Minimal */}
-            </Box>
-          )}
+          <IconGripVertical size={14} color="white" />
         </Box>
+      )}
 
-        {/* Buttons (only for phones/tablets) */}
-        {['notch', 'punch-hole', 'tablet', 'home-button', 'dynamic-island', 'flip', 'fold'].includes(config.type) && (
-          <>
-            <Box
-              style={{
-                position: 'absolute',
-                right: -2 * scale,
-                top: '25%',
-                width: 3 * scale,
-                height: 50 * scale,
-                backgroundColor: effectiveFrameColor,
-                borderRadius: `0 ${2 * scale}px ${2 * scale}px 0`,
-                opacity: 0.8,
-              }}
-            />
-            <Box
-              style={{
-                position: 'absolute',
-                left: -2 * scale,
-                top: '20%',
-                width: 3 * scale,
-                height: 30 * scale,
-                backgroundColor: effectiveFrameColor,
-                borderRadius: `${2 * scale}px 0 0 ${2 * scale}px`,
-                opacity: 0.8,
-              }}
-            />
-          </>
-        )}
-
-        {/* Frame Drag Handle - hide during any drag operation */}
-        {/* When frame is near the top (frameY < 20%), show handle at bottom instead */}
-        {onFramePositionChange && !isExporting && (isHovered || isFrameDragging) && !isDragging && (
-          <Box
-            data-export-hide="true"
-            onMouseDown={handleFrameDragStart}
-            data-no-frame-drag="true"
-            style={{
-              position: 'absolute',
-              ...(frameY < 20
-                ? { bottom: bottomPadding + 8 * scale }
-                : { top: topPadding + 8 * scale }),
-              left: '50%',
-              transform: 'translateX(-50%)',
-              zIndex: 20,
-              cursor: isFrameDragging ? 'grabbing' : 'grab',
-              padding: 4,
-              borderRadius: 4,
-              backgroundColor: 'rgba(102, 126, 234, 0.9)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              opacity: isFrameDragging ? 1 : 0.8,
-              transition: 'opacity 0.15s',
-            }}
-          >
-            <IconGripVertical size={14} color="white" />
-          </Box>
-        )}
-
-        {/* Quick Media Picker Button - hide during any drag operation */}
-        {(onMediaSelect || onPexelsSelect) && !isExporting && (isHovered || pickerOpen) && !isDragging && !isFrameDragging && (
+      {/* Media picker button */}
+      {showMediaPicker && showGuides && (
+        <Box
+          style={{
+            position: 'absolute',
+            bottom: 8,
+            right: 8,
+            zIndex: 20,
+          }}
+        >
           <Popover
             opened={pickerOpen}
             onChange={setPickerOpen}
-            position="bottom"
+            position="top-end"
+            shadow="md"
             withArrow
-            shadow="lg"
-            withinPortal
+            zIndex={1100}
           >
             <Popover.Target>
-              <ActionIcon
-                data-export-hide="true"
-                size="md"
-                variant="filled"
-                color="violet"
-                style={{
-                  position: 'absolute',
-                  bottom: bottomPadding + 8 * scale,
-                  right: sidePadding + 8 * scale,
-                  zIndex: 20,
-                  opacity: pickerOpen ? 1 : 0.9,
-                  transition: 'opacity 0.15s',
-                }}
+              <Box
                 onClick={(e) => {
                   e.stopPropagation();
-                  setPickerOpen(!pickerOpen);
+                  setPickerOpen((o) => !o);
+                }}
+                style={{
+                  width: 32,
+                  height: 32,
+                  borderRadius: 8,
+                  background: 'rgba(0,0,0,0.6)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
                 }}
               >
-                <IconPhoto size={16} />
-              </ActionIcon>
+                <Box component="span" style={{ fontSize: 16, color: 'white' }}>+</Box>
+              </Box>
             </Popover.Target>
-            <Popover.Dropdown p={0}>
+            <Popover.Dropdown p="xs">
               <QuickMediaPicker
-                onSelectMedia={(id) => onMediaSelect?.(id)}
-                onSelectPexels={(url) => onPexelsSelect?.(url)}
+                onSelectMedia={(id: number) => {
+                  onMediaSelect?.(id);
+                  setPickerOpen(false);
+                }}
+                onSelectPexels={(url: string) => {
+                  onPexelsSelect?.(url);
+                  setPickerOpen(false);
+                }}
                 onClose={() => setPickerOpen(false)}
               />
             </Popover.Dropdown>
           </Popover>
-        )}
+        </Box>
+      )}
 
-        {/* Base/Stand (laptops and monitors) */}
-        {renderBase()}
-      </Box>
+      {/* Selection outline */}
+      {effectiveSelected && (
+        <Box
+          style={{
+            position: 'absolute',
+            inset: -2,
+            border: '2px solid #228be6',
+            borderRadius: 'inherit',
+            pointerEvents: 'none',
+            zIndex: 15,
+          }}
+        />
+      )}
+
+      {/* Highlight overlay */}
+      {effectiveHighlighted && !effectiveSelected && (
+        <Box
+          style={{
+            position: 'absolute',
+            inset: 0,
+            border: '2px dashed #228be6',
+            borderRadius: 'inherit',
+            pointerEvents: 'none',
+            zIndex: 15,
+          }}
+        />
+      )}
+    </Box>
+  );
+
+  // Get the appropriate renderer
+  const getRenderer = () => {
+    const commonProps = {
+      options: options as any,
+      scale,
+      frameColor: effectiveFrameColor,
+      children: renderScreenContent(),
+    };
+
+    switch (deviceType) {
+      case 'phone':
+        return <PhoneRenderer {...commonProps} options={options as any} />;
+      case 'tablet':
+        return <TabletRenderer {...commonProps} options={options as any} />;
+      case 'flip':
+        return <FlipRenderer {...commonProps} options={options as any} />;
+      case 'foldable':
+        return <FoldableRenderer {...commonProps} options={options as any} />;
+      case 'laptop':
+        return <LaptopRenderer {...commonProps} options={options as any} />;
+      case 'desktop':
+        return <DesktopRenderer {...commonProps} options={options as any} />;
+      default:
+        return <PhoneRenderer {...commonProps} options={options as any} />;
+    }
+  };
+
+  return (
+    <Box
+      ref={frameWrapperRef}
+      style={{
+        position: 'relative',
+        display: 'inline-flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+      }}
+      onDragOver={(e) => {
+        e.preventDefault();
+        onDragOver?.();
+      }}
+      onDragLeave={onDragLeave}
+    >
+      {getRenderer()}
     </Box>
   );
 }
+
+export default DeviceFrame;

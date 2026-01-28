@@ -3,62 +3,15 @@
 import { Stack, Text, Box, ScrollArea, Group, Button } from '@mantine/core';
 import { IconPlus } from '@tabler/icons-react';
 import { useFrames, getCompositionFrameCount } from './FramesContext';
+import { BASE_TYPES, DIY_TEMPLATES, getTemplatesByCategory } from './diy-frames/templates';
+import { DIYDeviceType, getDefaultDIYOptions } from './diy-frames/types';
 
-interface DeviceOption {
-  id: string;
-  name: string;
-  dimensions: string;
-  category: string;
-  subcategory?: string;
-}
-
-const devices: DeviceOption[] = [
-  // NO BEZEL (generic, not tied to any device type)
-  { id: 'frameless-phone', name: 'Frameless Phone', dimensions: 'No bezel', category: 'NO BEZEL' },
-  { id: 'frameless-tablet', name: 'Frameless Tablet', dimensions: 'No bezel', category: 'NO BEZEL' },
-  { id: 'frameless-laptop', name: 'Frameless Laptop', dimensions: 'No bezel', category: 'NO BEZEL' },
-  { id: 'frameless-desktop', name: 'Frameless Desktop', dimensions: 'No bezel', category: 'NO BEZEL' },
-  
-  // PHONES - iOS
-  { id: 'iphone-14-pro', name: 'iPhone 14 Pro', dimensions: 'Dynamic Island', category: 'PHONES', subcategory: 'iOS' },
-  { id: 'iphone-14', name: 'iPhone 14', dimensions: 'Notch', category: 'PHONES', subcategory: 'iOS' },
-  { id: 'iphone-13', name: 'iPhone 13', dimensions: 'Notch', category: 'PHONES', subcategory: 'iOS' },
-  { id: 'iphone-se', name: 'iPhone SE', dimensions: 'Home Button', category: 'PHONES', subcategory: 'iOS' },
-  
-  // PHONES - Android
-  { id: 'pixel-7', name: 'Pixel 7', dimensions: 'Punch Hole', category: 'PHONES', subcategory: 'Android' },
-  { id: 'samsung-s23', name: 'Samsung S23', dimensions: 'Punch Hole', category: 'PHONES', subcategory: 'Android' },
-  { id: 'galaxy-z-flip-5', name: 'Flip', dimensions: 'Foldable', category: 'PHONES', subcategory: 'Android' },
-  { id: 'galaxy-z-fold-5', name: 'Fold', dimensions: 'Foldable', category: 'PHONES', subcategory: 'Android' },
-  
-  // TABLETS - iOS
-  { id: 'ipad-pro', name: 'iPad Pro', dimensions: 'Rounded', category: 'TABLETS', subcategory: 'iOS' },
-  { id: 'ipad-air', name: 'iPad Air', dimensions: 'Rounded', category: 'TABLETS', subcategory: 'iOS' },
-  { id: 'ipad-mini', name: 'iPad Mini', dimensions: 'Rounded', category: 'TABLETS', subcategory: 'iOS' },
-  
-  // TABLETS - Android
-  { id: 'galaxy-tab-s9', name: 'Galaxy Tab S9', dimensions: 'Rounded', category: 'TABLETS', subcategory: 'Android' },
-  
-  // LAPTOPS - macOS
-  { id: 'macbook-pro-16', name: 'MacBook Pro 16"', dimensions: 'Notch', category: 'LAPTOPS', subcategory: 'macOS' },
-  { id: 'macbook-pro-14', name: 'MacBook Pro 14"', dimensions: 'Notch', category: 'LAPTOPS', subcategory: 'macOS' },
-  { id: 'macbook-air', name: 'MacBook Air', dimensions: 'No Notch', category: 'LAPTOPS', subcategory: 'macOS' },
-  
-  // LAPTOPS - Windows
-  { id: 'surface-laptop', name: 'Surface Laptop', dimensions: 'Windows', category: 'LAPTOPS', subcategory: 'Windows' },
-  
-  // DESKTOPS - macOS
-  { id: 'imac-24', name: 'iMac 24"', dimensions: 'All-in-One', category: 'DESKTOPS', subcategory: 'macOS' },
-  { id: 'studio-display', name: 'Studio Display', dimensions: 'Monitor', category: 'DESKTOPS', subcategory: 'macOS' },
-  { id: 'pro-display-xdr', name: 'Pro Display XDR', dimensions: 'Monitor', category: 'DESKTOPS', subcategory: 'macOS' },
-];
-
-const DeviceButton = ({
-  device,
+const BaseTypeButton = ({
+  type,
   selected,
   onClick,
 }: {
-  device: DeviceOption;
+  type: { id: DIYDeviceType; name: string; description: string };
   selected: boolean;
   onClick: () => void;
 }) => (
@@ -71,69 +24,77 @@ const DeviceButton = ({
       cursor: 'pointer',
       backgroundColor: selected ? '#f8f9ff' : 'white',
       transition: 'all 0.2s',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      gap: 12,
     }}
   >
-    <Box style={{ flex: 1 }}>
-      <Text size="sm" fw={500} c={selected ? 'dark' : 'dimmed'}>
-        {device.name}
-      </Text>
-      <Text size="xs" c="dimmed">
-        {device.dimensions}
-      </Text>
-    </Box>
-    {selected && (
-      <Box
-        style={{
-          width: 18,
-          height: 18,
-          borderRadius: '50%',
-          backgroundColor: '#667eea',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          flexShrink: 0,
-        }}
-      >
-        <Text size="xs" c="white">
-          ✓
-        </Text>
-      </Box>
-    )}
+    <Text size="sm" fw={500} c={selected ? 'dark' : 'dimmed'}>
+      {type.name}
+    </Text>
+    <Text size="xs" c="dimmed">
+      {type.description}
+    </Text>
   </Box>
 );
 
-export function DeviceTab({ 
-}: {}) {
+const TemplateButton = ({
+  template,
+  selected,
+  onClick,
+}: {
+  template: typeof DIY_TEMPLATES[0];
+  selected: boolean;
+  onClick: () => void;
+}) => (
+  <Box
+    onClick={onClick}
+    style={{
+      padding: '10px 14px',
+      border: selected ? '2px solid #667eea' : '1px solid #dee2e6',
+      borderRadius: 8,
+      cursor: 'pointer',
+      backgroundColor: selected ? '#f8f9ff' : 'white',
+      transition: 'all 0.2s',
+    }}
+  >
+    <Text size="sm" fw={500} c={selected ? 'dark' : 'dimmed'}>
+      {template.name}
+    </Text>
+  </Box>
+);
+
+export function DeviceTab() {
   const {
     screens,
     primarySelectedIndex,
     selectedFrameIndex,
     setSelectedFrameIndex,
-    setFrameDevice,
+    setFrameDIYOptions,
     addFrameSlot,
     selectTextElement,
   } = useFrames();
-  const categories = ['NO BEZEL', 'PHONES', 'TABLETS', 'LAPTOPS', 'DESKTOPS'];
 
-  // Get current screen and its images
   const currentScreen = screens[primarySelectedIndex];
   const currentImages = currentScreen?.images || [];
-  
-  // Get the device frame for the selected frame
-  const rawDeviceFrame = currentImages[selectedFrameIndex]?.deviceFrame;
-  const isCleared = currentImages[selectedFrameIndex]?.cleared === true || rawDeviceFrame === '';
-  const currentDeviceFrame = isCleared ? '' : (rawDeviceFrame || 'iphone-14-pro');
+  const currentFrame = currentImages[selectedFrameIndex];
+  const currentDIYOptions = currentFrame?.diyOptions;
+  const currentTemplateId = currentFrame?.diyTemplateId;
+  const currentType = currentDIYOptions?.type;
 
   const currentFrameCount = getCompositionFrameCount(currentScreen?.settings?.composition ?? 'single');
   const canAddFrame = currentFrameCount < 3;
 
-  const handleDeviceSelect = (deviceId: string) => {
-    setFrameDevice(primarySelectedIndex, selectedFrameIndex, deviceId);
+  const handleBaseTypeSelect = (deviceType: DIYDeviceType) => {
+    const options = getDefaultDIYOptions(deviceType);
+    setFrameDIYOptions(primarySelectedIndex, selectedFrameIndex, options);
   };
+
+  const handleTemplateSelect = (templateId: string) => {
+    const template = DIY_TEMPLATES.find((t) => t.id === templateId);
+    if (template) {
+      setFrameDIYOptions(primarySelectedIndex, selectedFrameIndex, template.options, templateId);
+    }
+  };
+
+  const templateCategories: DIYDeviceType[] = ['phone', 'flip', 'foldable', 'tablet', 'laptop', 'desktop'];
 
   return (
     <ScrollArea style={{ height: '100%' }}>
@@ -146,7 +107,6 @@ export function DeviceTab({
             disabled={!currentScreen || !canAddFrame}
             onClick={() => {
               if (!currentScreen) return;
-              // Keep selection semantics consistent: frames and text are mutually exclusive.
               selectTextElement(null);
               addFrameSlot();
             }}
@@ -163,7 +123,6 @@ export function DeviceTab({
                 size="xs"
                 variant={selectedFrameIndex === i ? 'filled' : 'light'}
                 onClick={() => {
-                  // Keep selection semantics consistent: frames and text are mutually exclusive.
                   selectTextElement(null);
                   setSelectedFrameIndex(i);
                 }}
@@ -174,7 +133,6 @@ export function DeviceTab({
           </Group>
         )}
 
-        {/* Show which frame is being edited */}
         {currentScreen && (
           <Box p="xs" style={{ backgroundColor: '#f8f9ff', borderRadius: 8 }}>
             <Text size="xs" c="dimmed" fw={500}>
@@ -182,60 +140,54 @@ export function DeviceTab({
             </Text>
           </Box>
         )}
-        
-        {categories.map((category) => {
-          const categoryDevices = devices.filter((d) => d.category === category);
-          if (categoryDevices.length === 0) return null;
 
-          // Group devices by subcategory (if they have one)
-          const subcategories = Array.from(new Set(categoryDevices.map((d) => d.subcategory).filter(Boolean)));
+        {/* Base Types */}
+        <Box>
+          <Text size="sm" fw={700} c="dark" mb="md">
+            Base Type
+          </Text>
+          <Stack gap="xs">
+            {BASE_TYPES.map((type) => (
+              <BaseTypeButton
+                key={type.id}
+                type={type}
+                selected={currentType === type.id && !currentTemplateId}
+                onClick={() => handleBaseTypeSelect(type.id)}
+              />
+            ))}
+          </Stack>
+        </Box>
 
-          return (
-            <Box key={category}>
-              <Text size="sm" fw={700} c="dark" mb="md" tt="capitalize">
-                {category.toLowerCase()}
-              </Text>
-              <Stack gap="lg">
-                {subcategories.length > 0 ? (
-                  // Categories with subcategories (PHONES, TABLETS, etc.)
-                  subcategories.map((subcategory) => {
-                    const subcategoryDevices = categoryDevices.filter((d) => d.subcategory === subcategory);
-                    
-                    return (
-                      <Box key={subcategory}>
-                        <Text size="xs" fw={600} c="dimmed" mb="xs" pl="xs">
-                          {subcategory}
-                        </Text>
-                        <Stack gap="xs">
-                          {subcategoryDevices.map((device) => (
-                            <DeviceButton
-                              key={device.id}
-                              device={device}
-                              selected={currentDeviceFrame === device.id}
-                              onClick={() => handleDeviceSelect(device.id)}
-                            />
-                          ))}
-                        </Stack>
-                      </Box>
-                    );
-                  })
-                ) : (
-                  // Categories without subcategories (NO BEZEL)
+        {/* Templates by Category */}
+        <Box>
+          <Text size="sm" fw={700} c="dark" mb="md">
+            Templates
+          </Text>
+          <Stack gap="lg">
+            {templateCategories.map((category) => {
+              const templates = getTemplatesByCategory(category);
+              if (templates.length === 0) return null;
+
+              return (
+                <Box key={category}>
+                  <Text size="xs" fw={600} c="dimmed" mb="xs" pl="xs" tt="capitalize">
+                    {category}
+                  </Text>
                   <Stack gap="xs">
-                    {categoryDevices.map((device) => (
-                      <DeviceButton
-                        key={device.id}
-                        device={device}
-                        selected={currentDeviceFrame === device.id}
-                        onClick={() => handleDeviceSelect(device.id)}
+                    {templates.map((template) => (
+                      <TemplateButton
+                        key={template.id}
+                        template={template}
+                        selected={currentTemplateId === template.id}
+                        onClick={() => handleTemplateSelect(template.id)}
                       />
                     ))}
                   </Stack>
-                )}
-              </Stack>
-            </Box>
-          );
-        })}
+                </Box>
+              );
+            })}
+          </Stack>
+        </Box>
       </Stack>
     </ScrollArea>
   );
