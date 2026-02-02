@@ -8,6 +8,7 @@ import { persistenceDB, Project } from '@/lib/PersistenceDB';
 import { usePersistence } from '@/hooks/usePersistence';
 import { usePatchHistory, type PatchHistoryEntry } from '@/hooks/usePatchHistory';
 import { useProjectSync, type UseProjectSyncResult } from '@/hooks/useProjectSync';
+import { WelcomeModal } from '@/components/WelcomeModal/WelcomeModal';
 
 // Canvas dimensions helper (App Store requirements)
 export const getCanvasDimensions = (canvasSize: string, orientation: string) => {
@@ -1368,6 +1369,7 @@ export function FramesProvider({ children }: { children: ReactNode }) {
       }}
     >
       {children}
+      <WelcomeModal />
     </FramesContext.Provider>
   );
 }

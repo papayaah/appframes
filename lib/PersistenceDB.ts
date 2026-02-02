@@ -25,6 +25,7 @@ export interface AppState {
   navWidth: number; // Sidebar width in pixels
   downloadFormat?: 'png' | 'jpg';
   downloadJpegQuality?: number; // 0-100
+  hideWelcomeModal?: boolean; // Don't show welcome modal on load
   updatedAt: Date; // Last modification time
 }
 
