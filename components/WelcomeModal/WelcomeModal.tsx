@@ -116,65 +116,89 @@ export function WelcomeModal() {
       centered
       withCloseButton={false}
       size="auto"
-      padding="lg"
+      padding={0}
       styles={{
         content: {
           maxWidth: 'min(900px, 90vw)',
           maxHeight: '90vh',
           overflow: 'auto',
+          borderRadius: 12,
         },
         body: {
           padding: 0,
         },
       }}
+      zIndex={1000}
     >
-      <Stack gap="md">
-        {/* YouTube Video Embed */}
-        <Box style={{ width: 'min(800px, 85vw)' }}>
-          <AspectRatio ratio={16 / 9}>
-            <iframe
-              src={getEmbedUrl(DEMO_VIDEO_ID)}
-              title="AppFrames Demo"
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-              allowFullScreen
-              style={{ border: 0, borderRadius: 8 }}
+      <Stack gap={0}>
+        {/* Dark wrapper: video + Key Features share same color scheme */}
+        <Box
+          bg="dark.7"
+          style={{ borderRadius: '12px 12px 0 0' }}
+          p="md"
+          pb="lg"
+        >
+          {/* YouTube Video Embed - centered, proportioned */}
+          <Box
+            style={{
+              width: 'min(800px, 85vw)',
+              margin: '0 auto',
+            }}
+          >
+            <AspectRatio ratio={16 / 9}>
+              <iframe
+                src={getEmbedUrl(DEMO_VIDEO_ID)}
+                title="AppFrames Demo"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+                style={{ border: 0, borderRadius: 8 }}
+              />
+            </AspectRatio>
+          </Box>
+
+          {/* Key Features - same dark scheme as video area */}
+          <Box mt="lg" px="xs">
+            <Text fw={600} mb="sm" c="gray.2" size="sm" tt="uppercase" lts={0.5}>
+              Key Features
+            </Text>
+            <SimpleGrid cols={{ base: 1, xs: 2, sm: 3 }} spacing="md">
+              {features.map((feature, index) => (
+                <Group key={index} gap="sm" wrap="nowrap" align="flex-start">
+                  <ThemeIcon size="md" variant="light" color="gray">
+                    {feature.icon}
+                  </ThemeIcon>
+                  <Box style={{ flex: 1 }}>
+                    <Text size="sm" fw={600} lh={1.2} c="gray.2">
+                      {feature.title}
+                    </Text>
+                    <Text size="xs" c="gray.5">
+                      {feature.description}
+                    </Text>
+                  </Box>
+                </Group>
+              ))}
+            </SimpleGrid>
+          </Box>
+        </Box>
+
+        {/* Footer - subtle bar, same dark family */}
+        <Box bg="dark.8" p="md" style={{ borderRadius: '0 0 12px 12px' }}>
+          <Group justify="space-between">
+            <Checkbox
+              label="Don't show this again"
+              checked={dontShowAgain}
+              onChange={(event) => setDontShowAgain(event.currentTarget.checked)}
+              color="gray"
+              size="sm"
+              styles={{
+                label: { color: 'var(--mantine-color-gray-4)' },
+              }}
             />
-          </AspectRatio>
+            <Button onClick={handleClose} variant="white" color="gray">
+              Get Started
+            </Button>
+          </Group>
         </Box>
-
-        {/* Features Grid */}
-        <Box>
-          <Text fw={600} mb="sm">
-            Key Features
-          </Text>
-          <SimpleGrid cols={{ base: 1, xs: 2, sm: 3 }} spacing="sm">
-            {features.map((feature, index) => (
-              <Group key={index} gap="xs" wrap="nowrap" align="flex-start">
-                <ThemeIcon size="md" variant="light" color="blue">
-                  {feature.icon}
-                </ThemeIcon>
-                <Box style={{ flex: 1 }}>
-                  <Text size="sm" fw={600} lh={1.2}>
-                    {feature.title}
-                  </Text>
-                  <Text size="xs" c="dimmed">
-                    {feature.description}
-                  </Text>
-                </Box>
-              </Group>
-            ))}
-          </SimpleGrid>
-        </Box>
-
-        {/* Footer with checkbox and button */}
-        <Group justify="space-between">
-          <Checkbox
-            label="Don't show this again"
-            checked={dontShowAgain}
-            onChange={(event) => setDontShowAgain(event.currentTarget.checked)}
-          />
-          <Button onClick={handleClose}>Get Started</Button>
-        </Group>
       </Stack>
     </Modal>
   );

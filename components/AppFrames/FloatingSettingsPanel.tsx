@@ -411,7 +411,7 @@ export function FloatingSettingsPanel({
         top: 0,
         transform: position ? `translate3d(${position.x}px, ${position.y}px, 0)` : undefined,
         width: effectiveWidth,
-        zIndex: 1000,
+        zIndex: 200,
         willChange: 'transform',
         opacity: isDraggingRef.current || isResizingRef.current ? 0.9 : 1,
         transition: isDraggingRef.current || isResizingRef.current ? 'none' : 'opacity 0.2s',

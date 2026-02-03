@@ -83,7 +83,7 @@ export function AppFrames() {
     isInitializing,
   } = useFrames();
 
-  const [navWidth, setNavWidth] = useState(360); // Rail (80) + Panel (~280)
+  const [navWidth, setNavWidth] = useState(80); // Start collapsed, expands to 360 when panel opens
   const [aiSidebarOpen, setAiSidebarOpen] = useState(false);
   const [historyPanelOpen, setHistoryPanelOpen] = useState(false);
   const historyWidth = historyPanelOpen ? 320 : 16;
@@ -137,15 +137,15 @@ export function AppFrames() {
   const hasImage = hasValidFrame &&
     (currentFrameData?.mediaId != null || currentFrameData?.image != null);
 
-  // Listen for AI sidebar open/close events to expand navWidth
+  // Listen for AI sidebar open/close events (main panel always floats, rail is 80px)
   useEffect(() => {
     const handleAISidebarOpen = () => {
       setAiSidebarOpen(true);
-      setNavWidth(780); // 360 (main) + 420 (AI sidebar)
+      setNavWidth(500); // 80 (rail) + 420 (AI sidebar)
     };
     const handleAISidebarClose = () => {
       setAiSidebarOpen(false);
-      setNavWidth(360);
+      setNavWidth(80); // Back to rail only; main panel floats
     };
 
     window.addEventListener('ai-sidebar-open', handleAISidebarOpen);

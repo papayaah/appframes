@@ -305,7 +305,7 @@ const mantinePreset: ComponentPreset = {
           display: 'flex',
           flexDirection: 'column',
           position: 'fixed',
-          left: '360px', // Position next to main sidebar (80px rail + 280px panel)
+          left: '80px', // Position next to icon rail (main panel floats)
           top: '45px', // Below header
           zIndex: 100,
           boxShadow: '-2px 0 8px rgba(0,0,0,0.1)',
