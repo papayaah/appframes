@@ -214,7 +214,8 @@ export function FloatingSettingsPanel({
       anchorOffset
     );
     setPosition(newPosition);
-  }, [isOpen, mounted, anchorToElement, initialPosition, width, anchorOffset, positionKey, hasUserDragged, position, size.width]);
+  // Note: `position` intentionally excluded to avoid infinite loop (effect sets position)
+  }, [isOpen, mounted, anchorToElement, initialPosition, width, anchorOffset, positionKey, hasUserDragged, size.width]);
 
   // Apply visual position via rAF
   const applyPositionVisual = useCallback((x: number, y: number) => {

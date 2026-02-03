@@ -935,7 +935,17 @@ export function FramesProvider({ children }: { children: ReactNode }) {
   // Load project data into React state
   const loadProjectIntoState = useCallback((project: Project) => {
     setCurrentProjectId(project.id);
-    resetDocWithHistory({ name: project.name, screensByCanvasSize: project.screensByCanvasSize });
+    // Clear selection on load so user sees clean "nothing selected" state
+    const screensWithNoSelection = Object.fromEntries(
+      Object.entries(project.screensByCanvasSize).map(([size, screens]) => [
+        size,
+        screens.map((s) => ({
+          ...s,
+          settings: { ...s.settings, selectedTextId: undefined },
+        })),
+      ])
+    );
+    resetDocWithHistory({ name: project.name, screensByCanvasSize: screensWithNoSelection });
     setCurrentCanvasSize(project.currentCanvasSize);
     setSelectedScreenIndices(project.selectedScreenIndices);
     setSelectedFrameIndex(project.selectedFrameIndex ?? 0);

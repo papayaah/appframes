@@ -28,6 +28,7 @@ interface CanvasProps {
   onSelectTextElement?: (screenIndex: number, textId: string | null) => void;
   onUpdateTextElement?: (screenIndex: number, textId: string, updates: any) => void;
   onDeleteTextElement?: (screenIndex: number, textId: string) => void;
+  onClickOutsideCanvas?: () => void;
   zoom?: number;
   onZoomChange?: (zoom: number) => void;
 }
@@ -68,6 +69,7 @@ export function Canvas({
   onSelectTextElement,
   onUpdateTextElement,
   onDeleteTextElement,
+  onClickOutsideCanvas,
   zoom = 100,
   onZoomChange,
 }: CanvasProps) {
@@ -289,6 +291,18 @@ export function Canvas({
     };
   }, []);
 
+  const handleContainerMouseDown = useCallback(
+    (e: React.MouseEvent) => {
+      if (!onClickOutsideCanvas) return;
+      // Only deselect when clicking outside any canvas (e.g. gray editor area)
+      const target = e.target as HTMLElement;
+      if (!target.closest('[data-canvas="true"]')) {
+        onClickOutsideCanvas();
+      }
+    },
+    [onClickOutsideCanvas]
+  );
+
   return (
     <Box
       ref={containerRef}
@@ -303,6 +317,7 @@ export function Canvas({
         overflowY: 'hidden',
         position: 'relative',
       }}
+      onMouseDown={handleContainerMouseDown}
       onDragOver={(e) => {
         e.preventDefault();
         // Count files being dragged

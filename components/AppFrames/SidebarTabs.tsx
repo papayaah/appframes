@@ -65,8 +65,9 @@ export function SidebarTabs({
   const isHoveringRef = useRef(false);
   const prevPathnameRef = useRef<string | null>(null);
   // Refs to track current state for use in callbacks (avoid stale closures)
-  const activeTabRef = useRef(activeTab);
+  const activeTabRef = useRef<TabId | null>(activeTab);
   const isPinnedRef = useRef(isPinned);
+  // Keep refs in sync with state (ensures consistency after re-renders)
   activeTabRef.current = activeTab;
   isPinnedRef.current = isPinned;
 
@@ -74,7 +75,7 @@ export function SidebarTabs({
   const currentPathTab = pathname === '/' ? 'layout' : pathname.replace('/', '');
   const validTab = tabs.some(t => t.id === currentPathTab) ? currentPathTab as TabId : 'layout';
 
-  // If navigation happens programmatically while sidebar is open, switch to the correct tab
+  // If navigation happens programmatically (external, like back button) while sidebar is open, switch to the correct tab
   useEffect(() => {
     // Only respond to URL changes if sidebar is already open (user has interacted)
     // Don't auto-open sidebar on initial page load or URL changes when closed
@@ -86,15 +87,16 @@ export function SidebarTabs({
     if (prevPathnameRef.current === pathname) return;
     prevPathnameRef.current = pathname;
 
-    // Switch to the correct tab if sidebar is already open
-    if (validTab && activeTab !== validTab) {
+    // Switch to the correct tab if sidebar is open and URL changed to a different tab
+    // Use ref (not state) to avoid race condition with handleTabClick's router.push
+    if (validTab && activeTabRef.current !== validTab) {
       activeTabRef.current = validTab;
       isPinnedRef.current = true;
       setActiveTab(validTab);
       setIsPinned(true);
-      setShouldAnimate(true);
+      // Don't animate when switching tabs programmatically
     }
-  }, [pathname, validTab, activeTab, onPanelToggle]);
+  }, [pathname, validTab]);
 
   const clearHoverTimeout = useCallback(() => {
     if (hoverTimeoutRef.current) {
@@ -103,46 +105,45 @@ export function SidebarTabs({
     }
   }, []);
 
-  const handleTabClick = useCallback((tabId: TabId, event?: React.MouseEvent) => {
+  const handleTabClick = useCallback((tabId: TabId) => {
     clearHoverTimeout();
 
-    // Only treat as explicit "pin" when this is a real user click (not synthetic/bubbled from panel content).
-    // This keeps media (and other tabs) consistent: hover = float, click = pin.
-    const isExplicitUserClick = !event || event?.nativeEvent?.isTrusted === true;
-
-    // Use refs to get current state values (avoid stale closures)
     const currentActiveTab = activeTabRef.current;
     const currentIsPinned = isPinnedRef.current;
 
-    if (currentActiveTab === tabId) {
-      if (currentIsPinned) {
-        // Already pinned - close it (only on real click)
-        if (isExplicitUserClick) {
-          isPinnedRef.current = false;
-          activeTabRef.current = null;
-          setActiveTab(null);
-          setIsPinned(false);
-          onPanelToggle?.(false);
-        }
-      } else {
-        // Panel is floating (opened by hover) - pin to keep open, panel stays floating
-        if (isExplicitUserClick) {
-          isPinnedRef.current = true;
-          router.push(`/${tabId}`, { scroll: false });
-          setIsPinned(true);
-        }
-      }
-    } else {
-      // Different tab - open and pin
-      if (isExplicitUserClick) {
-        isPinnedRef.current = true;
-        activeTabRef.current = tabId;
-        router.push(`/${tabId}`, { scroll: false });
-        setShouldAnimate(true);
-        setActiveTab(tabId);
-        setIsPinned(true);
-      }
+    // Clicking the same tab that's already pinned = close/unpin
+    if (currentActiveTab === tabId && currentIsPinned) {
+      isPinnedRef.current = false;
+      activeTabRef.current = null;
+      setActiveTab(null);
+      setIsPinned(false);
+      onPanelToggle?.(false);
+      return;
     }
+
+    // Clicking any tab (same tab while hovering, or different tab) = pin it
+    const isNewPanel = currentActiveTab === null;
+
+    // Update refs immediately to prevent race conditions with leave handlers
+    activeTabRef.current = tabId;
+    isPinnedRef.current = true;
+
+    // Update state
+    setActiveTab(tabId);
+    setIsPinned(true);
+
+    // Only notify parent if we're newly pinning (not just switching tabs)
+    if (!currentIsPinned) {
+      onPanelToggle?.(true);
+    }
+
+    // Only animate if opening a fresh panel
+    if (isNewPanel) {
+      setShouldAnimate(true);
+    }
+
+    // Update URL
+    router.push(`/${tabId}`, { scroll: false });
   }, [clearHoverTimeout, router, onPanelToggle]);
 
   const handleTabHover = useCallback((tabId: TabId) => {
@@ -193,9 +194,10 @@ export function SidebarTabs({
       setIsPinned(false);
       onPanelToggle?.(false);
     } else {
-      // Pinning - keep panel open (stays floating)
+      // Pinning - expand sidebar to push content
       isPinnedRef.current = true;
       setIsPinned(true);
+      onPanelToggle?.(true);
     }
   }, [clearHoverTimeout, onPanelToggle]);
 
@@ -267,11 +269,11 @@ export function SidebarTabs({
     }
   };
 
-  // Panel always floats as overlay—navbar stays 80px (icon rail only)
-  const sidebarWidth = 80;
+  // When pinned, sidebar expands to include panel (pushes content); when hovering, panel floats
+  const sidebarWidth = isPinned && activeTab ? 360 : 80;
 
   return (
-    <Box style={{ display: 'flex', width: sidebarWidth, minWidth: sidebarWidth, maxWidth: sidebarWidth, height: '100%', position: 'relative', flexShrink: 0 }}>
+    <Box style={{ display: 'flex', width: sidebarWidth, minWidth: sidebarWidth, maxWidth: sidebarWidth, height: '100%', position: 'relative', flexShrink: 0, transition: 'width 0.2s ease, min-width 0.2s ease, max-width 0.2s ease' }}>
       {/* Icon Rail */}
       <Box
         style={{
@@ -292,7 +294,7 @@ export function SidebarTabs({
           return (
             <Tooltip key={id} label={label} position="right" withArrow>
               <Box
-                onClick={(e) => handleTabClick(id, e)}
+                onClick={() => handleTabClick(id)}
                 onMouseEnter={() => handleTabHover(id)}
                 onMouseLeave={handleTabLeave}
                 style={{
@@ -337,13 +339,13 @@ export function SidebarTabs({
           style={{
             width: 280,
             height: '100%',
-            position: 'absolute',
-            left: 80,
+            position: isPinned ? 'relative' : 'absolute',
+            left: isPinned ? 0 : 80,
             top: 0,
-            zIndex: 200,
+            zIndex: isPinned ? 1 : 200,
             backgroundColor: 'white',
             borderRight: '1px solid #E5E7EB',
-            boxShadow: '4px 0 12px rgba(0,0,0,0.1)',
+            boxShadow: isPinned ? 'none' : '4px 0 12px rgba(0,0,0,0.1)',
             display: 'flex',
             flexDirection: 'column',
             animation: shouldAnimate ? 'fadeIn 0.15s ease-out' : 'none',

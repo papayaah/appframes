@@ -513,7 +513,7 @@ export function AppFrames() {
         />
       </AppShell.Header>
 
-      <AppShell.Navbar p={0} style={{ borderRight: '1px solid #E5E7EB' }}>
+      <AppShell.Navbar p={0} style={{ borderRight: '1px solid #E5E7EB', transition: 'width 0.2s ease' }}>
         <SidebarTabs
           settings={settings}
           setSettings={setSettings}
@@ -536,7 +536,7 @@ export function AppFrames() {
         />
       </AppShell.Navbar>
 
-      <AppShell.Main>
+      <AppShell.Main style={{ transition: 'padding-left 0.2s ease, margin-left 0.2s ease' }}>
         {isInitializing ? (
           <Center style={{ height: 'calc(100vh - 45px)', backgroundColor: '#F9FAFB' }}>
             <Loader size="lg" color="gray" />
@@ -576,6 +576,7 @@ export function AppFrames() {
               if (!screen) return;
               deleteTextElement(screen.id, textId);
             }}
+            onClickOutsideCanvas={() => selectTextElement(null)}
             onReplaceScreen={async (files, targetFrameIndex, targetScreenIndex) => {
               try {
                 // Use targetScreenIndex if provided, otherwise primarySelectedIndex
