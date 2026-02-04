@@ -21,7 +21,7 @@ import {
   IconDownload,
   IconLayersIntersect,
 } from '@tabler/icons-react';
-import { persistenceDB } from '@/lib/PersistenceDB';
+import { useAppStore } from '@/stores/useAppStore';
 
 // Sample YouTube video - replace with actual demo video later
 const DEMO_VIDEO_ID = 'dQw4w9WgXcQ';
@@ -70,42 +70,43 @@ const features: FeatureItem[] = [
 ];
 
 export function WelcomeModal() {
+  const { welcomeModalDismissed, dismissWelcomeModal } = useAppStore();
   const [opened, setOpened] = useState(false);
   const [dontShowAgain, setDontShowAgain] = useState(false);
-  const [hasCheckedPreference, setHasCheckedPreference] = useState(false);
+  const [ready, setReady] = useState(false);
 
-  // Check if we should show the modal on mount
+  // Wait for Zustand to hydrate from localStorage before deciding to show modal
   useEffect(() => {
-    const checkPreference = async () => {
-      try {
-        const appState = await persistenceDB.loadAppState();
-        if (!appState?.hideWelcomeModal) {
-          setOpened(true);
-        }
-      } catch (error) {
-        // If we can't load state, show the modal
+    // Check if store has already hydrated
+    const unsub = useAppStore.persist.onFinishHydration(() => {
+      const dismissed = useAppStore.getState().welcomeModalDismissed;
+      if (!dismissed) {
         setOpened(true);
       }
-      setHasCheckedPreference(true);
-    };
+      setReady(true);
+    });
 
-    checkPreference();
+    // If already hydrated, check immediately
+    if (useAppStore.persist.hasHydrated()) {
+      const dismissed = useAppStore.getState().welcomeModalDismissed;
+      if (!dismissed) {
+        setOpened(true);
+      }
+      setReady(true);
+    }
+
+    return unsub;
   }, []);
 
-  const handleClose = async () => {
-    // Save preference if checkbox is checked
+  const handleClose = () => {
     if (dontShowAgain) {
-      try {
-        await persistenceDB.saveAppState({ hideWelcomeModal: true });
-      } catch (error) {
-        console.error('Failed to save welcome modal preference:', error);
-      }
+      dismissWelcomeModal();
     }
     setOpened(false);
   };
 
-  // Don't render anything until we've checked the preference
-  if (!hasCheckedPreference) {
+  // Don't render until store is hydrated
+  if (!ready) {
     return null;
   }
 

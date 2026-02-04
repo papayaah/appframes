@@ -16,6 +16,7 @@ interface CanvasProps {
   screens: Screen[];
   selectedScreenIndices: number[];
   selectedFrameIndex?: number;
+  frameSelectionVisible?: boolean;
   onSelectFrame?: (screenIndex: number, frameIndex: number) => void;
   onSelectScreen?: (index: number, multi: boolean) => void;
   onReplaceScreen?: (files: File[], targetFrameIndex?: number, screenIndex?: number) => void;
@@ -57,6 +58,7 @@ export function Canvas({
   screens,
   selectedScreenIndices,
   selectedFrameIndex,
+  frameSelectionVisible = false,
   onSelectFrame,
   onSelectScreen,
   onReplaceScreen,
@@ -375,8 +377,9 @@ export function Canvas({
             const isPrimaryScreen = screenIndex === primaryScreenIndex;
           // Only show *one* set of handles at a time:
           // - If a text element is selected, suppress frame selection/handles.
+          // - Hide frame handles until user explicitly selects a frame (frameSelectionVisible).
           const effectiveSelectedFrameIndex =
-            isPrimaryScreen && !screenSettings.selectedTextId ? selectedFrameIndex : undefined;
+            isPrimaryScreen && !screenSettings.selectedTextId && frameSelectionVisible ? selectedFrameIndex : undefined;
 
           return (
             <Box

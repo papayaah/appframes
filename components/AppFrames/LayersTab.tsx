@@ -36,6 +36,7 @@ export function LayersTab() {
     primarySelectedIndex,
     selectedFrameIndex,
     setSelectedFrameIndex,
+    setFrameSelectionVisible,
     selectTextElement,
     updateTextElement,
     deleteTextElement,
@@ -96,6 +97,7 @@ export function LayersTab() {
 
   const handleBackgroundSelect = () => {
     selectTextElement(null);
+    setFrameSelectionVisible(false);
     // Don't change selectedFrameIndex to avoid breaking other code
     // Just track that background is selected locally
     setBackgroundSelected(true);
@@ -104,6 +106,7 @@ export function LayersTab() {
   const handleFrameSelect = (frameIndex: number) => {
     selectTextElement(null);
     setSelectedFrameIndex(frameIndex);
+    setFrameSelectionVisible(true);
     setBackgroundSelected(false); // Clear background selection when frame is selected
   };
 

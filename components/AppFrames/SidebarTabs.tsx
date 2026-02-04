@@ -1,7 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { useRouter, usePathname } from 'next/navigation';
+import { useCallback, useRef, useState } from 'react';
 import { Box, Text, Stack, Select, Slider, Group, ActionIcon, Tooltip } from '@mantine/core';
 import { IconLayout, IconDeviceMobile, IconPhoto, IconTypography, IconSettings, IconStack, IconPin, IconPinFilled, IconX } from '@tabler/icons-react';
 import { Sidebar } from './Sidebar';
@@ -56,47 +55,14 @@ export function SidebarTabs({
   downloadJpegQuality,
   onDownloadJpegQualityChange,
 }: SidebarTabsProps) {
-  const router = useRouter();
-  const pathname = usePathname();
   const [activeTab, setActiveTab] = useState<TabId | null>(null);
   const [isPinned, setIsPinned] = useState(false);
   const [shouldAnimate, setShouldAnimate] = useState(false);
   const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isHoveringRef = useRef(false);
-  const prevPathnameRef = useRef<string | null>(null);
   // Refs to track current state for use in callbacks (avoid stale closures)
-  const activeTabRef = useRef<TabId | null>(activeTab);
-  const isPinnedRef = useRef(isPinned);
-  // Keep refs in sync with state (ensures consistency after re-renders)
-  activeTabRef.current = activeTab;
-  isPinnedRef.current = isPinned;
-
-  // Extract tab from pathname (e.g., "/layout" -> "layout", "/" -> "layout")
-  const currentPathTab = pathname === '/' ? 'layout' : pathname.replace('/', '');
-  const validTab = tabs.some(t => t.id === currentPathTab) ? currentPathTab as TabId : 'layout';
-
-  // If navigation happens programmatically (external, like back button) while sidebar is open, switch to the correct tab
-  useEffect(() => {
-    // Only respond to URL changes if sidebar is already open (user has interacted)
-    // Don't auto-open sidebar on initial page load or URL changes when closed
-    if (!activeTabRef.current) {
-      prevPathnameRef.current = pathname;
-      return;
-    }
-
-    if (prevPathnameRef.current === pathname) return;
-    prevPathnameRef.current = pathname;
-
-    // Switch to the correct tab if sidebar is open and URL changed to a different tab
-    // Use ref (not state) to avoid race condition with handleTabClick's router.push
-    if (validTab && activeTabRef.current !== validTab) {
-      activeTabRef.current = validTab;
-      isPinnedRef.current = true;
-      setActiveTab(validTab);
-      setIsPinned(true);
-      // Don't animate when switching tabs programmatically
-    }
-  }, [pathname, validTab]);
+  const activeTabRef = useRef<TabId | null>(null);
+  const isPinnedRef = useRef(false);
 
   const clearHoverTimeout = useCallback(() => {
     if (hoverTimeoutRef.current) {
@@ -141,10 +107,7 @@ export function SidebarTabs({
     if (isNewPanel) {
       setShouldAnimate(true);
     }
-
-    // Update URL
-    router.push(`/${tabId}`, { scroll: false });
-  }, [clearHoverTimeout, router, onPanelToggle]);
+  }, [clearHoverTimeout, onPanelToggle]);
 
   const handleTabHover = useCallback((tabId: TabId) => {
     if (isPinnedRef.current) return;

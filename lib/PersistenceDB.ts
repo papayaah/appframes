@@ -258,12 +258,17 @@ class PersistenceDB {
 
   /**
    * Save app state (current project, UI preferences)
+   * Merges with existing state to preserve other fields
    */
   async saveAppState(state: Partial<AppState>): Promise<void> {
     try {
       if (!this.db) await this.init();
 
+      // Load existing state to merge with
+      const existingState = await this.db!.get('appState', 'current');
+
       await this.db!.put('appState', {
+        ...existingState,
         ...state,
         id: 'current',
         updatedAt: new Date(),

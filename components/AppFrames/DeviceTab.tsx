@@ -67,6 +67,7 @@ export function DeviceTab() {
     primarySelectedIndex,
     selectedFrameIndex,
     setSelectedFrameIndex,
+    setFrameSelectionVisible,
     setFrameDIYOptions,
     addFrameSlot,
     selectTextElement,
@@ -125,6 +126,7 @@ export function DeviceTab() {
                 onClick={() => {
                   selectTextElement(null);
                   setSelectedFrameIndex(i);
+                  setFrameSelectionVisible(true);
                 }}
               >
                 Frame {i + 1}

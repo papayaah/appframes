@@ -41,6 +41,8 @@ export function AppFrames() {
     primarySelectedIndex,
     selectedFrameIndex,
     setSelectedFrameIndex,
+    frameSelectionVisible,
+    setFrameSelectionVisible,
     settings,
     setSettings,
     addScreen,
@@ -124,14 +126,15 @@ export function AppFrames() {
   const hasTextSelected = primaryScreen?.settings?.selectedTextId != null;
 
   // Check if frame has valid DIY options (for frame settings panel)
-  // Hide when text is selected
+  // Hide when text is selected or when frame is not explicitly selected (frameSelectionVisible)
   const hasValidFrame = currentScreen &&
     selectedFrameIndex !== null &&
     selectedFrameIndex !== undefined &&
     currentFrameData &&
     !currentFrameData.cleared &&
     currentFrameData.diyOptions &&
-    !hasTextSelected;
+    !hasTextSelected &&
+    frameSelectionVisible;
 
   // Check if frame has an actual image (for image settings panel)
   const hasImage = hasValidFrame &&
@@ -548,11 +551,13 @@ export function AppFrames() {
             screens={screens}
             selectedScreenIndices={selectedScreenIndices}
             selectedFrameIndex={selectedFrameIndex}
+            frameSelectionVisible={frameSelectionVisible}
             onSelectFrame={(screenIndex, frameIndex) => {
               // Track which screen the selected frame belongs to (for floating panels)
               // This doesn't change the canvas order - just tracks where the frame is
               setActiveFrameScreenIndex(screenIndex);
               setSelectedFrameIndex(frameIndex);
+              setFrameSelectionVisible(true);
               // Frame interactions stop propagation (for smooth drag/pan), so make sure
               // selecting a frame explicitly clears any selected text element.
               selectTextElement(null);
@@ -576,7 +581,10 @@ export function AppFrames() {
               if (!screen) return;
               deleteTextElement(screen.id, textId);
             }}
-            onClickOutsideCanvas={() => selectTextElement(null)}
+            onClickOutsideCanvas={() => {
+              selectTextElement(null);
+              setFrameSelectionVisible(false);
+            }}
             onReplaceScreen={async (files, targetFrameIndex, targetScreenIndex) => {
               try {
                 // Use targetScreenIndex if provided, otherwise primarySelectedIndex

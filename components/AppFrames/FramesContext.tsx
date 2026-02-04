@@ -159,7 +159,7 @@ const createDefaultTextElement = (existing: TextElement[], overrides?: Partial<T
     id: createId('text'),
     content: 'Double-click to edit',
     x: 50,
-    y: 50,
+    y: 20, // On top of canvas (was 50 = center)
     rotation: 0,
     style: { ...DEFAULT_TEXT_STYLE },
     visible: true,
@@ -194,6 +194,8 @@ interface FramesContextType {
   setSelectedScreenIndices: React.Dispatch<React.SetStateAction<number[]>>;
   selectedFrameIndex: number;
   setSelectedFrameIndex: (index: number) => void;
+  frameSelectionVisible: boolean;
+  setFrameSelectionVisible: (visible: boolean) => void;
   primarySelectedIndex: number;
   settings: CanvasSettings;
   handleScreenSelect: (index: number, multi: boolean) => void;
@@ -345,6 +347,8 @@ export function FramesProvider({ children }: { children: ReactNode }) {
   const [selectedScreenIndices, setSelectedScreenIndices] = useState<number[]>([0]);
   // Track selected frame index within the composition
   const [selectedFrameIndex, setSelectedFrameIndex] = useState<number>(0);
+  // Hide frame selection handles until user explicitly selects a frame (or on load)
+  const [frameSelectionVisible, setFrameSelectionVisible] = useState<boolean>(false);
   
   // Media Cache to prevent flashing
   const [mediaCache, setMediaCache] = useState<Record<number, string>>({});
@@ -483,6 +487,7 @@ export function FramesProvider({ children }: { children: ReactNode }) {
     // Select the newly added screen (exclusive selection)
     setSelectedScreenIndices([screens.length]);
     setSelectedFrameIndex(0);
+    setFrameSelectionVisible(false); // New screen: nothing selected
   };
 
   // Update settings for the currently selected screen(s)
@@ -949,6 +954,7 @@ export function FramesProvider({ children }: { children: ReactNode }) {
     setCurrentCanvasSize(project.currentCanvasSize);
     setSelectedScreenIndices(project.selectedScreenIndices);
     setSelectedFrameIndex(project.selectedFrameIndex ?? 0);
+    setFrameSelectionVisible(false);
     setZoom(project.zoom);
     projectCreatedAt.current = project.createdAt;
     
@@ -1014,6 +1020,7 @@ export function FramesProvider({ children }: { children: ReactNode }) {
           setCurrentProjectId(newProject.id);
           resetDocWithHistory({ name: newProject.name, screensByCanvasSize: newProject.screensByCanvasSize });
           setCurrentCanvasSize(newProject.currentCanvasSize);
+          setFrameSelectionVisible(false);
           projectCreatedAt.current = newProject.createdAt;
         }
       }
@@ -1315,6 +1322,8 @@ export function FramesProvider({ children }: { children: ReactNode }) {
         setSelectedScreenIndices,
         selectedFrameIndex,
         setSelectedFrameIndex,
+        frameSelectionVisible,
+        setFrameSelectionVisible,
         primarySelectedIndex,
         settings,
         handleScreenSelect,
