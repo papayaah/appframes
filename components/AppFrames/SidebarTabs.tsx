@@ -1,8 +1,8 @@
 'use client';
 
 import { useCallback, useRef, useState } from 'react';
-import { Box, Text, Stack, Select, Slider, Group, ActionIcon, Tooltip } from '@mantine/core';
-import { IconLayout, IconDeviceMobile, IconPhoto, IconTypography, IconSettings, IconStack, IconPin, IconPinFilled, IconX } from '@tabler/icons-react';
+import { Box, Text, Stack, Select, Slider, Group, Tooltip } from '@mantine/core';
+import { IconLayout, IconDeviceMobile, IconPhoto, IconTypography, IconSettings, IconStack } from '@tabler/icons-react';
 import { Sidebar } from './Sidebar';
 import { DeviceTab } from './DeviceTab';
 import { TextTab } from './TextTab';
@@ -16,7 +16,7 @@ interface SidebarTabsProps {
   screens: Screen[];
   selectedFrameIndex?: number;
   onMediaSelect?: (mediaId: number) => void;
-  onPanelToggle?: (isOpen: boolean) => void;
+  onPanelToggle?: (isOpen: boolean, animate?: boolean) => void;
   downloadFormat: 'png' | 'jpg';
   onDownloadFormatChange: (format: 'png' | 'jpg') => void;
   downloadJpegQuality: number;
@@ -34,14 +34,7 @@ const tabs: { id: TabId; icon: typeof IconLayout; label: string }[] = [
   { id: 'settings', icon: IconSettings, label: 'Settings' },
 ];
 
-const panelTitles: Record<TabId, string> = {
-  layout: 'Layout',
-  device: 'Device Frame',
-  text: 'Text',
-  layers: 'Layers',
-  media: 'Media Library',
-  settings: 'Settings',
-};
+const TRANSITION = 'width 0.2s ease, min-width 0.2s ease, max-width 0.2s ease';
 
 export function SidebarTabs({
   settings,
@@ -57,10 +50,9 @@ export function SidebarTabs({
 }: SidebarTabsProps) {
   const [activeTab, setActiveTab] = useState<TabId | null>(null);
   const [isPinned, setIsPinned] = useState(false);
-  const [shouldAnimate, setShouldAnimate] = useState(false);
+  const [animate, setAnimate] = useState(false);
   const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isHoveringRef = useRef(false);
-  // Refs to track current state for use in callbacks (avoid stale closures)
   const activeTabRef = useRef<TabId | null>(null);
   const isPinnedRef = useRef(false);
 
@@ -81,31 +73,26 @@ export function SidebarTabs({
     if (currentActiveTab === tabId && currentIsPinned) {
       isPinnedRef.current = false;
       activeTabRef.current = null;
+      setAnimate(true);
       setActiveTab(null);
       setIsPinned(false);
-      onPanelToggle?.(false);
+      onPanelToggle?.(false, true);
       return;
     }
 
-    // Clicking any tab (same tab while hovering, or different tab) = pin it
     const isNewPanel = currentActiveTab === null;
+    // Animate only when opening from collapsed (toggle), not when pinning from hover
+    const shouldAnimate = isNewPanel;
 
-    // Update refs immediately to prevent race conditions with leave handlers
     activeTabRef.current = tabId;
     isPinnedRef.current = true;
 
-    // Update state
+    setAnimate(shouldAnimate);
     setActiveTab(tabId);
     setIsPinned(true);
 
-    // Only notify parent if we're newly pinning (not just switching tabs)
     if (!currentIsPinned) {
-      onPanelToggle?.(true);
-    }
-
-    // Only animate if opening a fresh panel
-    if (isNewPanel) {
-      setShouldAnimate(true);
+      onPanelToggle?.(true, shouldAnimate);
     }
   }, [clearHoverTimeout, onPanelToggle]);
 
@@ -113,10 +100,6 @@ export function SidebarTabs({
     if (isPinnedRef.current) return;
     clearHoverTimeout();
     isHoveringRef.current = true;
-    // Only animate if we're opening a new panel (not already showing this tab)
-    if (activeTabRef.current !== tabId) {
-      setShouldAnimate(true);
-    }
     activeTabRef.current = tabId;
     setActiveTab(tabId);
   }, [clearHoverTimeout]);
@@ -146,32 +129,6 @@ export function SidebarTabs({
       }
     }, 200);
   }, []);
-
-  const togglePin = useCallback(() => {
-    clearHoverTimeout();
-    setShouldAnimate(false);
-    if (isPinnedRef.current) {
-      // Unpinning - close the panel
-      isPinnedRef.current = false;
-      setActiveTab(null);
-      setIsPinned(false);
-      onPanelToggle?.(false);
-    } else {
-      // Pinning - expand sidebar to push content
-      isPinnedRef.current = true;
-      setIsPinned(true);
-      onPanelToggle?.(true);
-    }
-  }, [clearHoverTimeout, onPanelToggle]);
-
-  const closePanel = useCallback(() => {
-    clearHoverTimeout();
-    isPinnedRef.current = false;
-    activeTabRef.current = null;
-    setActiveTab(null);
-    setIsPinned(false);
-    onPanelToggle?.(false);
-  }, [clearHoverTimeout, onPanelToggle]);
 
   const renderPanelContent = (tabId: TabId) => {
     switch (tabId) {
@@ -232,11 +189,10 @@ export function SidebarTabs({
     }
   };
 
-  // When pinned, sidebar expands to include panel (pushes content); when hovering, panel floats
   const sidebarWidth = isPinned && activeTab ? 360 : 80;
 
   return (
-    <Box style={{ display: 'flex', width: sidebarWidth, minWidth: sidebarWidth, maxWidth: sidebarWidth, height: '100%', position: 'relative', flexShrink: 0, transition: 'width 0.2s ease, min-width 0.2s ease, max-width 0.2s ease' }}>
+    <Box style={{ display: 'flex', width: sidebarWidth, minWidth: sidebarWidth, maxWidth: sidebarWidth, height: '100%', position: 'relative', flexShrink: 0, transition: animate ? TRANSITION : 'none' }}>
       {/* Icon Rail */}
       <Box
         style={{
@@ -298,7 +254,6 @@ export function SidebarTabs({
         <Box
           onMouseEnter={handlePanelHover}
           onMouseLeave={handlePanelLeave}
-          onAnimationEnd={() => setShouldAnimate(false)}
           style={{
             width: 280,
             height: '100%',
@@ -311,61 +266,14 @@ export function SidebarTabs({
             boxShadow: isPinned ? 'none' : '4px 0 12px rgba(0,0,0,0.1)',
             display: 'flex',
             flexDirection: 'column',
-            animation: shouldAnimate ? 'fadeIn 0.15s ease-out' : 'none',
           }}
         >
-          {/* Panel Header */}
-          <Box
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              padding: '12px 16px',
-              borderBottom: '1px solid #E5E7EB',
-              flexShrink: 0,
-            }}
-          >
-            <Text size="sm" fw={600}>{panelTitles[activeTab]}</Text>
-            <Group gap={4}>
-              <Tooltip label={isPinned ? 'Unpin sidebar' : 'Pin sidebar'} position="bottom">
-                <ActionIcon
-                  variant="subtle"
-                  size="sm"
-                  onClick={togglePin}
-                  color={isPinned ? 'violet' : 'gray'}
-                >
-                  {isPinned ? <IconPinFilled size={14} /> : <IconPin size={14} />}
-                </ActionIcon>
-              </Tooltip>
-              <ActionIcon
-                variant="subtle"
-                size="sm"
-                onClick={closePanel}
-                color="gray"
-              >
-                <IconX size={14} />
-              </ActionIcon>
-            </Group>
-          </Box>
-
           {/* Panel Content */}
           <Box style={{ flex: 1, overflow: 'auto', minHeight: 0 }} className="scroll-on-hover">
             {renderPanelContent(activeTab)}
           </Box>
         </Box>
       )}
-
-      {/* Add fadeIn keyframe via style tag */}
-      <style jsx global>{`
-        @keyframes fadeIn {
-          from {
-            opacity: 0;
-          }
-          to {
-            opacity: 1;
-          }
-        }
-      `}</style>
     </Box>
   );
 }

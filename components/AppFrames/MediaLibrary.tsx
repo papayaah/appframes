@@ -285,12 +285,15 @@ const mantinePreset: ComponentPreset = {
     onGenerate,
     onCancel,
   }: AIGenerateSidebarProps) => {
-    // Notify parent to expand navWidth when sidebar opens
+    // Track previous state so we only dispatch close when transitioning open→closed,
+    // not on initial mount with isOpen=false (which would reset navWidth to 80).
+    const wasOpenRef = useRef(false);
     useEffect(() => {
       if (isOpen) {
-        // Dispatch custom event to expand navbar
+        wasOpenRef.current = true;
         window.dispatchEvent(new CustomEvent('ai-sidebar-open'));
-      } else {
+      } else if (wasOpenRef.current) {
+        wasOpenRef.current = false;
         window.dispatchEvent(new CustomEvent('ai-sidebar-close'));
       }
     }, [isOpen]);
@@ -819,19 +822,12 @@ function MediaLibraryContent({ onSelectMedia, selectedSlot }: MediaLibraryProps)
   );
 
   return (
-    <Box p="md" style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-      <Box mb="xs" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-        <Box>
-          <Text size="sm" fw={700} mb={4}>
-            Media
-          </Text>
-          {selectedSlot !== undefined && (
-            <Text size="xs" c="dimmed">
-              APPLIES TO SLOT {selectedSlot + 1}
-            </Text>
-          )}
-        </Box>
-      </Box>
+    <Box p="xs" style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      {selectedSlot !== undefined && (
+        <Text size="xs" c="dimmed" mb={4} px={4}>
+          APPLIES TO SLOT {selectedSlot + 1}
+        </Text>
+      )}
 
       <Box style={{ flex: 1, overflow: 'auto', position: 'relative' }}>
         <MediaGrid

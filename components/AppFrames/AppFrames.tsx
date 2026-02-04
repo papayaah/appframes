@@ -86,6 +86,7 @@ export function AppFrames() {
   } = useFrames();
 
   const [navWidth, setNavWidth] = useState(80); // Start collapsed, expands to 360 when panel opens
+  const [animateNav, setAnimateNav] = useState(false);
   const [aiSidebarOpen, setAiSidebarOpen] = useState(false);
   const [historyPanelOpen, setHistoryPanelOpen] = useState(false);
   const historyWidth = historyPanelOpen ? 320 : 16;
@@ -516,13 +517,16 @@ export function AppFrames() {
         />
       </AppShell.Header>
 
-      <AppShell.Navbar p={0} style={{ borderRight: '1px solid #E5E7EB', transition: 'width 0.2s ease' }}>
+      <AppShell.Navbar p={0} style={{ borderRight: '1px solid #E5E7EB', transition: animateNav ? 'width 0.2s ease' : 'none' }}>
         <SidebarTabs
           settings={settings}
           setSettings={setSettings}
           screens={screens}
           selectedFrameIndex={selectedFrameIndex}
-          onPanelToggle={(isOpen) => setNavWidth(isOpen ? 360 : 80)}
+          onPanelToggle={(isOpen, animate = false) => {
+            setAnimateNav(animate);
+            setNavWidth(isOpen ? 360 : 80);
+          }}
           downloadFormat={downloadFormat}
           onDownloadFormatChange={setDownloadFormat}
           downloadJpegQuality={downloadJpegQuality}
@@ -539,7 +543,7 @@ export function AppFrames() {
         />
       </AppShell.Navbar>
 
-      <AppShell.Main style={{ transition: 'padding-left 0.2s ease, margin-left 0.2s ease' }}>
+      <AppShell.Main style={{ transition: animateNav ? 'padding-left 0.2s ease, margin-left 0.2s ease' : 'none' }}>
         {isInitializing ? (
           <Center style={{ height: 'calc(100vh - 45px)', backgroundColor: '#F9FAFB' }}>
             <Loader size="lg" color="gray" />
