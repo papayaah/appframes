@@ -15,9 +15,7 @@ import { CrossCanvasDragProvider } from './CrossCanvasDragContext';
 import { InteractionLockProvider } from './InteractionLockContext';
 import { exportService } from '@/lib/ExportService';
 import { useUndoRedoHotkeys } from '@/hooks/useUndoRedoHotkeys';
-import { FloatingSettingsPanel } from './FloatingSettingsPanel';
-import { ImageSettingsPanel } from './ImageSettingsPanel';
-import { FrameSettingsPanel } from './FrameSettingsPanel';
+import { SettingsSidebar } from './SettingsSidebar';
 import { getDefaultDIYOptions, type DIYOptions } from './diy-frames/types';
 
 // Re-export types for compatibility
@@ -89,9 +87,8 @@ export function AppFrames() {
   const [animateNav, setAnimateNav] = useState(false);
   const [aiSidebarOpen, setAiSidebarOpen] = useState(false);
   const [historyPanelOpen, setHistoryPanelOpen] = useState(false);
-  const historyWidth = historyPanelOpen ? 320 : 16;
 
-  // Track which screen the currently selected frame belongs to (for floating panels)
+  // Track which screen the currently selected frame belongs to (for settings sidebar)
   // This is separate from primarySelectedIndex to avoid reordering canvases when clicking frames
   const [activeFrameScreenIndex, setActiveFrameScreenIndex] = useState<number>(primarySelectedIndex);
 
@@ -100,24 +97,7 @@ export function AppFrames() {
     setActiveFrameScreenIndex(primarySelectedIndex);
   }, [primarySelectedIndex]);
 
-  // Track selected frame element for floating panel anchoring
-  const [selectedFrameElement, setSelectedFrameElement] = useState<HTMLElement | null>(null);
-
-  // Update selected frame element when selection changes
-  useEffect(() => {
-    if (selectedFrameIndex === null || selectedFrameIndex === undefined) {
-      setSelectedFrameElement(null);
-      return;
-    }
-
-    // Query for the selected frame element using data attributes (scoped to correct screen)
-    const frameEl = document.querySelector<HTMLElement>(
-      `[data-frame-drop-zone="true"][data-screen-index="${activeFrameScreenIndex}"][data-frame-index="${selectedFrameIndex}"]`
-    );
-    setSelectedFrameElement(frameEl);
-  }, [selectedFrameIndex, activeFrameScreenIndex, screens]);
-
-  // Get current screen and frame data for floating panels (use activeFrameScreenIndex, not primarySelectedIndex)
+  // Get current screen and frame data for settings sidebar (use activeFrameScreenIndex, not primarySelectedIndex)
   const currentScreen = screens[activeFrameScreenIndex];
   const currentFrameData = currentScreen?.images?.[selectedFrameIndex ?? 0];
 
@@ -126,7 +106,7 @@ export function AppFrames() {
   const primaryScreen = screens[primarySelectedIndex];
   const hasTextSelected = primaryScreen?.settings?.selectedTextId != null;
 
-  // Check if frame is selected and valid (for floating settings panels)
+  // Check if frame is selected and valid (for settings sidebar)
   // Hide when text is selected or when frame is not explicitly selected (frameSelectionVisible)
   const hasValidFrame = currentScreen &&
     selectedFrameIndex !== null &&
@@ -136,12 +116,15 @@ export function AppFrames() {
     !hasTextSelected &&
     frameSelectionVisible;
 
-  // Check if frame has an actual image (for image settings panel)
+  // Check if frame has an actual image (for image settings section in sidebar)
   const hasImage = hasValidFrame &&
     (currentFrameData?.mediaId != null || currentFrameData?.image != null);
 
   // Default diyOptions for frames from older projects that don't have them saved
   const currentDiyOptions = currentFrameData?.diyOptions ?? getDefaultDIYOptions('phone');
+
+  // Right sidebar widths — settings overlays (no push), history pushes
+  const historyWidth = historyPanelOpen ? 320 : 0;
 
   // Listen for AI sidebar open/close events (main panel always floats, rail is 80px)
   useEffect(() => {
@@ -495,8 +478,8 @@ export function AppFrames() {
       padding={0}
       styles={{
         main: { backgroundColor: '#F9FAFB' },
-        navbar: { overflow: 'visible' }, // Allow notch to protrude
-        aside: { overflow: 'visible' }, // Allow notch to protrude
+        navbar: { overflow: 'visible' },
+        aside: { overflow: 'visible' },
       }}
     >
       <AppShell.Header>
@@ -545,7 +528,12 @@ export function AppFrames() {
         />
       </AppShell.Navbar>
 
-      <AppShell.Main style={{ transition: animateNav ? 'padding-left 0.2s ease, margin-left 0.2s ease' : 'none' }}>
+      <AppShell.Main style={{
+        transition: [
+          animateNav ? 'padding-left 0.2s ease, margin-left 0.2s ease' : '',
+          'padding-right 0.2s ease, margin-right 0.2s ease',
+        ].filter(Boolean).join(', '),
+      }}>
         {isInitializing ? (
           <Center style={{ height: 'calc(100vh - 45px)', backgroundColor: '#F9FAFB' }}>
             <Loader size="lg" color="gray" />
@@ -747,12 +735,75 @@ export function AppFrames() {
           />
         </Box>
         )}
+
+        {/* Settings sidebar — overlays canvas, does not push content */}
+        <SettingsSidebar
+          isOpen={!!hasValidFrame}
+          onClose={() => setFrameSelectionVisible(false)}
+          slotLabel={hasValidFrame ? `Slot ${(selectedFrameIndex ?? 0) + 1}` : undefined}
+          hasImage={!!hasImage}
+          imageSettings={{
+            screenScale: currentScreen?.settings?.screenScale ?? 50,
+            screenPanX: currentFrameData?.panX ?? 50,
+            screenPanY: currentFrameData?.panY ?? 50,
+            imageRotation: currentFrameData?.imageRotation ?? 0,
+            onScaleChange: (value) => {
+              if (!currentScreen) return;
+              setSettings({ ...settings, screenScale: value });
+            },
+            onPanXChange: (value) => {
+              if (selectedFrameIndex === null || selectedFrameIndex === undefined) return;
+              setFramePan(activeFrameScreenIndex, selectedFrameIndex, value, currentFrameData?.panY ?? 50);
+            },
+            onPanYChange: (value) => {
+              if (selectedFrameIndex === null || selectedFrameIndex === undefined) return;
+              setFramePan(activeFrameScreenIndex, selectedFrameIndex, currentFrameData?.panX ?? 50, value);
+            },
+            onRotationChange: (value) => {
+              if (selectedFrameIndex === null || selectedFrameIndex === undefined) return;
+              setImageRotation(activeFrameScreenIndex, selectedFrameIndex, value);
+            },
+            onReset: () => {
+              if (selectedFrameIndex === null || selectedFrameIndex === undefined) return;
+              setSettings({ ...settings, screenScale: 50 });
+              setFramePan(activeFrameScreenIndex, selectedFrameIndex, 50, 50);
+              setImageRotation(activeFrameScreenIndex, selectedFrameIndex, 0);
+            },
+          }}
+          frameSettings={{
+            frameColor: currentFrameData?.frameColor,
+            defaultFrameColor: '#1a1a1a',
+            onFrameColorChange: (color) => {
+              if (selectedFrameIndex === null || selectedFrameIndex === undefined) return;
+              setFrameColor(activeFrameScreenIndex, selectedFrameIndex, color);
+            },
+            frameRotation: currentFrameData?.rotateZ ?? 0,
+            onFrameRotationChange: (rotation) => {
+              if (selectedFrameIndex === null || selectedFrameIndex === undefined) return;
+              setFrameRotate(activeFrameScreenIndex, selectedFrameIndex, clampFrameTransform(rotation, 'rotateZ'));
+            },
+            frameScale: currentFrameData?.frameScale ?? 100,
+            onFrameScaleChange: (scale) => {
+              if (selectedFrameIndex === null || selectedFrameIndex === undefined) return;
+              setFrameScale(activeFrameScreenIndex, selectedFrameIndex, clampFrameTransform(scale, 'frameScale'));
+            },
+            onResetTransforms: () => {
+              if (selectedFrameIndex === null || selectedFrameIndex === undefined) return;
+              setFrameRotate(activeFrameScreenIndex, selectedFrameIndex, 0);
+              setFrameScale(activeFrameScreenIndex, selectedFrameIndex, 100);
+            },
+            diyOptions: currentDiyOptions,
+            onDIYOptionsChange: (options: DIYOptions) => {
+              if (selectedFrameIndex === null || selectedFrameIndex === undefined) return;
+              setFrameDIYOptions(activeFrameScreenIndex, selectedFrameIndex, options);
+            },
+          }}
+        />
       </AppShell.Main>
 
-      <AppShell.Aside p={0} style={{ borderLeft: '1px solid #E5E7EB' }}>
+      <AppShell.Aside p={0} style={{ borderLeft: '1px solid #E5E7EB', transition: 'width 0.2s ease' }}>
         <HistorySidebar
           open={historyPanelOpen}
-          onToggleOpen={() => setHistoryPanelOpen((v) => !v)}
           entries={historyEntries}
           position={historyPosition}
           goTo={goToHistory}
@@ -763,83 +814,8 @@ export function AppFrames() {
         />
       </AppShell.Aside>
 
-      {/* Floating settings panel for image (only when frame has an image) */}
-      <FloatingSettingsPanel
-        title="Image Settings"
-        subtitle={hasImage ? `Slot ${(selectedFrameIndex ?? 0) + 1}` : undefined}
-        isOpen={!!hasImage}
-        anchorToElement={selectedFrameElement}
-        positionKey="image-settings-panel"
-      >
-        <ImageSettingsPanel
-          screenScale={currentScreen?.settings?.screenScale ?? 50}
-          screenPanX={currentFrameData?.panX ?? 50}
-          screenPanY={currentFrameData?.panY ?? 50}
-          imageRotation={currentFrameData?.imageRotation ?? 0}
-          onScaleChange={(value) => {
-            if (!currentScreen) return;
-            setSettings({ ...settings, screenScale: value });
-          }}
-          onPanXChange={(value) => {
-            if (selectedFrameIndex === null || selectedFrameIndex === undefined) return;
-            setFramePan(activeFrameScreenIndex, selectedFrameIndex, value, currentFrameData?.panY ?? 50);
-          }}
-          onPanYChange={(value) => {
-            if (selectedFrameIndex === null || selectedFrameIndex === undefined) return;
-            setFramePan(activeFrameScreenIndex, selectedFrameIndex, currentFrameData?.panX ?? 50, value);
-          }}
-          onRotationChange={(value) => {
-            if (selectedFrameIndex === null || selectedFrameIndex === undefined) return;
-            setImageRotation(activeFrameScreenIndex, selectedFrameIndex, value);
-          }}
-          onReset={() => {
-            if (selectedFrameIndex === null || selectedFrameIndex === undefined) return;
-            setSettings({ ...settings, screenScale: 50 });
-            setFramePan(activeFrameScreenIndex, selectedFrameIndex, 50, 50);
-            setImageRotation(activeFrameScreenIndex, selectedFrameIndex, 0);
-          }}
-        />
-      </FloatingSettingsPanel>
 
-      {/* Floating settings panel for frame appearance (always shows when frame is selected) */}
-      <FloatingSettingsPanel
-        title="Frame Settings"
-        subtitle={hasValidFrame ? `Slot ${(selectedFrameIndex ?? 0) + 1}` : undefined}
-        isOpen={!!hasValidFrame}
-        anchorToElement={selectedFrameElement}
-        positionKey="frame-settings-panel"
-        anchorOffset={{ x: 20, y: hasImage ? 280 : 0 }} // Offset down if image panel is also open
-        maxHeight={500}
-      >
-        <FrameSettingsPanel
-          frameColor={currentFrameData?.frameColor}
-          defaultFrameColor="#1a1a1a"
-          onFrameColorChange={(color) => {
-            if (selectedFrameIndex === null || selectedFrameIndex === undefined) return;
-            setFrameColor(activeFrameScreenIndex, selectedFrameIndex, color);
-          }}
-          frameRotation={currentFrameData?.rotateZ ?? 0}
-          onFrameRotationChange={(rotation) => {
-            if (selectedFrameIndex === null || selectedFrameIndex === undefined) return;
-            setFrameRotate(activeFrameScreenIndex, selectedFrameIndex, clampFrameTransform(rotation, 'rotateZ'));
-          }}
-          frameScale={currentFrameData?.frameScale ?? 100}
-          onFrameScaleChange={(scale) => {
-            if (selectedFrameIndex === null || selectedFrameIndex === undefined) return;
-            setFrameScale(activeFrameScreenIndex, selectedFrameIndex, clampFrameTransform(scale, 'frameScale'));
-          }}
-          onResetTransforms={() => {
-            if (selectedFrameIndex === null || selectedFrameIndex === undefined) return;
-            setFrameRotate(activeFrameScreenIndex, selectedFrameIndex, 0);
-            setFrameScale(activeFrameScreenIndex, selectedFrameIndex, 100);
-          }}
-          diyOptions={currentDiyOptions}
-          onDIYOptionsChange={(options: DIYOptions) => {
-            if (selectedFrameIndex === null || selectedFrameIndex === undefined) return;
-            setFrameDIYOptions(activeFrameScreenIndex, selectedFrameIndex, options);
-          }}
-        />
-      </FloatingSettingsPanel>
+
       </AppShell>
     </InteractionLockProvider>
   </CrossCanvasDragProvider>
