@@ -18,7 +18,7 @@ import { useUndoRedoHotkeys } from '@/hooks/useUndoRedoHotkeys';
 import { FloatingSettingsPanel } from './FloatingSettingsPanel';
 import { ImageSettingsPanel } from './ImageSettingsPanel';
 import { FrameSettingsPanel } from './FrameSettingsPanel';
-import type { DIYOptions } from './diy-frames/types';
+import { getDefaultDIYOptions, type DIYOptions } from './diy-frames/types';
 
 // Re-export types for compatibility
 export type { Screen, CanvasSettings, ScreenImage, AppFramesActions };
@@ -126,20 +126,22 @@ export function AppFrames() {
   const primaryScreen = screens[primarySelectedIndex];
   const hasTextSelected = primaryScreen?.settings?.selectedTextId != null;
 
-  // Check if frame has valid DIY options (for frame settings panel)
+  // Check if frame is selected and valid (for floating settings panels)
   // Hide when text is selected or when frame is not explicitly selected (frameSelectionVisible)
   const hasValidFrame = currentScreen &&
     selectedFrameIndex !== null &&
     selectedFrameIndex !== undefined &&
     currentFrameData &&
     !currentFrameData.cleared &&
-    currentFrameData.diyOptions &&
     !hasTextSelected &&
     frameSelectionVisible;
 
   // Check if frame has an actual image (for image settings panel)
   const hasImage = hasValidFrame &&
     (currentFrameData?.mediaId != null || currentFrameData?.image != null);
+
+  // Default diyOptions for frames from older projects that don't have them saved
+  const currentDiyOptions = currentFrameData?.diyOptions ?? getDefaultDIYOptions('phone');
 
   // Listen for AI sidebar open/close events (main panel always floats, rail is 80px)
   useEffect(() => {
@@ -831,7 +833,7 @@ export function AppFrames() {
             setFrameRotate(activeFrameScreenIndex, selectedFrameIndex, 0);
             setFrameScale(activeFrameScreenIndex, selectedFrameIndex, 100);
           }}
-          diyOptions={currentFrameData?.diyOptions}
+          diyOptions={currentDiyOptions}
           onDIYOptionsChange={(options: DIYOptions) => {
             if (selectedFrameIndex === null || selectedFrameIndex === undefined) return;
             setFrameDIYOptions(activeFrameScreenIndex, selectedFrameIndex, options);

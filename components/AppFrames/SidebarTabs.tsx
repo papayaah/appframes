@@ -55,6 +55,8 @@ export function SidebarTabs({
   const isHoveringRef = useRef(false);
   const activeTabRef = useRef<TabId | null>(null);
   const isPinnedRef = useRef(false);
+  const panelRef = useRef<HTMLDivElement | null>(null);
+  const sidebarRef = useRef<HTMLDivElement | null>(null);
 
   const clearHoverTimeout = useCallback(() => {
     if (hoverTimeoutRef.current) {
@@ -130,6 +132,160 @@ export function SidebarTabs({
     }, 200);
   }, []);
 
+  const dragStartXRef = useRef<number | null>(null);
+  const didDragRef = useRef(false);
+
+  const handleNotchMouseDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+
+    // Floating (non-pinned) panel: just close on click, no drag
+    if (!isPinnedRef.current) {
+      clearHoverTimeout();
+      activeTabRef.current = null;
+      setActiveTab(null);
+      return;
+    }
+
+    dragStartXRef.current = e.clientX;
+    didDragRef.current = false;
+
+    const panel = panelRef.current;
+    const sidebar = sidebarRef.current;
+    const navbar = sidebar?.parentElement;
+    const mainEl = navbar?.parentElement?.querySelector('main') as HTMLElement | null;
+
+    // Panel becomes absolute so it slides rigidly (no flex squish).
+    // Icon rail has higher z-index, so panel slides behind it.
+    if (panel) {
+      panel.style.position = 'absolute';
+      panel.style.left = '80px';
+      panel.style.top = '0';
+      panel.style.height = '100%';
+      panel.style.transition = 'none';
+      panel.style.willChange = 'transform';
+    }
+    // clip-path: clip left overflow (panel behind icon rail) but allow
+    // notch to protrude ~20px past the right edge
+    if (sidebar) {
+      sidebar.style.clipPath = 'inset(0 -20px 0 0)';
+      sidebar.style.transition = 'none';
+    }
+    if (navbar) navbar.style.transition = 'none';
+    if (mainEl) mainEl.style.transition = 'none';
+    document.body.style.cursor = 'grabbing';
+
+    // Helper to strip every inline override we touch
+    const cleanUpAll = () => {
+      if (panel) {
+        panel.style.position = '';
+        panel.style.left = '';
+        panel.style.top = '';
+        panel.style.height = '';
+        panel.style.transform = '';
+        panel.style.transition = '';
+        panel.style.willChange = '';
+      }
+      if (sidebar) {
+        sidebar.style.clipPath = '';
+        sidebar.style.width = '';
+        sidebar.style.minWidth = '';
+        sidebar.style.maxWidth = '';
+        sidebar.style.transition = '';
+      }
+      if (navbar) {
+        navbar.style.width = '';
+        navbar.style.minWidth = '';
+        navbar.style.maxWidth = '';
+        navbar.style.transition = '';
+      }
+      if (mainEl) {
+        mainEl.style.paddingLeft = '';
+        mainEl.style.paddingInlineStart = '';
+        mainEl.style.transition = '';
+      }
+    };
+
+    const setWidth = (w: string) => {
+      for (const el of [sidebar, navbar]) {
+        if (!el) continue;
+        el.style.width = w;
+        el.style.minWidth = w;
+        el.style.maxWidth = w;
+      }
+      if (mainEl) {
+        mainEl.style.paddingLeft = w;
+        mainEl.style.paddingInlineStart = w;
+      }
+    };
+
+    const onMouseMove = (moveEvent: MouseEvent) => {
+      if (dragStartXRef.current === null) return;
+      const delta = Math.min(0, moveEvent.clientX - dragStartXRef.current);
+      if (delta < -4) didDragRef.current = true;
+
+      // Slide panel left (rigid, no squish)
+      if (panel) panel.style.transform = `translateX(${delta}px)`;
+
+      // Shrink sidebar + navbar + main padding so canvas follows
+      setWidth(`${Math.max(80, 360 + delta)}px`);
+    };
+
+    const onMouseUp = (upEvent: MouseEvent) => {
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onMouseUp);
+      document.body.style.cursor = '';
+
+      const delta = dragStartXRef.current !== null
+        ? Math.min(0, upEvent.clientX - dragStartXRef.current)
+        : 0;
+      dragStartXRef.current = null;
+
+      const dur = '0.2s';
+      const widthTrans = `width ${dur} ease, min-width ${dur} ease, max-width ${dur} ease`;
+      const padTrans = `padding-left ${dur} ease, padding-inline-start ${dur} ease`;
+
+      const onTransitionDone = (cb: () => void) => {
+        const fallback = setTimeout(cb, 300);
+        const handler = () => { clearTimeout(fallback); cb(); };
+        sidebar?.addEventListener('transitionend', handler, { once: true });
+      };
+
+      if (delta < -60 || !didDragRef.current) {
+        // Past threshold or plain click → close.
+        // Hide panel instantly, strip drag overrides, and let React
+        // close the sidebar with its normal CSS transition (same path
+        // as clicking a tab icon to toggle).
+        if (panel) panel.style.visibility = 'hidden';
+        cleanUpAll();
+
+        clearHoverTimeout();
+        isPinnedRef.current = false;
+        activeTabRef.current = null;
+        setAnimate(true);
+        setActiveTab(null);
+        setIsPinned(false);
+        onPanelToggle?.(false, true);
+      } else {
+        // Snap back to fully open
+        if (panel) {
+          panel.style.transition = `transform 0.15s ease`;
+          panel.style.transform = 'translateX(0)';
+        }
+        for (const el of [sidebar, navbar]) {
+          if (!el) continue;
+          el.style.transition = widthTrans;
+        }
+        if (mainEl) mainEl.style.transition = padTrans;
+        setWidth('360px');
+
+        onTransitionDone(() => cleanUpAll());
+      }
+    };
+
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
+  }, [clearHoverTimeout, onPanelToggle]);
+
   const renderPanelContent = (tabId: TabId) => {
     switch (tabId) {
       case 'layout':
@@ -192,7 +348,7 @@ export function SidebarTabs({
   const sidebarWidth = isPinned && activeTab ? 360 : 80;
 
   return (
-    <Box style={{ display: 'flex', width: sidebarWidth, minWidth: sidebarWidth, maxWidth: sidebarWidth, height: '100%', position: 'relative', flexShrink: 0, transition: animate ? TRANSITION : 'none' }}>
+    <Box ref={sidebarRef} style={{ display: 'flex', width: sidebarWidth, minWidth: sidebarWidth, maxWidth: sidebarWidth, height: '100%', position: 'relative', flexShrink: 0, transition: animate ? TRANSITION : 'none' }}>
       {/* Icon Rail */}
       <Box
         style={{
@@ -206,6 +362,8 @@ export function SidebarTabs({
           gap: 8,
           alignItems: 'center',
           flexShrink: 0,
+          position: 'relative',
+          zIndex: 2,
         }}
       >
         {tabs.map(({ id, icon: Icon, label }) => {
@@ -252,6 +410,7 @@ export function SidebarTabs({
       {/* Floating/Pinned Panel */}
       {activeTab && (
         <Box
+          ref={panelRef}
           onMouseEnter={handlePanelHover}
           onMouseLeave={handlePanelLeave}
           style={{
@@ -271,6 +430,59 @@ export function SidebarTabs({
           {/* Panel Content */}
           <Box style={{ flex: 1, overflow: 'auto', minHeight: 0 }} className="scroll-on-hover">
             {renderPanelContent(activeTab)}
+          </Box>
+
+          {/* Notch handle — drag or click to close */}
+          <Box
+            onMouseDown={handleNotchMouseDown}
+            style={{
+              position: 'absolute',
+              right: -10,
+              top: '50%',
+              transform: 'translateY(-50%)',
+              width: 12,
+              height: 44,
+              borderRadius: 6,
+              backgroundColor: 'var(--notch-bg, #E8EAF0)',
+              border: '1px solid var(--notch-border, #D1D5DB)',
+              boxShadow: 'var(--notch-shadow, 0 1px 3px rgba(0,0,0,0.06))',
+              cursor: 'grab',
+              zIndex: 10,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 3,
+              transition: 'all 0.2s ease',
+            }}
+            onMouseEnter={(e) => {
+              const el = e.currentTarget;
+              el.style.backgroundColor = '#667eea';
+              el.style.borderColor = '#5a6fd6';
+              el.style.boxShadow = '0 2px 8px rgba(102,126,234,0.3)';
+              el.querySelectorAll<HTMLElement>('[data-grip]').forEach(d => d.style.backgroundColor = 'rgba(255,255,255,0.7)');
+            }}
+            onMouseLeave={(e) => {
+              const el = e.currentTarget;
+              el.style.backgroundColor = '#E8EAF0';
+              el.style.borderColor = '#D1D5DB';
+              el.style.boxShadow = '0 1px 3px rgba(0,0,0,0.06)';
+              el.querySelectorAll<HTMLElement>('[data-grip]').forEach(d => d.style.backgroundColor = '#B0B5C0');
+            }}
+          >
+            {[0, 1, 2].map(i => (
+              <Box
+                key={i}
+                data-grip=""
+                style={{
+                  width: 6,
+                  height: 1.5,
+                  borderRadius: 1,
+                  backgroundColor: '#B0B5C0',
+                  transition: 'background-color 0.2s ease',
+                }}
+              />
+            ))}
           </Box>
         </Box>
       )}
