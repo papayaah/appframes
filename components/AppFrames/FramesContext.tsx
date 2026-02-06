@@ -333,6 +333,8 @@ export function FramesProvider({ children }: { children: ReactNode }) {
   const [currentCanvasSize, setCurrentCanvasSize] = useState<string>('iphone-6.5');
   const currentCanvasSizeRef = useRef<string>('iphone-6.5');
   const projectCreatedAt = useRef<Date>(new Date());
+  // Tracks if project is pristine (untouched) - used to skip syncing on sign-in
+  const projectPristine = useRef<boolean>(true);
 
   // Sidebar state
   const [sidebarTab, setSidebarTab] = useState<string>('layout');
@@ -957,7 +959,8 @@ export function FramesProvider({ children }: { children: ReactNode }) {
     setFrameSelectionVisible(false);
     setZoom(project.zoom);
     projectCreatedAt.current = project.createdAt;
-    
+    projectPristine.current = project.pristine;
+
     // Update screenIdCounter to avoid duplicate IDs
     let maxId = 0;
     Object.values(project.screensByCanvasSize).forEach(screens => {
@@ -1059,9 +1062,15 @@ export function FramesProvider({ children }: { children: ReactNode }) {
 
   // Save project state (debounced)
   // Don't use useCallback - we need fresh values on each call
-  const saveProjectState = () => {
+  // contentChanged: true when screensByCanvasSize or name changed (marks project non-pristine)
+  const saveProjectState = (contentChanged = false) => {
     if (!currentProjectId || !hasLoadedInitialState.current) {
       return;
+    }
+
+    // If content changed, mark project as no longer pristine
+    if (contentChanged) {
+      projectPristine.current = false;
     }
 
     debouncedSave(async () => {
@@ -1074,12 +1083,15 @@ export function FramesProvider({ children }: { children: ReactNode }) {
         primarySelectedIndex,
         selectedFrameIndex,
         zoom,
+        pristine: projectPristine.current,
         createdAt: projectCreatedAt.current,
         updatedAt: new Date(),
         lastAccessedAt: new Date(),
       });
-      // Enqueue for server sync (if signed in)
-      syncProject(currentProjectId);
+      // Enqueue for server sync (if signed in, and only if not pristine)
+      if (!projectPristine.current) {
+        syncProject(currentProjectId);
+      }
     });
   };
 
@@ -1105,9 +1117,9 @@ export function FramesProvider({ children }: { children: ReactNode }) {
     loadPersistedState();
   }, [loadPersistedState]);
 
-  // Save project state when screensByCanvasSize changes
+  // Save project state when screensByCanvasSize or name changes (content changes mark non-pristine)
   useEffect(() => {
-    saveProjectState();
+    saveProjectState(true); // Content changed - mark non-pristine
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [doc.screensByCanvasSize, doc.name]);
 
@@ -1157,6 +1169,7 @@ export function FramesProvider({ children }: { children: ReactNode }) {
           primarySelectedIndex,
           selectedFrameIndex,
           zoom,
+          pristine: projectPristine.current,
           createdAt: projectCreatedAt.current,
           updatedAt: new Date(),
           lastAccessedAt: new Date(),
@@ -1203,6 +1216,7 @@ export function FramesProvider({ children }: { children: ReactNode }) {
           primarySelectedIndex,
           selectedFrameIndex,
           zoom,
+          pristine: projectPristine.current,
           createdAt: projectCreatedAt.current,
           updatedAt: new Date(),
           lastAccessedAt: new Date(),

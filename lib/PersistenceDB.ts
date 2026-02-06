@@ -11,6 +11,7 @@ export interface Project {
   primarySelectedIndex: number; // Primary selection (for current canvas size)
   selectedFrameIndex: number | null; // Selected frame within screen
   zoom: number; // Canvas zoom level (10-400)
+  pristine: boolean; // True if project hasn't been meaningfully edited (auto-delete on sign-in)
   createdAt: Date; // Project creation time
   updatedAt: Date; // Last modification time
   lastAccessedAt: Date; // Last time project was opened
@@ -158,6 +159,7 @@ class PersistenceDB {
         primarySelectedIndex: 0,
         selectedFrameIndex: null,
         zoom: 100,
+        pristine: true, // New projects start pristine, set to false when edited
         createdAt: new Date(),
         updatedAt: new Date(),
         lastAccessedAt: new Date(),
@@ -517,6 +519,7 @@ export function validateProject(project: any): Project {
       primarySelectedIndex: 0,
       selectedFrameIndex: null,
       zoom: 100,
+      pristine: true,
       createdAt: new Date(),
       updatedAt: new Date(),
       lastAccessedAt: new Date(),
@@ -560,6 +563,9 @@ export function validateProject(project: any): Project {
 
     // zoom: must be a number between 10 and 400
     zoom: clampZoom(project.zoom),
+
+    // pristine: boolean (default to false for existing projects without the flag)
+    pristine: typeof project.pristine === 'boolean' ? project.pristine : false,
 
     // Dates: validate and convert to Date objects
     createdAt: validateDate(project.createdAt),

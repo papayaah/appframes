@@ -1,14 +1,16 @@
 FROM node:24-bookworm-slim AS deps
 WORKDIR /app
 
-# Only copy dependency manifests first for better layer caching
+# Copy dependency manifests and workspace packages for proper resolution
 COPY package.json package-lock.json ./
+COPY packages/ ./packages/
 RUN npm ci
 
 FROM node:24-bookworm-slim AS builder
 WORKDIR /app
 
 COPY --from=deps /app/node_modules ./node_modules
+COPY --from=deps /app/packages ./packages
 COPY . .
 
 ENV NEXT_TELEMETRY_DISABLED=1
@@ -23,9 +25,14 @@ ENV NEXT_TELEMETRY_DISABLED=1
 # Copy the minimal runtime artifacts
 COPY --from=builder /app/package.json ./package.json
 COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/packages ./packages
 COPY --from=builder /app/.next ./.next
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/next.config.mjs ./next.config.mjs
+# Drizzle migrations
+COPY --from=builder /app/drizzle.config.ts ./drizzle.config.ts
+COPY --from=builder /app/db ./db
+COPY --from=builder /app/drizzle ./drizzle
 
 EXPOSE 3000
 CMD ["npm","run","start","--","-p","3000","-H","0.0.0.0"]

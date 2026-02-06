@@ -547,7 +547,8 @@ export class ProjectSyncService {
 
   /**
    * Claim local projects on first sign-in
-   * Pushes all local projects that don't exist on server
+   * - Deletes pristine (untouched) local projects if user has server projects
+   * - Pushes non-pristine local projects that don't exist on server
    */
   async claimLocalProjects(): Promise<void> {
     try {
@@ -565,13 +566,21 @@ export class ProjectSyncService {
 
       const serverProjects: ServerProjectListItem[] = await response.json();
       const serverProjectIds = new Set(serverProjects.map(p => p.id));
+      const hasServerProjects = serverProjects.length > 0;
 
       // Get all local projects
       const localProjects = await persistenceDB.getAllProjects();
 
-      // Enqueue local projects that don't exist on server
+      // Process local projects
       for (const localProject of localProjects) {
-        if (!serverProjectIds.has(localProject.id)) {
+        const existsOnServer = serverProjectIds.has(localProject.id);
+
+        if (localProject.pristine && hasServerProjects && !existsOnServer) {
+          // Delete pristine local projects when user has server projects
+          // This ensures they see their cloud projects instead of empty local ones
+          await persistenceDB.deleteProject(localProject.id);
+        } else if (!existsOnServer && !localProject.pristine) {
+          // Enqueue non-pristine local projects for sync
           await persistenceDB.enqueueSyncProject(localProject.id);
         }
       }

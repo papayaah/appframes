@@ -1,9 +1,11 @@
 'use client';
 
-import { Box, CloseButton, Divider, Group, Stack, Text } from '@mantine/core';
+import { Box, CloseButton, Divider, Drawer, Group, Stack, Text } from '@mantine/core';
+import { useMediaQuery } from '@mantine/hooks';
 import { IconSettings } from '@tabler/icons-react';
 import { ImageSettingsPanel, type ImageSettingsPanelProps } from './ImageSettingsPanel';
 import { FrameSettingsPanel, type FrameSettingsPanelProps } from './FrameSettingsPanel';
+import { MOBILE_NAV_HEIGHT } from './MobileBottomNav';
 
 export interface SettingsSidebarProps {
   isOpen: boolean;
@@ -22,6 +24,97 @@ export function SettingsSidebar({
   imageSettings,
   frameSettings,
 }: SettingsSidebarProps) {
+  const isMobile = useMediaQuery('(max-width: 48em)');
+
+  // Mobile: render as bottom drawer
+  if (isMobile) {
+    return (
+      <Drawer
+        opened={isOpen}
+        onClose={onClose}
+        position="bottom"
+        size="70%"
+        withCloseButton={false}
+        overlayProps={{ backgroundOpacity: 0.15 }}
+        styles={{
+          content: {
+            borderTopLeftRadius: 16,
+            borderTopRightRadius: 16,
+            display: 'flex',
+            flexDirection: 'column',
+            maxHeight: '70dvh',
+          },
+          body: {
+            padding: 0,
+            flex: 1,
+            overflow: 'hidden',
+            display: 'flex',
+            flexDirection: 'column',
+          },
+          inner: {
+            bottom: MOBILE_NAV_HEIGHT,
+          },
+        }}
+      >
+        {/* Drawer handle */}
+        <Box
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            padding: '10px 16px 0',
+            flexShrink: 0,
+          }}
+        >
+          <Box
+            style={{
+              width: 36,
+              height: 4,
+              borderRadius: 2,
+              backgroundColor: '#D1D5DB',
+              marginBottom: 10,
+            }}
+          />
+        </Box>
+
+        {/* Header */}
+        <Group justify="space-between" align="center" px="md" py="xs" style={{ flexShrink: 0 }}>
+          <Group gap="xs">
+            <IconSettings size={16} color="#666" />
+            <Text fw={700} size="sm">Settings</Text>
+            {slotLabel && (
+              <Text size="xs" c="dimmed">{slotLabel}</Text>
+            )}
+          </Group>
+          <CloseButton size="sm" onClick={onClose} aria-label="Close settings" />
+        </Group>
+
+        <Divider />
+
+        {/* Scrollable content */}
+        <Box style={{ flex: 1, overflow: 'auto', minHeight: 0 }}>
+          <Stack gap={0}>
+            <Box p="md">
+              <Text size="xs" fw={600} c="dimmed" mb="sm" tt="uppercase">Frame</Text>
+              <FrameSettingsPanel {...frameSettings} />
+            </Box>
+
+            {hasImage && (
+              <>
+                <Divider />
+                <Box p="md">
+                  <Text size="xs" fw={600} c="dimmed" mb="sm" tt="uppercase">Image</Text>
+                  <ImageSettingsPanel {...imageSettings} />
+                </Box>
+              </>
+            )}
+          </Stack>
+        </Box>
+      </Drawer>
+    );
+  }
+
+  // Desktop: render as side panel
   if (!isOpen) return null;
 
   return (
