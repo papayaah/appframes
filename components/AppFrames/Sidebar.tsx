@@ -275,7 +275,7 @@ export function Sidebar({ settings, setSettings, screens }: SidebarProps) {
                 { value: 'watch-s3', label: '312 × 390 (Series 3)' },
               ]
             },
-            { 
+            {
               group: 'Google Play Store',
               items: [
                 { value: 'google-phone', label: '1080 × 1920 (Phone)' },
@@ -283,6 +283,7 @@ export function Sidebar({ settings, setSettings, screens }: SidebarProps) {
                 { value: 'google-tablet-10', label: '2048 × 2732 (10" Tablet)' },
                 { value: 'google-chromebook', label: '1920 × 1080 (Chromebook)' },
                 { value: 'google-xr', label: '1920 × 1080 (Android XR)' },
+                { value: 'google-feature-graphic', label: '1024 × 500 (Feature Graphic)' },
               ]
             },
           ]}

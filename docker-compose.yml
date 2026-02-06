@@ -2,7 +2,7 @@ services:
   web:
     container_name: ${APP_NAME:-appframes}
     build:
-      context: ./app
+      context: .
     restart: unless-stopped
     depends_on:
       - postgres

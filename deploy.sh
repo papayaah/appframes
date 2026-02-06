@@ -2,6 +2,10 @@
 set -euo pipefail
 IFS=$'\n\t'
 
+# Load nvm if available (for npm access)
+export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
+[[ -s "$NVM_DIR/nvm.sh" ]] && source "$NVM_DIR/nvm.sh"
+
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TF_DIR="${ROOT_DIR}/terraform"
 TFVARS_FILE="${TF_DIR}/terraform.tfvars"
@@ -143,7 +147,6 @@ fi
 
 REMOTE_HOST="${SSH_USER}@${SERVER_IP}"
 REMOTE_BASE="/srv/${APP_NAME}"
-REMOTE_APP_DIR="${REMOTE_BASE}/app"
 REMOTE_COMPOSE="${REMOTE_BASE}/docker-compose.yml"
 REMOTE_ENV="${REMOTE_BASE}/.env"
 
@@ -167,10 +170,24 @@ echo "  app_port:   ${APP_PORT}"
 echo "  deploy_dir: ${REMOTE_BASE}"
 echo
 
-echo "Syncing code to ${REMOTE_HOST}:${REMOTE_APP_DIR} ..."
-run "ssh_cmd \"mkdir -p '$REMOTE_APP_DIR'\""
+# Build local packages (submodules) before deploying
+echo "Building local packages..."
+for pkg_dir in "$ROOT_DIR"/packages/*/; do
+  if [[ -f "${pkg_dir}package.json" ]] && grep -q '"build"' "${pkg_dir}package.json" 2>/dev/null; then
+    pkg_name="$(basename "$pkg_dir")"
+    echo "  Building $pkg_name..."
+    npm run build --silent --prefix "$pkg_dir" || {
+      echo "Failed to build $pkg_name" >&2
+      exit 1
+    }
+  fi
+done
+echo
 
-# Sync the repository to the remote app folder (build happens on the server).
+echo "Syncing code to ${REMOTE_HOST}:${REMOTE_BASE} ..."
+run "ssh_cmd \"mkdir -p '$REMOTE_BASE'\""
+
+# Sync the repository to the remote folder (build happens on the server).
 run "rsync -az --delete \
   -e \"ssh -i '$SSH_KEY_PATH' -o StrictHostKeyChecking=accept-new\" \
   --exclude '.git/' \
@@ -181,42 +198,28 @@ run "rsync -az --delete \
   --exclude '*.tfstate*' \
   --exclude 'docs/' \
   --exclude '.DS_Store' \
-  \"$ROOT_DIR/\" \"$REMOTE_HOST:$REMOTE_APP_DIR/\""
+  --exclude '.env' \
+  --exclude '.env.local' \
+  \"$ROOT_DIR/\" \"$REMOTE_HOST:$REMOTE_BASE/\""
 
-LOCAL_COMPOSE="${ROOT_DIR}/docker-compose.yml"
-if [[ ! -f "$LOCAL_COMPOSE" ]]; then
-  echo "Missing required file: $LOCAL_COMPOSE" >&2
-  exit 1
-fi
-
-echo "Uploading docker-compose.yml to ${REMOTE_HOST}:${REMOTE_COMPOSE} ..."
+# Create .env template only if it doesn't exist (to avoid overwriting secrets)
 if [[ "$DRY_RUN" == "true" ]]; then
-  echo "[dry-run] Would upload: $LOCAL_COMPOSE"
+  echo "[dry-run] Would create ${REMOTE_ENV} if it doesn't exist"
 else
-  ssh_cmd "cat > '$REMOTE_COMPOSE'" < "$LOCAL_COMPOSE"
-fi
-
-echo "Writing ${REMOTE_ENV} (compose env) ..."
-#
-# Postgres note:
-# - The repo docker-compose.yml does NOT publish Postgres to the host by default (safer).
-# - If you later decide to publish Postgres to the host, you'll want a unique PG_PORT per app
-#   to avoid collisions (example formula: APP_PORT + 10000).
-ENV_CONTENT="$(cat <<EOF
+  ssh_cmd "test -f '$REMOTE_ENV' || cat > '$REMOTE_ENV'" <<EOF
 APP_NAME=${APP_NAME}
 APP_PORT=${APP_PORT}
 POSTGRES_DB=${APP_NAME}
 POSTGRES_USER=${APP_NAME}
-# Set this on the server (do not commit). Example:
-# POSTGRES_PASSWORD=$(openssl rand -base64 24 | tr -d '\n')
-# POSTGRES_PASSWORD=change-me
+# Set these on the server (do not commit secrets):
+# POSTGRES_PASSWORD=
+# DATABASE_URL=postgresql://\${POSTGRES_USER}:\${POSTGRES_PASSWORD}@postgres:5432/\${POSTGRES_DB}
+# BETTER_AUTH_SECRET=
+# BETTER_AUTH_URL=https://${DOMAIN}
+# GOOGLE_CLIENT_ID=
+# GOOGLE_CLIENT_SECRET=
 EOF
-)"
-if [[ "$DRY_RUN" == "true" ]]; then
-  echo "[dry-run] Would write .env with:"
-  echo "$ENV_CONTENT"
-else
-  printf '%s\n' "$ENV_CONTENT" | ssh_cmd "cat > '$REMOTE_ENV'"
+  echo "Checked ${REMOTE_ENV} (created if missing)"
 fi
 
 echo "Building + starting container on server (docker compose up -d --build) ..."

@@ -14,6 +14,9 @@ COPY --from=deps /app/packages ./packages
 COPY . .
 
 ENV NEXT_TELEMETRY_DISABLED=1
+# Dummy values for build-time only (Next.js evaluates API routes during build)
+ENV DATABASE_URL="postgresql://build:build@localhost:5432/build"
+ENV BETTER_AUTH_SECRET="build-time-placeholder"
 RUN npm run build
 
 FROM node:24-bookworm-slim AS runner

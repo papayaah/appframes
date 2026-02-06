@@ -532,6 +532,7 @@ export class ProjectSyncService {
         primarySelectedIndex: data.primarySelectedIndex ?? 0,
         selectedFrameIndex: data.selectedFrameIndex ?? null,
         zoom: data.zoom ?? 100,
+        pristine: false, // Pulled from server, not pristine
         createdAt: new Date(),
         updatedAt: new Date(serverProject.updatedAt),
         lastAccessedAt: new Date(),

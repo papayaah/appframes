@@ -21,17 +21,23 @@ A modern web application for creating beautiful app screenshots and mockups with
 
 ### Prerequisites
 
-- Node.js 18+ 
-- Yarn 4.x
+- Node.js 24+
+- npm 11+
 
 ### Installation
 
 ```bash
+# Clone with submodules
+git clone --recurse-submodules <repo-url>
+
+# Or if already cloned, initialize submodules
+git submodule update --init --recursive
+
 # Install dependencies
-yarn install
+npm install
 
 # Run development server
-yarn dev
+npm run dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000) to view the app.
@@ -39,8 +45,8 @@ Open [http://localhost:3000](http://localhost:3000) to view the app.
 ### Build for Production
 
 ```bash
-yarn build
-yarn start
+npm run build
+npm start
 ```
 
 ## Database

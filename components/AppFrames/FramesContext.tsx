@@ -61,6 +61,7 @@ export const getCanvasDimensions = (canvasSize: string, orientation: string) => 
     'google-tablet-10': { width: 2048, height: 2732 },
     'google-chromebook': { width: 1920, height: 1080 },
     'google-xr': { width: 1920, height: 1080 },
+    'google-feature-graphic': { width: 1024, height: 500 },
   };
 
   const entry = dimensions[canvasSize] || { width: 1284, height: 2778 };
