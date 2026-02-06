@@ -4,8 +4,10 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { AppShell, Box, Center, Loader } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
+import { useMediaQuery } from '@mantine/hooks';
 import { Header } from './Header';
 import { SidebarTabs } from './SidebarTabs';
+import { MobileBottomNav, MOBILE_NAV_HEIGHT } from './MobileBottomNav';
 import { Canvas } from './Canvas';
 import { ScreensPanel } from './ScreensPanel';
 import { HistorySidebar } from './HistorySidebar';
@@ -82,6 +84,8 @@ export function AppFrames() {
     setDownloadJpegQuality,
     isInitializing,
   } = useFrames();
+
+  const isMobile = useMediaQuery('(max-width: 48em)');
 
   const [navWidth, setNavWidth] = useState(80); // Start collapsed, expands to 360 when panel opens
   const [animateNav, setAnimateNav] = useState(false);
@@ -473,11 +477,14 @@ export function AppFrames() {
     <InteractionLockProvider>
       <AppShell
       header={{ height: 45 }}
-      navbar={{ width: navWidth, breakpoint: 'sm' }}
-      aside={{ width: historyWidth, breakpoint: 'sm' }}
+      navbar={isMobile ? undefined : { width: navWidth, breakpoint: 'sm' }}
+      aside={isMobile ? undefined : { width: historyWidth, breakpoint: 'sm' }}
       padding={0}
       styles={{
-        main: { backgroundColor: '#F9FAFB' },
+        main: {
+          backgroundColor: '#F9FAFB',
+          ...(isMobile ? { paddingBottom: MOBILE_NAV_HEIGHT } : {}),
+        },
         navbar: { overflow: 'visible' },
         aside: { overflow: 'visible' },
       }}
@@ -502,31 +509,33 @@ export function AppFrames() {
         />
       </AppShell.Header>
 
-      <AppShell.Navbar p={0} style={{ borderRight: '1px solid #E5E7EB', transition: animateNav ? 'width 0.2s ease' : 'none' }}>
-        <SidebarTabs
-          settings={settings}
-          setSettings={setSettings}
-          screens={screens}
-          selectedFrameIndex={selectedFrameIndex}
-          onPanelToggle={(isOpen, animate = false) => {
-            setAnimateNav(animate);
-            setNavWidth(isOpen ? 360 : 80);
-          }}
-          downloadFormat={downloadFormat}
-          onDownloadFormatChange={setDownloadFormat}
-          downloadJpegQuality={downloadJpegQuality}
-          onDownloadJpegQualityChange={setDownloadJpegQuality}
-          onMediaSelect={(mediaId) => {
-            // If no screens exist, create one
-            if (screens.length === 0) {
-              addScreen(mediaId);
-            } else {
-              // Use selectedFrameIndex to determine which slot to fill
-              replaceScreen(primarySelectedIndex, mediaId, selectedFrameIndex);
-            }
-          }}
-        />
-      </AppShell.Navbar>
+      {!isMobile && (
+        <AppShell.Navbar p={0} style={{ borderRight: '1px solid #E5E7EB', transition: animateNav ? 'width 0.2s ease' : 'none' }}>
+          <SidebarTabs
+            settings={settings}
+            setSettings={setSettings}
+            screens={screens}
+            selectedFrameIndex={selectedFrameIndex}
+            onPanelToggle={(isOpen, animate = false) => {
+              setAnimateNav(animate);
+              setNavWidth(isOpen ? 360 : 80);
+            }}
+            downloadFormat={downloadFormat}
+            onDownloadFormatChange={setDownloadFormat}
+            downloadJpegQuality={downloadJpegQuality}
+            onDownloadJpegQualityChange={setDownloadJpegQuality}
+            onMediaSelect={(mediaId) => {
+              // If no screens exist, create one
+              if (screens.length === 0) {
+                addScreen(mediaId);
+              } else {
+                // Use selectedFrameIndex to determine which slot to fill
+                replaceScreen(primarySelectedIndex, mediaId, selectedFrameIndex);
+              }
+            }}
+          />
+        </AppShell.Navbar>
+      )}
 
       <AppShell.Main style={{
         transition: [
@@ -539,7 +548,7 @@ export function AppFrames() {
             <Loader size="lg" color="gray" />
           </Center>
         ) : (
-        <Box style={{ height: 'calc(100vh - 40px)', display: 'flex', flexDirection: 'column' }}>
+        <Box style={{ height: isMobile ? `calc(100vh - 45px - ${MOBILE_NAV_HEIGHT}px)` : 'calc(100vh - 40px)', display: 'flex', flexDirection: 'column' }}>
           <Canvas
             settings={settings}
             screens={screens}
@@ -801,20 +810,40 @@ export function AppFrames() {
         />
       </AppShell.Main>
 
-      <AppShell.Aside p={0} style={{ borderLeft: '1px solid #E5E7EB', transition: 'width 0.2s ease' }}>
-        <HistorySidebar
-          open={historyPanelOpen}
-          entries={historyEntries}
-          position={historyPosition}
-          goTo={goToHistory}
-          canUndo={canUndo}
-          canRedo={canRedo}
-          undo={undo}
-          redo={redo}
+      {!isMobile && (
+        <AppShell.Aside p={0} style={{ borderLeft: '1px solid #E5E7EB', transition: 'width 0.2s ease' }}>
+          <HistorySidebar
+            open={historyPanelOpen}
+            entries={historyEntries}
+            position={historyPosition}
+            goTo={goToHistory}
+            canUndo={canUndo}
+            canRedo={canRedo}
+            undo={undo}
+            redo={redo}
+          />
+        </AppShell.Aside>
+      )}
+
+      {isMobile && (
+        <MobileBottomNav
+          settings={settings}
+          setSettings={setSettings}
+          screens={screens}
+          selectedFrameIndex={selectedFrameIndex}
+          onMediaSelect={(mediaId) => {
+            if (screens.length === 0) {
+              addScreen(mediaId);
+            } else {
+              replaceScreen(primarySelectedIndex, mediaId, selectedFrameIndex);
+            }
+          }}
+          downloadFormat={downloadFormat}
+          onDownloadFormatChange={setDownloadFormat}
+          downloadJpegQuality={downloadJpegQuality}
+          onDownloadJpegQualityChange={setDownloadJpegQuality}
         />
-      </AppShell.Aside>
-
-
+      )}
 
       </AppShell>
     </InteractionLockProvider>
