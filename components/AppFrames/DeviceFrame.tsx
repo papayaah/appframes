@@ -21,6 +21,7 @@ interface DeviceFrameProps {
   diyOptions?: DIYOptions;
   image?: string;
   mediaId?: number;
+  serverMediaPath?: string; // Server-side media path (for cross-device sync)
   screenIndex?: number;
   scale: number;
   viewportScale?: number;
@@ -68,6 +69,7 @@ export function DeviceFrame({
   diyOptions,
   image,
   mediaId,
+  serverMediaPath,
   screenIndex,
   scale,
   viewportScale = 1,
@@ -99,7 +101,9 @@ export function DeviceFrame({
   const effectiveHighlighted = isExporting ? false : isHighlighted;
   const { isLocked, isOwnerActive, begin, end } = useInteractionLock();
   const { imageUrl } = useMediaImage(mediaId);
-  const displayImage = imageUrl || image;
+  // Priority: local OPFS (mediaId) > server path > base64 image
+  const serverImageUrl = serverMediaPath ? `/api/media/files/${serverMediaPath}` : undefined;
+  const displayImage = imageUrl || serverImageUrl || image;
   const [isDragging, setIsDragging] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
@@ -188,6 +192,9 @@ export function DeviceFrame({
     pendingFrameOffsetRef.current = { x: 0, y: 0 };
     pendingFrameVisualOffsetRef.current = { x: 0, y: 0 };
 
+    // Dispatch drag start event for parent components (e.g., DraggableFrame)
+    frameWrapperRef.current?.dispatchEvent(new CustomEvent('appframes:framedragstart', { bubbles: true }));
+
     const startX = e.clientX;
     const startY = e.clientY;
     const radians = (dragRotateZ * Math.PI) / 180;
@@ -203,6 +210,11 @@ export function DeviceFrame({
       pendingFrameOffsetRef.current = { x: rawDx, y: rawDy };
       pendingFrameVisualOffsetRef.current = { x: localDx, y: localDy };
       scheduleFrameDragVisual();
+      // Dispatch drag move event with offset for parent components
+      frameWrapperRef.current?.dispatchEvent(new CustomEvent('appframes:framedragmove', {
+        bubbles: true,
+        detail: { x: localDx, y: localDy },
+      }));
     };
 
     const handleEnd = () => {
@@ -218,6 +230,8 @@ export function DeviceFrame({
       pendingFrameVisualOffsetRef.current = null;
       document.removeEventListener('mousemove', handleMove);
       document.removeEventListener('mouseup', handleEnd);
+      // Dispatch drag end event for parent components
+      frameWrapperRef.current?.dispatchEvent(new CustomEvent('appframes:framedragend', { bubbles: true }));
       if (gestureTokenRef.current) {
         end(gestureTokenRef.current);
         gestureTokenRef.current = null;

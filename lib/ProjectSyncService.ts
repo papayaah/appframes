@@ -548,8 +548,8 @@ export class ProjectSyncService {
 
   /**
    * Claim local projects on first sign-in
-   * - Deletes pristine (untouched) local projects if user has server projects
-   * - Pushes non-pristine local projects that don't exist on server
+   * - Deletes empty/default local projects if user has server projects
+   * - Pushes non-empty local projects that don't exist on server
    */
   async claimLocalProjects(): Promise<void> {
     try {
@@ -576,12 +576,18 @@ export class ProjectSyncService {
       for (const localProject of localProjects) {
         const existsOnServer = serverProjectIds.has(localProject.id);
 
-        if (localProject.pristine && hasServerProjects && !existsOnServer) {
-          // Delete pristine local projects when user has server projects
+        // Check if project is empty (no screens with content)
+        const isEmptyProject = this.isProjectEmpty(localProject);
+        const isDefaultName = localProject.name === 'My Project';
+        const shouldDelete = (localProject.pristine || (isEmptyProject && isDefaultName))
+          && hasServerProjects && !existsOnServer;
+
+        if (shouldDelete) {
+          // Delete empty/pristine local projects when user has server projects
           // This ensures they see their cloud projects instead of empty local ones
           await persistenceDB.deleteProject(localProject.id);
-        } else if (!existsOnServer && !localProject.pristine) {
-          // Enqueue non-pristine local projects for sync
+        } else if (!existsOnServer && !isEmptyProject) {
+          // Enqueue non-empty local projects for sync
           await persistenceDB.enqueueSyncProject(localProject.id);
         }
       }
@@ -595,6 +601,31 @@ export class ProjectSyncService {
       this.setStatus('error');
       throw error;
     }
+  }
+
+  /**
+   * Check if a project is empty (no meaningful content)
+   */
+  private isProjectEmpty(project: Project): boolean {
+    const allScreens = Object.values(project.screensByCanvasSize).flat();
+    if (allScreens.length === 0) return true;
+
+    // Check if any screen has actual content (images or modified text)
+    for (const screen of allScreens) {
+      // Check for images with actual content
+      for (const img of screen.images || []) {
+        if (img.image || img.mediaId || (img as any).serverMediaPath) {
+          return false; // Has image content
+        }
+      }
+      // Check for non-default text elements (content changed from default)
+      for (const text of screen.textElements || []) {
+        if (text.content && text.content !== 'Double-click to edit') {
+          return false; // Has custom text
+        }
+      }
+    }
+    return true;
   }
 
   /**
@@ -617,6 +648,54 @@ export class ProjectSyncService {
       // Server delete failed - not critical since we deleted locally
       console.error('Failed to delete project on server:', error);
     }
+  }
+
+  /**
+   * Delete account and all associated data
+   * This is a destructive operation that:
+   * 1. Clears all local data (IndexedDB projects, sync state, app state)
+   * 2. Clears all local media data (IndexedDB media assets, OPFS files)
+   * 3. Calls server API to delete account (deletes server media files, cascades to all tables)
+   *
+   * @returns Promise that resolves when deletion is complete
+   * @throws Error if server deletion fails
+   */
+  async deleteAccount(): Promise<void> {
+    // Stop any running sync operations
+    this.stopAutoSync();
+
+    // 1. Clear all local project data (IndexedDB)
+    try {
+      await persistenceDB.clearAllData();
+      console.log('[ProjectSync] Local project data cleared');
+    } catch (error) {
+      console.error('[ProjectSync] Failed to clear local project data:', error);
+      // Continue anyway - server deletion is more important
+    }
+
+    // 2. Clear all local media data (IndexedDB + OPFS)
+    try {
+      const { clearAllMediaData } = await import('@reactkits.dev/react-media-library');
+      await clearAllMediaData();
+      console.log('[ProjectSync] Local media data cleared');
+    } catch (error) {
+      console.error('[ProjectSync] Failed to clear local media data:', error);
+      // Continue anyway - server deletion is more important
+    }
+
+    // 3. Call server API to delete account
+    const response = await fetch(`${this.config.apiBaseUrl}/account`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ confirmPhrase: 'DELETE MY ACCOUNT' }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Unknown error' }));
+      throw new Error(error.error || 'Failed to delete account');
+    }
+
+    console.log('[ProjectSync] Account deleted successfully');
   }
 }
 

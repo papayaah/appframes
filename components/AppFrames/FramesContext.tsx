@@ -336,6 +336,8 @@ export function FramesProvider({ children }: { children: ReactNode }) {
   const projectCreatedAt = useRef<Date>(new Date());
   // Tracks if project is pristine (untouched) - used to skip syncing on sign-in
   const projectPristine = useRef<boolean>(true);
+  // Tracks first content save after load to avoid marking pristine=false on initial render
+  const hasCompletedFirstContentSave = useRef<boolean>(false);
 
   // Sidebar state
   const [sidebarTab, setSidebarTab] = useState<string>('layout');
@@ -961,6 +963,7 @@ export function FramesProvider({ children }: { children: ReactNode }) {
     setZoom(project.zoom);
     projectCreatedAt.current = project.createdAt;
     projectPristine.current = project.pristine;
+    hasCompletedFirstContentSave.current = false; // Reset to skip first save after load
 
     // Update screenIdCounter to avoid duplicate IDs
     let maxId = 0;
@@ -1069,12 +1072,22 @@ export function FramesProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    // If content changed, mark project as no longer pristine
+    // If content changed, mark project as no longer pristine (skip first save after load)
     if (contentChanged) {
-      projectPristine.current = false;
+      if (hasCompletedFirstContentSave.current) {
+        projectPristine.current = false;
+      }
+      hasCompletedFirstContentSave.current = true;
     }
 
     debouncedSave(async () => {
+      // Check if project still exists (might have been deleted by claimLocalProjects)
+      const existingProject = await persistenceDB.loadProject(currentProjectId);
+      if (!existingProject && projectPristine.current) {
+        // Project was deleted and was pristine - don't re-create it
+        return;
+      }
+
       await persistenceDB.saveProject({
         id: currentProjectId,
         name: doc.name,

@@ -501,6 +501,31 @@ class PersistenceDB {
       throw error;
     }
   }
+
+  /**
+   * Clear all local data (projects, media, sync state)
+   * Used for account deletion
+   */
+  async clearAllData(): Promise<void> {
+    try {
+      if (!this.db) await this.init();
+
+      // Clear all stores
+      const tx = this.db!.transaction(['projects', 'appState', 'syncState'], 'readwrite');
+
+      await Promise.all([
+        tx.objectStore('projects').clear(),
+        tx.objectStore('appState').clear(),
+        tx.objectStore('syncState').clear(),
+      ]);
+
+      await tx.done;
+      console.log('[PersistenceDB] All local data cleared');
+    } catch (error) {
+      console.error('Failed to clear all data:', error);
+      throw error;
+    }
+  }
 }
 
 /**
@@ -757,6 +782,11 @@ function validateScreenImage(image: any): Screen['images'][0] {
   // mediaId: optional number
   if (typeof image.mediaId === 'number') {
     validated.mediaId = image.mediaId;
+  }
+
+  // serverMediaPath: optional string (for cross-device sync)
+  if (typeof image.serverMediaPath === 'string') {
+    (validated as any).serverMediaPath = image.serverMediaPath;
   }
 
   // panX: optional number 0-100

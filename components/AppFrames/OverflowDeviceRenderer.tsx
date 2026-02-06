@@ -50,6 +50,7 @@ export function OverflowDeviceRenderer({
         diyOptions={image?.diyOptions ?? getDefaultDIYOptions('phone')}
         image={image?.image}
         mediaId={image?.mediaId}
+        serverMediaPath={(image as any)?.serverMediaPath}
         scale={effectiveScale}
         screenScale={settings.screenScale}
         panX={image?.panX ?? 50}

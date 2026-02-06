@@ -94,6 +94,7 @@ const DraggableFrame = ({
   const { isLocked, isOwnerActive } = useInteractionLock();
   const [isHovered, setIsHovered] = useState(false);
   const [isChildFrameDragging, setIsChildFrameDragging] = useState(false);
+  const [childDragOffset, setChildDragOffset] = useState<{ x: number; y: number } | null>(null);
   const frameRef = useRef<HTMLDivElement | null>(null);
   const rafRef = useRef<number | null>(null);
 
@@ -170,13 +171,21 @@ const DraggableFrame = ({
     if (!el) return;
 
     const onStart = () => setIsChildFrameDragging(true);
-    const onEnd = () => setIsChildFrameDragging(false);
+    const onMove = (e: CustomEvent<{ x: number; y: number }>) => {
+      setChildDragOffset(e.detail);
+    };
+    const onEnd = () => {
+      setIsChildFrameDragging(false);
+      setChildDragOffset(null);
+    };
 
     el.addEventListener('appframes:framedragstart', onStart as EventListener);
+    el.addEventListener('appframes:framedragmove', onMove as EventListener);
     el.addEventListener('appframes:framedragend', onEnd as EventListener);
 
     return () => {
       el.removeEventListener('appframes:framedragstart', onStart as EventListener);
+      el.removeEventListener('appframes:framedragmove', onMove as EventListener);
       el.removeEventListener('appframes:framedragend', onEnd as EventListener);
     };
   }, []);
@@ -224,40 +233,49 @@ const DraggableFrame = ({
       }}
     >
       {children}
-      {(isHovered || isSelected) && onResizeScale && !isChildFrameDragging && (
-        <ResizeHandles
-          viewportScale={viewportScale}
-          value={frameScale}
-          onScalePreview={(next) => {
-            previewScaleRef.current = next;
-            schedulePreview();
+      {(isHovered || isSelected) && onResizeScale && (
+        <Box
+          style={{
+            position: 'absolute',
+            inset: 0,
+            pointerEvents: 'none',
+            transform: childDragOffset ? `translate3d(${childDragOffset.x}px, ${childDragOffset.y}px, 0)` : undefined,
           }}
-          onScaleCommit={(next) => {
-            previewScaleRef.current = null;
-            schedulePreview(); // snap back to state-driven transform after commit
-            onResizeScale(next, 'bottom-right');
-          }}
-          rotateZ={rotateZ}
-          onRotatePreview={
-            onRotate
-              ? (next) => {
-                  previewRotateRef.current = clampFrameTransform(next, 'rotateZ');
-                  schedulePreview();
-                }
-              : undefined
-          }
-          onRotateCommit={
-            onRotate
-              ? (next) => {
-                  previewRotateRef.current = null;
-                  schedulePreview();
-                  onRotate(clampFrameTransform(next, 'rotateZ'));
-                }
-              : undefined
-          }
-          frameRef={frameRef}
-          gestureOwnerKey={gestureOwnerKey}
-        />
+        >
+          <ResizeHandles
+            viewportScale={viewportScale}
+            value={frameScale}
+            onScalePreview={isChildFrameDragging ? () => {} : (next) => {
+              previewScaleRef.current = next;
+              schedulePreview();
+            }}
+            onScaleCommit={isChildFrameDragging ? () => {} : (next) => {
+              previewScaleRef.current = null;
+              schedulePreview(); // snap back to state-driven transform after commit
+              onResizeScale(next, 'bottom-right');
+            }}
+            rotateZ={rotateZ}
+            onRotatePreview={
+              onRotate && !isChildFrameDragging
+                ? (next) => {
+                    previewRotateRef.current = clampFrameTransform(next, 'rotateZ');
+                    schedulePreview();
+                  }
+                : undefined
+            }
+            onRotateCommit={
+              onRotate && !isChildFrameDragging
+                ? (next) => {
+                    previewRotateRef.current = null;
+                    schedulePreview();
+                    onRotate(clampFrameTransform(next, 'rotateZ'));
+                  }
+                : undefined
+            }
+            frameRef={frameRef}
+            gestureOwnerKey={gestureOwnerKey}
+          />
+        </Box>
       )}
     </Box>
   );
@@ -337,6 +355,7 @@ export function CompositionRenderer({
       diyOptions: images[index]?.diyOptions ?? getDefaultDIYOptions('phone'),
       image: images[index]?.image,
       mediaId: images[index]?.mediaId,
+      serverMediaPath: (images[index] as any)?.serverMediaPath, // Server-side path for cross-device sync
       // The base size for layout (single/dual/stack/etc). Per-frame resizing is applied via wrapper transforms.
       scale: scaleMultiplier,
       viewportScale,
@@ -356,6 +375,7 @@ export function CompositionRenderer({
       onPexelsSelect: (url: string) => onPexelsSelect?.(index, url),
       onPanChange: (x: number, y: number) => onPanChange?.(index, x, y),
       onFramePositionChange: (x: number, y: number) => onFramePositionChange?.(index, x, y),
+      onFrameMove: (dx: number, dy: number) => onFramePositionChange?.(index, dx, dy),
       frameY: handlePosition,
       frameColor: images[index]?.frameColor,
       imageRotation: images[index]?.imageRotation ?? 0,
