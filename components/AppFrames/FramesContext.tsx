@@ -61,7 +61,7 @@ export const getCanvasDimensions = (canvasSize: string, orientation: string) => 
     'google-tablet-10': { width: 2048, height: 2732 },
     'google-chromebook': { width: 1920, height: 1080 },
     'google-xr': { width: 1920, height: 1080 },
-    'google-feature-graphic': { width: 1024, height: 500 },
+    'google-feature-graphic': { portrait: { width: 1024, height: 500 }, landscape: { width: 1024, height: 500 } },
   };
 
   const entry = dimensions[canvasSize] || { width: 1284, height: 2778 };
@@ -460,20 +460,60 @@ export function FramesProvider({ children }: { children: ReactNode }) {
   };
 
   const addScreen = (imageOrMediaId?: string | number) => {
-    const defaultSettings = getDefaultScreenSettings();
+    // Inherit settings from the last screen if one exists, otherwise use defaults
+    const lastScreen = screens.length > 0 ? screens[screens.length - 1] : null;
+    const defaultSettings = lastScreen
+      ? { ...lastScreen.settings, selectedTextId: undefined }
+      : (() => {
+          // Auto-detect orientation from canvas size dimensions for first screen
+          const defaults = getDefaultScreenSettings();
+          const size = currentCanvasSizeRef.current;
+          const dims = getCanvasDimensions(size, 'portrait');
+          if (dims.width > dims.height) defaults.orientation = 'landscape';
+          return defaults;
+        })();
     const frameCount = getCompositionFrameCount(defaultSettings.composition);
 
-    // Initialize images array based on composition type with default device frame
-    const images: ScreenImage[] = Array(frameCount).fill(null).map(() => ({
-      diyOptions: getDefaultDIYOptions('phone')
-    }));
+    // Determine which DIY options to use for the new screen's frames:
+    // 1. If screens exist, reuse the frame from the last screen's first non-cleared slot
+    // 2. Otherwise, infer device type from the current canvas size
+    // Canvas sizes that should not have a device frame
+    const isFramelessCanvas = (size: string) =>
+      size === 'google-feature-graphic';
+
+    const getFrameOptions = (): DIYOptions | null => {
+      const size = currentCanvasSizeRef.current;
+      if (isFramelessCanvas(size)) return null;
+
+      if (screens.length > 0) {
+        const lastScreen = screens[screens.length - 1];
+        const lastFrame = lastScreen?.images?.find(
+          (img) => img && !img.cleared && img.diyOptions
+        );
+        if (lastFrame?.diyOptions) return { ...lastFrame.diyOptions };
+      }
+      // Infer device type from canvas size
+      if (size.startsWith('ipad-')) return getDefaultDIYOptions('tablet');
+      if (size.startsWith('watch-')) return getDefaultDIYOptions('phone');
+      if (size.startsWith('google-tablet')) return getDefaultDIYOptions('tablet');
+      if (size.startsWith('google-chromebook')) return getDefaultDIYOptions('laptop');
+      return getDefaultDIYOptions('phone');
+    };
+
+    const frameOpts = getFrameOptions();
+
+    // Initialize images array based on composition type
+    // For frameless canvas sizes, create cleared slots (no device frame)
+    const images: ScreenImage[] = Array(frameCount).fill(null).map(() =>
+      frameOpts ? { diyOptions: { ...frameOpts } } : { cleared: true }
+    );
 
     // If an image was provided, add it to the first slot
     if (imageOrMediaId) {
       if (typeof imageOrMediaId === 'number') {
-        images[0] = { mediaId: imageOrMediaId, diyOptions: getDefaultDIYOptions('phone') };
+        images[0] = { mediaId: imageOrMediaId, ...(frameOpts ? { diyOptions: { ...frameOpts } } : { cleared: true }) };
       } else {
-        images[0] = { image: imageOrMediaId, diyOptions: getDefaultDIYOptions('phone') };
+        images[0] = { image: imageOrMediaId, ...(frameOpts ? { diyOptions: { ...frameOpts } } : { cleared: true }) };
       }
     }
 
@@ -501,9 +541,10 @@ export function FramesProvider({ children }: { children: ReactNode }) {
   const updateSelectedScreenSettings = (updates: Partial<Omit<CanvasSettings, 'selectedScreenIndex'>>) => {
     // Check if canvas size is being changed
     if (updates.canvasSize && updates.canvasSize !== currentCanvasSize) {
-      // Trigger canvas size switch
-      switchCanvasSize(updates.canvasSize);
-      return; // Don't update screen settings - the canvas size switch handles everything
+      // Pass any additional settings (e.g. orientation) to apply to the new canvas size's screens
+      const { canvasSize, ...remainingUpdates } = updates;
+      switchCanvasSize(canvasSize, Object.keys(remainingUpdates).length > 0 ? remainingUpdates : undefined);
+      return;
     }
 
     // Treat pure text selection as UI state (no undo history entry) to avoid noisy history and flicker.
@@ -892,17 +933,24 @@ export function FramesProvider({ children }: { children: ReactNode }) {
   }, [doc.screensByCanvasSize, currentCanvasSize]);
 
   // Switch canvas size
-  const switchCanvasSize = useCallback((newSize: string) => {
+  const switchCanvasSize = useCallback((newSize: string, settingsOverrides?: Record<string, unknown>) => {
     // Save current workspace state before switching (will be triggered by useEffect)
-    
+
     // Update to new canvas size
     setCurrentCanvasSize(newSize);
-    
+
     // Initialize empty screen array for new canvas size if it doesn't exist
+    // and apply any settings overrides (e.g. orientation) to existing screens
     commitDoc('Switch canvas size', (draft) => {
       if (!draft.screensByCanvasSize[newSize]) draft.screensByCanvasSize[newSize] = [];
+      if (settingsOverrides) {
+        const screens = draft.screensByCanvasSize[newSize];
+        screens.forEach(screen => {
+          screen.settings = { ...screen.settings, ...settingsOverrides };
+        });
+      }
     });
-    
+
     // Reset selection state for new canvas size
     const screensForNewSize = doc.screensByCanvasSize[newSize] || [];
     if (screensForNewSize.length > 0) {
@@ -910,7 +958,7 @@ export function FramesProvider({ children }: { children: ReactNode }) {
     } else {
       setSelectedScreenIndices([]);
     }
-    
+
     // Reset selected frame index
     setSelectedFrameIndex(0);
   }, [commitDoc, doc.screensByCanvasSize]);

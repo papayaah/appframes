@@ -29,6 +29,7 @@ interface CanvasProps {
   onSelectTextElement?: (screenIndex: number, textId: string | null) => void;
   onUpdateTextElement?: (screenIndex: number, textId: string, updates: any) => void;
   onDeleteTextElement?: (screenIndex: number, textId: string) => void;
+  onClickCanvas?: (screenIndex: number) => void;
   onClickOutsideCanvas?: () => void;
   zoom?: number;
   onZoomChange?: (zoom: number) => void;
@@ -71,6 +72,7 @@ export function Canvas({
   onSelectTextElement,
   onUpdateTextElement,
   onDeleteTextElement,
+  onClickCanvas,
   onClickOutsideCanvas,
   zoom = 100,
   onZoomChange,
@@ -451,7 +453,14 @@ export function Canvas({
                   // The overflow will be rendered in adjacent canvases via OverflowDeviceRenderer
                   overflow: 'hidden',
                 }}
-                onMouseDown={() => {
+                onMouseDown={(e) => {
+                  // Clicking on the canvas background (not on a frame device or text element)
+                  const target = e.target as HTMLElement;
+                  const isOnFrame = !!target.closest('[data-frame-drop-zone="true"]');
+                  const isOnText = !!target.closest('[data-text-element="true"]');
+                  if (!isOnFrame && !isOnText) {
+                    onClickCanvas?.(screenIndex);
+                  }
                   if (!isPrimaryScreen) return;
                   onSelectTextElement?.(screenIndex, null);
                 }}

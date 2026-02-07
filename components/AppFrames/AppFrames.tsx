@@ -91,6 +91,7 @@ export function AppFrames() {
   const [animateNav, setAnimateNav] = useState(false);
   const [aiSidebarOpen, setAiSidebarOpen] = useState(false);
   const [historyPanelOpen, setHistoryPanelOpen] = useState(false);
+  const [canvasSelected, setCanvasSelected] = useState(false);
 
   // Track which screen the currently selected frame belongs to (for settings sidebar)
   // This is separate from primarySelectedIndex to avoid reordering canvases when clicking frames
@@ -384,6 +385,9 @@ export function AppFrames() {
 
         // Hide interactive UI (handles/buttons) and replace blob: background urls with data: URLs for export.
         document.body.dataset.appframesExporting = 'true';
+        // Temporarily allow overflow so frames extending beyond canvas bounds are captured
+        const prevOverflow = canvasElement.style.overflow;
+        canvasElement.style.overflow = 'visible';
         const restoreBg = await replaceBlobUrlsWithDataUrls(canvasElement);
         try {
           // 1) Capture what you see at a higher pixel ratio.
@@ -451,6 +455,7 @@ export function AppFrames() {
           });
           exportService.downloadBlob(blob, `${screen.name || `screen-${screenIndex + 1}`}-${Date.now()}.${outExt}`);
         } finally {
+          canvasElement.style.overflow = prevOverflow;
           restoreBg?.();
           delete document.body.dataset.appframesExporting;
         }
@@ -561,6 +566,7 @@ export function AppFrames() {
               setActiveFrameScreenIndex(screenIndex);
               setSelectedFrameIndex(frameIndex);
               setFrameSelectionVisible(true);
+              setCanvasSelected(false);
               // Frame interactions stop propagation (for smooth drag/pan), so make sure
               // selecting a frame explicitly clears any selected text element.
               selectTextElement(null);
@@ -584,9 +590,15 @@ export function AppFrames() {
               if (!screen) return;
               deleteTextElement(screen.id, textId);
             }}
+            onClickCanvas={(screenIndex) => {
+              setCanvasSelected(true);
+              setFrameSelectionVisible(false);
+              selectTextElement(null);
+            }}
             onClickOutsideCanvas={() => {
               selectTextElement(null);
               setFrameSelectionVisible(false);
+              setCanvasSelected(false);
             }}
             onReplaceScreen={async (files, targetFrameIndex, targetScreenIndex) => {
               try {
@@ -747,10 +759,18 @@ export function AppFrames() {
 
         {/* Settings sidebar — overlays canvas, does not push content */}
         <SettingsSidebar
-          isOpen={!!hasValidFrame}
-          onClose={() => setFrameSelectionVisible(false)}
+          isOpen={!!hasValidFrame || canvasSelected}
+          onClose={() => {
+            setFrameSelectionVisible(false);
+            setCanvasSelected(false);
+          }}
+          mode={hasValidFrame ? 'frame' : 'canvas'}
           slotLabel={hasValidFrame ? `Slot ${(selectedFrameIndex ?? 0) + 1}` : undefined}
           hasImage={!!hasImage}
+          canvasSettings={{
+            settings,
+            setSettings,
+          }}
           imageSettings={{
             screenScale: currentScreen?.settings?.screenScale ?? 50,
             screenPanX: currentFrameData?.panX ?? 50,

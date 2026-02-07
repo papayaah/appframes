@@ -713,8 +713,8 @@ export function TextElement({
         <Box
           style={{
             position: 'relative',
-            padding: 8,
-            borderRadius: 8,
+            padding: `max(var(--appframes-text-bg-padding), 4px)`,
+            borderRadius: style.backgroundRadius || 8,
             backgroundColor: 'rgba(255, 255, 255, 0.95)',
             boxShadow: '0 0 0 2px #667eea, 0 4px 20px rgba(102, 126, 234, 0.3)',
           }}

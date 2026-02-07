@@ -5,26 +5,74 @@ import { useMediaQuery } from '@mantine/hooks';
 import { IconSettings } from '@tabler/icons-react';
 import { ImageSettingsPanel, type ImageSettingsPanelProps } from './ImageSettingsPanel';
 import { FrameSettingsPanel, type FrameSettingsPanelProps } from './FrameSettingsPanel';
+import { CanvasSettingsPanel, type CanvasSettingsPanelProps } from './CanvasSettingsPanel';
 import { MOBILE_NAV_HEIGHT } from './MobileBottomNav';
+
+export type SettingsMode = 'frame' | 'canvas';
 
 export interface SettingsSidebarProps {
   isOpen: boolean;
   onClose: () => void;
+  mode: SettingsMode;
   slotLabel?: string;
   hasImage: boolean;
   imageSettings: ImageSettingsPanelProps;
   frameSettings: FrameSettingsPanelProps;
+  canvasSettings?: CanvasSettingsPanelProps;
+}
+
+function SettingsContent({
+  mode,
+  slotLabel,
+  hasImage,
+  imageSettings,
+  frameSettings,
+  canvasSettings,
+}: Pick<SettingsSidebarProps, 'mode' | 'slotLabel' | 'hasImage' | 'imageSettings' | 'frameSettings' | 'canvasSettings'>) {
+  if (mode === 'canvas' && canvasSettings) {
+    return (
+      <Stack gap={0}>
+        <Box p="md">
+          <Text size="xs" fw={600} c="dimmed" mb="sm" tt="uppercase">Canvas</Text>
+          <CanvasSettingsPanel {...canvasSettings} />
+        </Box>
+      </Stack>
+    );
+  }
+
+  return (
+    <Stack gap={0}>
+      <Box p="md">
+        <Text size="xs" fw={600} c="dimmed" mb="sm" tt="uppercase">Frame</Text>
+        <FrameSettingsPanel {...frameSettings} />
+      </Box>
+
+      {hasImage && (
+        <>
+          <Divider />
+          <Box p="md">
+            <Text size="xs" fw={600} c="dimmed" mb="sm" tt="uppercase">Image</Text>
+            <ImageSettingsPanel {...imageSettings} />
+          </Box>
+        </>
+      )}
+    </Stack>
+  );
 }
 
 export function SettingsSidebar({
   isOpen,
   onClose,
+  mode,
   slotLabel,
   hasImage,
   imageSettings,
   frameSettings,
+  canvasSettings,
 }: SettingsSidebarProps) {
   const isMobile = useMediaQuery('(max-width: 48em)');
+
+  const headerLabel = mode === 'canvas' ? 'Canvas' : 'Settings';
 
   // Mobile: render as bottom drawer
   if (isMobile) {
@@ -81,7 +129,7 @@ export function SettingsSidebar({
         <Group justify="space-between" align="center" px="md" py="xs" style={{ flexShrink: 0 }}>
           <Group gap="xs">
             <IconSettings size={16} color="#666" />
-            <Text fw={700} size="sm">Settings</Text>
+            <Text fw={700} size="sm">{headerLabel}</Text>
             {slotLabel && (
               <Text size="xs" c="dimmed">{slotLabel}</Text>
             )}
@@ -93,22 +141,14 @@ export function SettingsSidebar({
 
         {/* Scrollable content */}
         <Box style={{ flex: 1, overflow: 'auto', minHeight: 0 }}>
-          <Stack gap={0}>
-            <Box p="md">
-              <Text size="xs" fw={600} c="dimmed" mb="sm" tt="uppercase">Frame</Text>
-              <FrameSettingsPanel {...frameSettings} />
-            </Box>
-
-            {hasImage && (
-              <>
-                <Divider />
-                <Box p="md">
-                  <Text size="xs" fw={600} c="dimmed" mb="sm" tt="uppercase">Image</Text>
-                  <ImageSettingsPanel {...imageSettings} />
-                </Box>
-              </>
-            )}
-          </Stack>
+          <SettingsContent
+            mode={mode}
+            slotLabel={slotLabel}
+            hasImage={hasImage}
+            imageSettings={imageSettings}
+            frameSettings={frameSettings}
+            canvasSettings={canvasSettings}
+          />
         </Box>
       </Drawer>
     );
@@ -191,7 +231,7 @@ export function SettingsSidebar({
       <Group justify="space-between" align="center" px="md" py="sm" style={{ flexShrink: 0 }}>
         <Group gap="xs">
           <IconSettings size={16} color="#666" />
-          <Text fw={700} size="sm">Settings</Text>
+          <Text fw={700} size="sm">{headerLabel}</Text>
           {slotLabel && (
             <Text size="xs" c="dimmed">{slotLabel}</Text>
           )}
@@ -203,24 +243,14 @@ export function SettingsSidebar({
 
       {/* Scrollable content */}
       <Box style={{ flex: 1, overflow: 'auto', minHeight: 0 }} className="scroll-on-hover">
-        <Stack gap={0}>
-          {/* Frame Settings — always visible when sidebar is open */}
-          <Box p="md">
-            <Text size="xs" fw={600} c="dimmed" mb="sm" tt="uppercase">Frame</Text>
-            <FrameSettingsPanel {...frameSettings} />
-          </Box>
-
-          {/* Image Settings — only when frame has an image */}
-          {hasImage && (
-            <>
-              <Divider />
-              <Box p="md">
-                <Text size="xs" fw={600} c="dimmed" mb="sm" tt="uppercase">Image</Text>
-                <ImageSettingsPanel {...imageSettings} />
-              </Box>
-            </>
-          )}
-        </Stack>
+        <SettingsContent
+          mode={mode}
+          slotLabel={slotLabel}
+          hasImage={hasImage}
+          imageSettings={imageSettings}
+          frameSettings={frameSettings}
+          canvasSettings={canvasSettings}
+        />
       </Box>
     </Box>
   );
