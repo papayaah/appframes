@@ -1,0 +1,96 @@
+{
+    "name": "@reactkits.dev/modern-layout",
+    "version": "0.0.1",
+    "description": "Headless Modern Layout Shell for React 19 - Sidebars, Floating Panels, Performance-First",
+    "license": "MIT",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/reactkits/modern-layout"
+    },
+    "keywords": [
+        "react",
+        "layout",
+        "headless",
+        "sidebar",
+        "floating-panel",
+        "app-shell",
+        "tailwind",
+        "mantine",
+        "lighthouse",
+        "performance"
+    ],
+    "main": "./src/index.ts",
+    "module": "./src/index.ts",
+    "types": "./src/index.ts",
+    "exports": {
+        ".": {
+            "development": {
+                "types": "./src/index.ts",
+                "import": "./src/index.ts",
+                "require": "./src/index.ts"
+            },
+            "default": {
+                "types": "./dist/index.d.ts",
+                "import": "./dist/index.mjs",
+                "require": "./dist/index.js"
+            }
+        },
+        "./presets/mantine": {
+            "types": "./src/presets/mantine.tsx",
+            "development": {
+                "types": "./src/presets/mantine.tsx",
+                "import": "./src/presets/mantine.tsx",
+                "require": "./src/presets/mantine.tsx"
+            },
+            "default": {
+                "types": "./dist/presets/mantine.d.ts",
+                "import": "./dist/presets/mantine.mjs",
+                "require": "./dist/presets/mantine.js"
+            }
+        }
+    },
+    "files": [
+        "dist",
+        "src"
+    ],
+    "engines": {
+        "node": ">=22.0.0"
+    },
+    "scripts": {
+        "dev": "concurrently \"npm run storybook\" \"npm run dev:demo\" --names \"storybook,demo\" --prefix-colors \"blue,green\"",
+        "dev:demo": "cd demo && npm run dev",
+        "build": "vite build",
+        "lint": "eslint .",
+        "preview": "vite preview",
+        "storybook": "storybook dev",
+        "build-storybook": "storybook build"
+    },
+    "peerDependencies": {
+        "react": "^19.0.0",
+        "react-dom": "^19.0.0"
+    },
+    "peerDependenciesMeta": {},
+    "dependencies": {},
+    "devDependencies": {
+        "@mantine/core": "^7.15.2",
+        "@mantine/hooks": "^7.15.2",
+        "@storybook/react": "^10.2.7",
+        "@storybook/react-vite": "^10.2.7",
+        "@tabler/icons-react": "^3.5.0",
+        "@types/react": "^19.0.0",
+        "@types/react-dom": "^19.0.0",
+        "@vitejs/plugin-react": "^4.2.1",
+        "autoprefixer": "^10.4.19",
+        "concurrently": "^9.2.1",
+        "postcss": "^8.4.38",
+        "postcss-preset-mantine": "^1.17.0",
+        "postcss-simple-vars": "^7.0.1",
+        "react": "^19.2.0",
+        "react-dom": "^19.2.0",
+        "storybook": "^10.2.7",
+        "tailwindcss": "^3.4.3",
+        "typescript": "^5.4.5",
+        "vite": "^5.2.0",
+        "vite-plugin-dts": "^3.9.0"
+    }
+}
