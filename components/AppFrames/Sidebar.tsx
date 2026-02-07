@@ -1,14 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import {
-  Stack,
-  Text,
-  SimpleGrid,
-  Box,
-  Group,
-} from '@mantine/core';
-import { IconChevronDown } from '@tabler/icons-react';
+import { Stack, Text, SimpleGrid, Box, Group } from '@mantine/core';
+import { IconChevronDown, IconBrandApple, IconBrandGooglePlay } from '@tabler/icons-react';
 import { CanvasSettings, Screen } from './AppFrames';
 import { getCanvasDimensions } from './FramesContext';
 
@@ -52,111 +46,75 @@ export const BACKGROUND_PRESETS = [
   'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
 ] as const;
 
-// Canvas size data organized by device category
+// Canvas size data organized by store and device
 interface SizeOption {
   value: string;
   label: string;
 }
 
-interface SizeSubgroup {
-  subLabel: string;
-  items: SizeOption[];
-}
-
-interface DeviceCategory {
+interface DeviceConfig {
   id: string;
   label: string;
-  subgroups: SizeSubgroup[];
+  shortLabel?: string;
+  defaultSize: string; // The default size when this device is selected
+  sizes: SizeOption[];
 }
 
-const DEVICE_CATEGORIES: DeviceCategory[] = [
+interface StoreConfig {
+  id: string;
+  label: string;
+  devices: DeviceConfig[];
+}
+
+const STORES: StoreConfig[] = [
   {
-    id: 'iphone',
-    label: 'iPhone',
-    subgroups: [
+    id: 'apple',
+    label: 'Apple Store',
+    devices: [
       {
-        subLabel: '6.9" Display',
-        items: [
-          { value: 'iphone-6.9-1260x2736', label: '1260 × 2736' },
-          { value: 'iphone-6.9-1290x2796', label: '1290 × 2796' },
-          { value: 'iphone-6.9', label: '1320 × 2868' },
+        id: 'iphone',
+        label: 'iPhone',
+        defaultSize: 'iphone-6.9',
+        sizes: [
+          { value: 'iphone-6.9', label: '6.9" — 1320 × 2868' },
+          { value: 'iphone-6.5', label: '6.5" — 1284 × 2778' },
+          { value: 'iphone-6.9-1290x2796', label: '6.9" — 1290 × 2796' },
+          { value: 'iphone-6.9-1260x2736', label: '6.9" — 1260 × 2736' },
+          { value: 'iphone-6.5-1242x2688', label: '6.5" — 1242 × 2688' },
+          { value: 'iphone-6.3', label: '6.3" — 1206 × 2622' },
+          { value: 'iphone-6.3-1179x2556', label: '6.3" — 1179 × 2556' },
+          { value: 'iphone-6.1-1170x2532', label: '6.1" — 1170 × 2532' },
+          { value: 'iphone-6.1-1125x2436', label: '6.1" — 1125 × 2436' },
+          { value: 'iphone-6.1-1080x2340', label: '6.1" — 1080 × 2340' },
+          { value: 'iphone-5.5', label: '5.5" — 1242 × 2208' },
+          { value: 'iphone-4.7', label: '4.7" — 750 × 1334' },
+          { value: 'iphone-4.0', label: '4.0" — 640 × 1136' },
+          { value: 'iphone-3.5', label: '3.5" — 640 × 960' },
         ],
       },
       {
-        subLabel: '6.5" Display',
-        items: [
-          { value: 'iphone-6.5-1242x2688', label: '1242 × 2688' },
-          { value: 'iphone-6.5', label: '1284 × 2778' },
+        id: 'ipad',
+        label: 'iPad',
+        defaultSize: 'ipad-13',
+        sizes: [
+          { value: 'ipad-13', label: '13" — 2064 × 2752' },
+          { value: 'ipad-12.9-gen2', label: '12.9" — 2048 × 2732' },
+          { value: 'ipad-11', label: '11" — 1668 × 2388' },
+          { value: 'ipad-10.5', label: '10.5" — 1668 × 2224' },
+          { value: 'ipad-9.7', label: '9.7" — 1536 × 2048' },
         ],
       },
       {
-        subLabel: '6.3" Display',
-        items: [
-          { value: 'iphone-6.3-1179x2556', label: '1179 × 2556' },
-          { value: 'iphone-6.3', label: '1206 × 2622' },
-        ],
-      },
-      {
-        subLabel: '6.1" Display',
-        items: [
-          { value: 'iphone-6.1-1170x2532', label: '1170 × 2532' },
-          { value: 'iphone-6.1-1125x2436', label: '1125 × 2436' },
-          { value: 'iphone-6.1-1080x2340', label: '1080 × 2340' },
-        ],
-      },
-      {
-        subLabel: '5.5" Display',
-        items: [{ value: 'iphone-5.5', label: '1242 × 2208' }],
-      },
-      {
-        subLabel: '4.7" Display',
-        items: [{ value: 'iphone-4.7', label: '750 × 1334' }],
-      },
-      {
-        subLabel: '4.0" Display',
-        items: [
-          { value: 'iphone-4.0-640x1096', label: '640 × 1096 (no status bar)' },
-          { value: 'iphone-4.0', label: '640 × 1136 (with status bar)' },
-        ],
-      },
-      {
-        subLabel: '3.5" Display',
-        items: [
-          { value: 'iphone-3.5-640x920', label: '640 × 920 (no status bar)' },
-          { value: 'iphone-3.5', label: '640 × 960 (with status bar)' },
-        ],
-      },
-    ],
-  },
-  {
-    id: 'ipad',
-    label: 'iPad',
-    subgroups: [
-      {
-        subLabel: 'App Store',
-        items: [
-          { value: 'ipad-13', label: '2064 × 2752 (13")' },
-          { value: 'ipad-11', label: '1668 × 2388 (11")' },
-          { value: 'ipad-12.9-gen2', label: '2048 × 2732 (12.9" 2nd Gen)' },
-          { value: 'ipad-10.5', label: '1668 × 2224 (10.5")' },
-          { value: 'ipad-9.7', label: '1536 × 2048 (9.7")' },
-        ],
-      },
-    ],
-  },
-  {
-    id: 'watch',
-    label: 'Apple Watch',
-    subgroups: [
-      {
-        subLabel: 'All Models',
-        items: [
-          { value: 'watch-ultra-3', label: '422 × 514 (Ultra 3)' },
-          { value: 'watch-ultra-3-alt', label: '410 × 502 (Ultra 3 Alt)' },
-          { value: 'watch-s11', label: '416 × 496 (Series 11)' },
-          { value: 'watch-s9', label: '396 × 484 (Series 9)' },
-          { value: 'watch-s6', label: '368 × 448 (Series 6)' },
-          { value: 'watch-s3', label: '312 × 390 (Series 3)' },
+        id: 'watch',
+        label: 'Watch',
+        defaultSize: 'watch-ultra-3',
+        sizes: [
+          { value: 'watch-ultra-3', label: 'Ultra 3 — 422 × 514' },
+          { value: 'watch-s11', label: 'Series 11 — 416 × 496' },
+          { value: 'watch-ultra-3-alt', label: 'Ultra 3 Alt — 410 × 502' },
+          { value: 'watch-s9', label: 'Series 9 — 396 × 484' },
+          { value: 'watch-s6', label: 'Series 6 — 368 × 448' },
+          { value: 'watch-s3', label: 'Series 3 — 312 × 390' },
         ],
       },
     ],
@@ -164,78 +122,339 @@ const DEVICE_CATEGORIES: DeviceCategory[] = [
   {
     id: 'google',
     label: 'Google Play',
-    subgroups: [
+    devices: [
       {
-        subLabel: 'All Formats',
-        items: [
-          { value: 'google-phone', label: '1080 × 1920 (Phone)' },
-          { value: 'google-tablet-7', label: '1536 × 2048 (7" Tablet)' },
-          { value: 'google-tablet-10', label: '2048 × 2732 (10" Tablet)' },
-          { value: 'google-chromebook', label: '1920 × 1080 (Chromebook)' },
-          { value: 'google-xr', label: '1920 × 1080 (Android XR)' },
-          { value: 'google-feature-graphic', label: '1024 × 500 (Feature Graphic)' },
-        ],
+        id: 'phone',
+        label: 'Phone',
+        defaultSize: 'google-phone',
+        sizes: [{ value: 'google-phone', label: 'Phone — 1080 × 1920' }],
+      },
+      {
+        id: 'tablet-7',
+        label: '7" Tablet',
+        shortLabel: '7"',
+        defaultSize: 'google-tablet-7',
+        sizes: [{ value: 'google-tablet-7', label: '7" Tablet — 1536 × 2048' }],
+      },
+      {
+        id: 'tablet-10',
+        label: '10" Tablet',
+        shortLabel: '10"',
+        defaultSize: 'google-tablet-10',
+        sizes: [{ value: 'google-tablet-10', label: '10" Tablet — 2048 × 2732' }],
+      },
+      {
+        id: 'chromebook',
+        label: 'Chromebook',
+        shortLabel: 'Chrome',
+        defaultSize: 'google-chromebook',
+        sizes: [{ value: 'google-chromebook', label: 'Chromebook — 1920 × 1080' }],
+      },
+      {
+        id: 'xr',
+        label: 'Android XR',
+        shortLabel: 'XR',
+        defaultSize: 'google-xr',
+        sizes: [{ value: 'google-xr', label: 'Android XR — 1920 × 1080' }],
+      },
+      {
+        id: 'feature',
+        label: 'Feature Graphic',
+        shortLabel: 'Feature',
+        defaultSize: 'google-feature-graphic',
+        sizes: [{ value: 'google-feature-graphic', label: 'Feature Graphic — 1024 × 500' }],
       },
     ],
   },
 ];
 
-// Build flat lookup + legacy grouped format for any consumers that still need it
-const ALL_SIZE_VALUES = new Set(
-  DEVICE_CATEGORIES.flatMap((c) => c.subgroups.flatMap((s) => s.items.map((i) => i.value)))
-);
-
-export const CANVAS_SIZE_OPTIONS = DEVICE_CATEGORIES.flatMap((cat) =>
-  cat.subgroups.map((sg) => ({
-    group: cat.subgroups.length === 1 ? cat.label : `${cat.label} — ${sg.subLabel}`,
-    items: sg.items,
+// Legacy export for consumers that need grouped format
+export const CANVAS_SIZE_OPTIONS = STORES.flatMap((store) =>
+  store.devices.map((device) => ({
+    group: `${store.label} — ${device.label}`,
+    items: device.sizes,
   }))
 );
 
-// Find which category a canvas size value belongs to
-function getCategoryForValue(value: string): string | null {
-  for (const cat of DEVICE_CATEGORIES) {
-    for (const sg of cat.subgroups) {
-      if (sg.items.some((i) => i.value === value)) return cat.id;
+// Find store and device for a given size value
+function findStoreAndDevice(value: string): { store: StoreConfig; device: DeviceConfig } | null {
+  for (const store of STORES) {
+    for (const device of store.devices) {
+      if (device.sizes.some((s) => s.value === value)) {
+        return { store, device };
+      }
     }
   }
   return null;
 }
 
-// Device shape icons for the category cards
-function DeviceIcon({ type, size = 32 }: { type: string; size?: number }) {
+// Get current size label
+function getSizeLabel(value: string): string {
+  for (const store of STORES) {
+    for (const device of store.devices) {
+      const size = device.sizes.find((s) => s.value === value);
+      if (size) return size.label;
+    }
+  }
+  return value;
+}
+
+// Device Icons
+function DeviceIcon({ deviceId, size = 40 }: { deviceId: string; size?: number }) {
   const s = size;
-  if (type === 'iphone') {
+  const strokeWidth = 2;
+  const color = 'currentColor';
+
+  // iPhone - tall rectangle with notch indicator
+  if (deviceId === 'iphone') {
     return (
-      <Box style={{ width: s * 0.45, height: s * 0.85, border: '2px solid currentColor', borderRadius: s * 0.1, position: 'relative' }}>
-        <Box style={{ position: 'absolute', bottom: s * 0.04, left: '50%', transform: 'translateX(-50%)', width: s * 0.12, height: s * 0.02, borderRadius: 1, backgroundColor: 'currentColor' }} />
+      <Box style={{ width: s * 0.5, height: s * 0.9, position: 'relative' }}>
+        <Box
+          style={{
+            width: '100%',
+            height: '100%',
+            border: `${strokeWidth}px solid ${color}`,
+            borderRadius: s * 0.12,
+          }}
+        />
+        <Box
+          style={{
+            position: 'absolute',
+            bottom: s * 0.06,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            width: s * 0.15,
+            height: s * 0.03,
+            backgroundColor: color,
+            borderRadius: 2,
+          }}
+        />
       </Box>
     );
   }
-  if (type === 'ipad') {
+
+  // iPad - wider rectangle with home button
+  if (deviceId === 'ipad') {
     return (
-      <Box style={{ width: s * 0.65, height: s * 0.85, border: '2px solid currentColor', borderRadius: s * 0.08, position: 'relative' }}>
-        <Box style={{ position: 'absolute', bottom: s * 0.04, left: '50%', transform: 'translateX(-50%)', width: s * 0.08, height: s * 0.08, borderRadius: '50%', border: '1.5px solid currentColor' }} />
+      <Box style={{ width: s * 0.7, height: s * 0.9, position: 'relative' }}>
+        <Box
+          style={{
+            width: '100%',
+            height: '100%',
+            border: `${strokeWidth}px solid ${color}`,
+            borderRadius: s * 0.08,
+          }}
+        />
+        <Box
+          style={{
+            position: 'absolute',
+            bottom: s * 0.05,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            width: s * 0.1,
+            height: s * 0.1,
+            border: `1.5px solid ${color}`,
+            borderRadius: '50%',
+          }}
+        />
       </Box>
     );
   }
-  if (type === 'watch') {
+
+  // Watch - small rectangle with bands
+  if (deviceId === 'watch') {
     return (
-      <Box style={{ position: 'relative', width: s * 0.5, height: s * 0.85 }}>
-        {/* Band top */}
-        <Box style={{ width: s * 0.3, height: s * 0.15, backgroundColor: 'currentColor', borderRadius: '3px 3px 0 0', margin: '0 auto', opacity: 0.4 }} />
-        {/* Face */}
-        <Box style={{ width: s * 0.45, height: s * 0.45, border: '2px solid currentColor', borderRadius: s * 0.1, margin: '0 auto' }} />
-        {/* Band bottom */}
-        <Box style={{ width: s * 0.3, height: s * 0.15, backgroundColor: 'currentColor', borderRadius: '0 0 3px 3px', margin: '0 auto', opacity: 0.4 }} />
+      <Box style={{ width: s * 0.5, height: s * 0.9, position: 'relative' }}>
+        {/* Top band */}
+        <Box
+          style={{
+            width: s * 0.3,
+            height: s * 0.15,
+            backgroundColor: color,
+            opacity: 0.4,
+            borderRadius: '3px 3px 0 0',
+            margin: '0 auto',
+          }}
+        />
+        {/* Watch face */}
+        <Box
+          style={{
+            width: s * 0.45,
+            height: s * 0.5,
+            border: `${strokeWidth}px solid ${color}`,
+            borderRadius: s * 0.1,
+            margin: '0 auto',
+          }}
+        />
+        {/* Bottom band */}
+        <Box
+          style={{
+            width: s * 0.3,
+            height: s * 0.15,
+            backgroundColor: color,
+            opacity: 0.4,
+            borderRadius: '0 0 3px 3px',
+            margin: '0 auto',
+          }}
+        />
       </Box>
     );
   }
-  // google / android
+
+  // Phone (Android) - rectangle with camera dot at top
+  if (deviceId === 'phone') {
+    return (
+      <Box style={{ width: s * 0.5, height: s * 0.9, position: 'relative' }}>
+        <Box
+          style={{
+            width: '100%',
+            height: '100%',
+            border: `${strokeWidth}px solid ${color}`,
+            borderRadius: s * 0.08,
+          }}
+        />
+        <Box
+          style={{
+            position: 'absolute',
+            top: s * 0.06,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            width: s * 0.06,
+            height: s * 0.06,
+            backgroundColor: color,
+            borderRadius: '50%',
+          }}
+        />
+      </Box>
+    );
+  }
+
+  // Tablet (7" / 10") - landscape-oriented rectangle
+  if (deviceId === 'tablet-7' || deviceId === 'tablet-10') {
+    return (
+      <Box style={{ width: s * 0.85, height: s * 0.6, position: 'relative' }}>
+        <Box
+          style={{
+            width: '100%',
+            height: '100%',
+            border: `${strokeWidth}px solid ${color}`,
+            borderRadius: s * 0.06,
+          }}
+        />
+      </Box>
+    );
+  }
+
+  // Chromebook - laptop shape
+  if (deviceId === 'chromebook') {
+    return (
+      <Box style={{ width: s * 0.9, height: s * 0.7, position: 'relative' }}>
+        {/* Screen */}
+        <Box
+          style={{
+            width: '100%',
+            height: '70%',
+            border: `${strokeWidth}px solid ${color}`,
+            borderRadius: `${s * 0.04}px ${s * 0.04}px 0 0`,
+          }}
+        />
+        {/* Keyboard base */}
+        <Box
+          style={{
+            width: '110%',
+            height: '20%',
+            marginLeft: '-5%',
+            backgroundColor: color,
+            opacity: 0.3,
+            borderRadius: `0 0 ${s * 0.04}px ${s * 0.04}px`,
+          }}
+        />
+      </Box>
+    );
+  }
+
+  // XR - VR headset shape
+  if (deviceId === 'xr') {
+    return (
+      <Box style={{ width: s * 0.9, height: s * 0.5, position: 'relative' }}>
+        <Box
+          style={{
+            width: '100%',
+            height: '100%',
+            border: `${strokeWidth}px solid ${color}`,
+            borderRadius: s * 0.15,
+          }}
+        />
+        {/* Left lens */}
+        <Box
+          style={{
+            position: 'absolute',
+            top: '50%',
+            left: '25%',
+            transform: 'translate(-50%, -50%)',
+            width: s * 0.2,
+            height: s * 0.2,
+            border: `1.5px solid ${color}`,
+            borderRadius: '50%',
+          }}
+        />
+        {/* Right lens */}
+        <Box
+          style={{
+            position: 'absolute',
+            top: '50%',
+            left: '75%',
+            transform: 'translate(-50%, -50%)',
+            width: s * 0.2,
+            height: s * 0.2,
+            border: `1.5px solid ${color}`,
+            borderRadius: '50%',
+          }}
+        />
+      </Box>
+    );
+  }
+
+  // Feature graphic - landscape rectangle with play icon
+  if (deviceId === 'feature') {
+    return (
+      <Box style={{ width: s * 0.9, height: s * 0.45, position: 'relative' }}>
+        <Box
+          style={{
+            width: '100%',
+            height: '100%',
+            border: `${strokeWidth}px solid ${color}`,
+            borderRadius: s * 0.04,
+          }}
+        />
+        {/* Play triangle */}
+        <Box
+          style={{
+            position: 'absolute',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-40%, -50%)',
+            width: 0,
+            height: 0,
+            borderTop: `${s * 0.1}px solid transparent`,
+            borderBottom: `${s * 0.1}px solid transparent`,
+            borderLeft: `${s * 0.15}px solid ${color}`,
+          }}
+        />
+      </Box>
+    );
+  }
+
+  // Default fallback
   return (
-    <Box style={{ width: s * 0.45, height: s * 0.85, border: '2px solid currentColor', borderRadius: s * 0.06, position: 'relative' }}>
-      <Box style={{ position: 'absolute', top: s * 0.04, left: '50%', transform: 'translateX(-50%)', width: s * 0.06, height: s * 0.06, borderRadius: '50%', backgroundColor: 'currentColor' }} />
-    </Box>
+    <Box
+      style={{
+        width: s * 0.5,
+        height: s * 0.9,
+        border: `${strokeWidth}px solid ${color}`,
+        borderRadius: s * 0.08,
+      }}
+    />
   );
 }
 
@@ -269,9 +488,7 @@ const CompositionButton = ({
     }}
   >
     <Box style={{ marginBottom: 8, display: 'flex', justifyContent: 'center', alignItems: 'center', height: 40 }}>
-      {type === 'single' && (
-        <Box style={{ width: 20, height: 35, border: '2px solid #495057', borderRadius: 4 }} />
-      )}
+      {type === 'single' && <Box style={{ width: 20, height: 35, border: '2px solid #495057', borderRadius: 4 }} />}
       {type === 'dual' && (
         <Group gap={4}>
           <Box style={{ width: 18, height: 35, border: '2px solid #495057', borderRadius: 4 }} />
@@ -359,140 +576,180 @@ const CompositionButton = ({
 
 export function Sidebar({ settings, setSettings, screens }: SidebarProps) {
   const currentScreen = screens[settings.selectedScreenIndex];
-  const hasAnyFrames =
-    (currentScreen?.images ?? []).some((img) => !(img?.cleared === true) && img?.diyOptions);
+  const hasAnyFrames = (currentScreen?.images ?? []).some((img) => !(img?.cleared === true) && img?.diyOptions);
   const effectiveComposition = hasAnyFrames ? settings.composition : undefined;
 
-  // Determine which device category is currently selected based on the canvas size value
-  const activeCategory = getCategoryForValue(settings.canvasSize);
-  const [expandedCategory, setExpandedCategory] = useState<string | null>(activeCategory);
+  // Find current store and device based on selected canvas size
+  const current = findStoreAndDevice(settings.canvasSize);
+  const currentStore = current?.store || STORES[0];
+  const currentDevice = current?.device || STORES[0].devices[0];
 
-  const handleCategoryClick = (catId: string) => {
-    setExpandedCategory((prev) => (prev === catId ? null : catId));
-  };
+  // State for UI
+  const [activeStoreId, setActiveStoreId] = useState<string>(currentStore.id);
+  const [showSizeDropdown, setShowSizeDropdown] = useState(false);
+
+  const activeStore = STORES.find((s) => s.id === activeStoreId) || STORES[0];
 
   const handleSizeSelect = (value: string) => {
-    // Auto-set orientation based on the native aspect ratio of the selected size
     const dims = getCanvasDimensions(value, 'portrait');
     const orientation = dims.width > dims.height ? 'landscape' : 'portrait';
     setSettings({ ...settings, canvasSize: value, orientation });
+    setShowSizeDropdown(false);
+  };
+
+  const handleDeviceSelect = (device: DeviceConfig) => {
+    // Select the default size for this device
+    handleSizeSelect(device.defaultSize);
+  };
+
+  // Check if a device is currently selected
+  const isDeviceSelected = (device: DeviceConfig) => {
+    return device.sizes.some((s) => s.value === settings.canvasSize);
   };
 
   return (
     <Stack gap="lg" style={{ overflow: 'auto', height: '100%', padding: '16px' }}>
-      {/* Canvas Size — category cards */}
+      {/* Canvas Size */}
       <Box>
         <Text size="xs" c="dimmed" mb="xs" tt="uppercase">
           Canvas Size
         </Text>
 
-        <Stack gap={6}>
-          {DEVICE_CATEGORIES.map((cat) => {
-            const isExpanded = expandedCategory === cat.id;
-            const isCategoryActive = activeCategory === cat.id;
-
+        {/* Store Tabs */}
+        <Group gap={8} mb="sm">
+          {STORES.map((store) => {
+            const isActive = activeStoreId === store.id;
             return (
-              <Box key={cat.id}>
-                {/* Category card */}
-                <Box
-                  onClick={() => handleCategoryClick(cat.id)}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 10,
-                    padding: '8px 10px',
-                    borderRadius: 8,
-                    border: isCategoryActive
-                      ? '2px solid #228be6'
-                      : '1px solid #dee2e6',
-                    backgroundColor: isCategoryActive ? '#e7f5ff' : 'white',
-                    cursor: 'pointer',
-                    transition: 'all 0.15s ease',
-                  }}
-                >
-                  <Box style={{
-                    width: 32,
-                    height: 32,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: isCategoryActive ? '#228be6' : '#868e96',
-                    flexShrink: 0,
-                  }}>
-                    <DeviceIcon type={cat.id} size={32} />
-                  </Box>
-                  <Text size="sm" fw={isCategoryActive ? 600 : 500} style={{ flex: 1 }}>
-                    {cat.label}
-                  </Text>
-                  <IconChevronDown
-                    size={14}
-                    color="#868e96"
-                    style={{
-                      transition: 'transform 0.2s ease',
-                      transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
-                      flexShrink: 0,
-                    }}
-                  />
-                </Box>
-
-                {/* Expanded sub-list */}
-                {isExpanded && (
-                  <Box
-                    style={{
-                      marginTop: 4,
-                      marginLeft: 12,
-                      borderLeft: '2px solid #e9ecef',
-                      paddingLeft: 10,
-                    }}
-                  >
-                    {cat.subgroups.map((sg) => (
-                      <Box key={sg.subLabel}>
-                        {cat.subgroups.length > 1 && (
-                          <Text size="xs" c="dimmed" mt={6} mb={2} fw={500}>
-                            {sg.subLabel}
-                          </Text>
-                        )}
-                        <Stack gap={1}>
-                          {sg.items.map((item) => {
-                            const isSelected = settings.canvasSize === item.value;
-                            return (
-                              <Box
-                                key={item.value}
-                                onClick={() => handleSizeSelect(item.value)}
-                                style={{
-                                  padding: '5px 8px',
-                                  borderRadius: 6,
-                                  cursor: 'pointer',
-                                  backgroundColor: isSelected ? '#e7f5ff' : 'transparent',
-                                  transition: 'background-color 0.1s ease',
-                                }}
-                                onMouseEnter={(e) => {
-                                  if (!isSelected) e.currentTarget.style.backgroundColor = '#f1f3f5';
-                                }}
-                                onMouseLeave={(e) => {
-                                  if (!isSelected) e.currentTarget.style.backgroundColor = 'transparent';
-                                }}
-                              >
-                                <Text
-                                  size="xs"
-                                  fw={isSelected ? 600 : 400}
-                                  c={isSelected ? '#228be6' : undefined}
-                                  style={{ fontVariantNumeric: 'tabular-nums' }}
-                                >
-                                  {item.label}
-                                </Text>
-                              </Box>
-                            );
-                          })}
-                        </Stack>
-                      </Box>
-                    ))}
-                  </Box>
+              <Box
+                key={store.id}
+                onClick={() => setActiveStoreId(store.id)}
+                style={{
+                  padding: '10px 16px',
+                  borderRadius: 8,
+                  cursor: 'pointer',
+                  border: isActive ? '2px solid #228be6' : '1px solid #dee2e6',
+                  backgroundColor: isActive ? '#e7f5ff' : 'white',
+                  color: isActive ? '#228be6' : '#868e96',
+                  transition: 'all 0.15s ease',
+                  textAlign: 'center',
+                  flex: 1,
+                }}
+              >
+                {store.id === 'apple' ? (
+                  <IconBrandApple size={24} style={{ marginBottom: 4 }} />
+                ) : (
+                  <IconBrandGooglePlay size={24} style={{ marginBottom: 4 }} />
                 )}
+                <Text size="xs" fw={isActive ? 600 : 500}>
+                  {store.id === 'apple' ? 'Apple' : 'Google'}
+                </Text>
               </Box>
             );
           })}
-        </Stack>
+        </Group>
+
+        {/* Device Cards Grid */}
+        <SimpleGrid cols={3} spacing={8}>
+          {activeStore.devices.map((device) => {
+            const isSelected = isDeviceSelected(device);
+            return (
+              <Box
+                key={device.id}
+                onClick={() => handleDeviceSelect(device)}
+                style={{
+                  padding: '10px 4px',
+                  borderRadius: 8,
+                  border: isSelected ? '2px solid #228be6' : '1px solid #dee2e6',
+                  backgroundColor: isSelected ? '#e7f5ff' : 'white',
+                  cursor: 'pointer',
+                  textAlign: 'center',
+                  transition: 'all 0.15s ease',
+                }}
+              >
+                <Box
+                  style={{
+                    height: 40,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: isSelected ? '#228be6' : '#868e96',
+                    marginBottom: 4,
+                  }}
+                >
+                  <DeviceIcon deviceId={device.id} size={40} />
+                </Box>
+                <Text size="xs" fw={isSelected ? 600 : 400} c={isSelected ? '#228be6' : undefined}>
+                  {device.shortLabel || device.label}
+                </Text>
+              </Box>
+            );
+          })}
+        </SimpleGrid>
+
+        {/* Current Size Display & Dropdown */}
+        <Box mt="sm">
+          <Box
+            onClick={() => currentDevice.sizes.length > 1 && setShowSizeDropdown(!showSizeDropdown)}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '8px 10px',
+              borderRadius: 6,
+              backgroundColor: '#f8f9fa',
+              cursor: currentDevice.sizes.length > 1 ? 'pointer' : 'default',
+            }}
+          >
+            <Text size="xs" c="dimmed">
+              {getSizeLabel(settings.canvasSize)}
+            </Text>
+            {currentDevice.sizes.length > 1 && (
+              <IconChevronDown
+                size={14}
+                color="#868e96"
+                style={{
+                  transition: 'transform 0.2s ease',
+                  transform: showSizeDropdown ? 'rotate(180deg)' : 'rotate(0deg)',
+                }}
+              />
+            )}
+          </Box>
+
+          {/* Size Dropdown */}
+          {showSizeDropdown && currentDevice.sizes.length > 1 && (
+            <Box
+              style={{
+                marginTop: 4,
+                padding: '4px',
+                borderRadius: 6,
+                border: '1px solid #dee2e6',
+                backgroundColor: 'white',
+              }}
+            >
+              <Stack gap={1}>
+                {currentDevice.sizes.map((size) => {
+                  const isSelected = settings.canvasSize === size.value;
+                  return (
+                    <Box
+                      key={size.value}
+                      onClick={() => handleSizeSelect(size.value)}
+                      style={{
+                        padding: '6px 8px',
+                        borderRadius: 4,
+                        cursor: 'pointer',
+                        backgroundColor: isSelected ? '#e7f5ff' : 'transparent',
+                      }}
+                    >
+                      <Text size="xs" fw={isSelected ? 600 : 400} c={isSelected ? '#228be6' : undefined}>
+                        {size.label}
+                      </Text>
+                    </Box>
+                  );
+                })}
+              </Stack>
+            </Box>
+          )}
+        </Box>
       </Box>
 
       {/* Composition */}
