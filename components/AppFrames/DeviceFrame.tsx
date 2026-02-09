@@ -241,20 +241,9 @@ export function DeviceFrame({
 
   const handleMouseDown = (e: React.MouseEvent) => {
     if (e.button !== 0) return; // Only left mouse button
-    if (moveModifierPressedRef.current) {
-      if (isInteractiveTarget(e.target)) return;
-      if (!(onFramePositionChange || onFrameMove)) return;
-      e.preventDefault();
-      e.stopPropagation();
-      onClick?.();
-      if (gestureOwnerKey && !gestureTokenRef.current) {
-        gestureTokenRef.current = begin(gestureOwnerKey, 'frame-move');
-      }
-      handleFrameDragStart(e);
-      return;
-    }
 
-    if (displayImage && onPanChange && screenRef.current) {
+    // Space held → image pan (modifier gesture)
+    if (moveModifierPressedRef.current && displayImage && onPanChange && screenRef.current) {
       e.preventDefault();
       e.stopPropagation();
       setIsDragging(true);
@@ -273,8 +262,8 @@ export function DeviceFrame({
       const handleMove = (moveEvent: MouseEvent) => {
         const deltaX = ((moveEvent.clientX - startX) / rect.width) * 100;
         const deltaY = ((moveEvent.clientY - startY) / rect.height) * 100;
-        const newPanX = Math.max(0, Math.min(100, startPanX + deltaX));
-        const newPanY = Math.max(0, Math.min(100, startPanY + deltaY));
+        const newPanX = Math.round(Math.max(0, Math.min(100, startPanX + deltaX)));
+        const newPanY = Math.round(Math.max(0, Math.min(100, startPanY + deltaY)));
         pendingPanRef.current = { x: newPanX, y: newPanY };
         schedulePanVisual();
       };
@@ -301,6 +290,7 @@ export function DeviceFrame({
       return;
     }
 
+    // Default: frame drag
     if (onFramePositionChange || onFrameMove) {
       if (isInteractiveTarget(e.target)) return;
       e.preventDefault();
@@ -325,7 +315,7 @@ export function DeviceFrame({
       style={{
         position: 'absolute',
         inset: 0,
-        cursor: displayImage && onPanChange ? (isDragging ? 'grabbing' : 'grab') : 'default',
+        cursor: isDragging ? 'grabbing' : (onFramePositionChange || onFrameMove) ? 'move' : 'default',
         overflow: 'hidden',
         borderRadius: 'inherit',
       }}
@@ -334,22 +324,28 @@ export function DeviceFrame({
       onMouseLeave={() => setIsHovered(false)}
     >
       {/* Image layer */}
-      {displayImage && (
-        <Box
-          ref={imageLayerRef}
-          style={{
-            position: 'absolute',
-            inset: 0,
-            backgroundImage: `url(${displayImage})`,
-            backgroundSize: 'cover',
-            backgroundPosition: `${panX}% ${panY}%`,
-            backgroundRepeat: 'no-repeat',
-            transform: imageRotation !== 0 ? `rotate(${imageRotation}deg)` : undefined,
-            transformOrigin: 'center center',
-            scale: [90, 270].includes(imageRotation % 360) ? 1.42 : 1,
-          }}
-        />
-      )}
+      {displayImage && (() => {
+        // screenScale 0 = cover (1x), 100 = 2x zoom
+        // Negative inset makes the element larger, creating real overflow for backgroundPosition to pan
+        const zoomInset = -(screenScale / 2);
+        const rotationCompensation = [90, 270].includes(imageRotation % 360) ? 1.42 : 1;
+        return (
+          <Box
+            ref={imageLayerRef}
+            style={{
+              position: 'absolute',
+              inset: `${zoomInset}%`,
+              backgroundImage: `url(${displayImage})`,
+              backgroundSize: 'cover',
+              backgroundPosition: `${panX}% ${panY}%`,
+              backgroundRepeat: 'no-repeat',
+              transform: imageRotation !== 0 ? `rotate(${imageRotation}deg)` : undefined,
+              transformOrigin: 'center center',
+              scale: rotationCompensation !== 1 ? rotationCompensation : undefined,
+            }}
+          />
+        );
+      })()}
 
       {/* Highlight overlay for drag-drop targeting */}
       {effectiveHighlighted && !effectiveSelected && (

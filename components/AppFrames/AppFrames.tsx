@@ -800,7 +800,7 @@ export function AppFrames() {
             },
           }}
           imageSettings={{
-            screenScale: currentScreen?.settings?.screenScale ?? 50,
+            screenScale: currentScreen?.settings?.screenScale ?? 0,
             screenPanX: currentFrameData?.panX ?? 50,
             screenPanY: currentFrameData?.panY ?? 50,
             imageRotation: currentFrameData?.imageRotation ?? 0,
@@ -822,7 +822,7 @@ export function AppFrames() {
             },
             onReset: () => {
               if (selectedFrameIndex === null || selectedFrameIndex === undefined) return;
-              setSettings({ ...settings, screenScale: 50 });
+              setSettings({ ...settings, screenScale: 0 });
               setFramePan(activeFrameScreenIndex, selectedFrameIndex, 50, 50);
               setImageRotation(activeFrameScreenIndex, selectedFrameIndex, 0);
             },
