@@ -478,7 +478,8 @@ const CompositionButton = ({
   <Box
     onClick={onClick}
     style={{
-      border: selected ? '2px solid #228be6' : '1px solid #dee2e6',
+      border: '2px solid',
+      borderColor: selected ? '#228be6' : '#dee2e6',
       borderRadius: 8,
       padding: '12px 8px',
       cursor: 'pointer',
@@ -627,7 +628,8 @@ export function Sidebar({ settings, setSettings, screens }: SidebarProps) {
                   padding: '10px 16px',
                   borderRadius: 8,
                   cursor: 'pointer',
-                  border: isActive ? '2px solid #228be6' : '1px solid #dee2e6',
+                  border: '2px solid',
+                  borderColor: isActive ? '#228be6' : '#dee2e6',
                   backgroundColor: isActive ? '#e7f5ff' : 'white',
                   color: isActive ? '#228be6' : '#868e96',
                   transition: 'all 0.15s ease',
@@ -659,7 +661,8 @@ export function Sidebar({ settings, setSettings, screens }: SidebarProps) {
                 style={{
                   padding: '10px 4px',
                   borderRadius: 8,
-                  border: isSelected ? '2px solid #228be6' : '1px solid #dee2e6',
+                  border: '2px solid',
+                  borderColor: isSelected ? '#228be6' : '#dee2e6',
                   backgroundColor: isSelected ? '#e7f5ff' : 'white',
                   cursor: 'pointer',
                   textAlign: 'center',

@@ -1,4 +1,4 @@
-import type { DIYTemplate, DIYDeviceType } from './types';
+import type { DIYTemplate, DIYDeviceType, DeviceBrand } from './types';
 
 export const DIY_TEMPLATES: DIYTemplate[] = [
   // Phone Templates
@@ -6,6 +6,7 @@ export const DIY_TEMPLATES: DIYTemplate[] = [
     id: 'iphone-pro',
     name: 'iPhone Pro',
     category: 'phone',
+    brand: 'apple',
     description: 'Dynamic Island',
     options: {
       type: 'phone',
@@ -22,6 +23,7 @@ export const DIY_TEMPLATES: DIYTemplate[] = [
     id: 'iphone',
     name: 'iPhone',
     category: 'phone',
+    brand: 'apple',
     description: 'Notch',
     options: {
       type: 'phone',
@@ -38,6 +40,7 @@ export const DIY_TEMPLATES: DIYTemplate[] = [
     id: 'iphone-se',
     name: 'iPhone SE',
     category: 'phone',
+    brand: 'apple',
     description: 'Home Button',
     options: {
       type: 'phone',
@@ -54,6 +57,7 @@ export const DIY_TEMPLATES: DIYTemplate[] = [
     id: 'pixel',
     name: 'Pixel',
     category: 'phone',
+    brand: 'other',
     description: 'Punch Hole (left)',
     options: {
       type: 'phone',
@@ -70,6 +74,7 @@ export const DIY_TEMPLATES: DIYTemplate[] = [
     id: 'galaxy',
     name: 'Galaxy',
     category: 'phone',
+    brand: 'samsung',
     description: 'Punch Hole (center)',
     options: {
       type: 'phone',
@@ -88,6 +93,7 @@ export const DIY_TEMPLATES: DIYTemplate[] = [
     id: 'galaxy-z-flip',
     name: 'Galaxy Z Flip',
     category: 'flip',
+    brand: 'samsung',
     description: 'Cover Screen',
     options: {
       type: 'flip',
@@ -103,6 +109,7 @@ export const DIY_TEMPLATES: DIYTemplate[] = [
     id: 'galaxy-z-fold',
     name: 'Galaxy Z Fold',
     category: 'foldable',
+    brand: 'samsung',
     description: 'Unfolded',
     options: {
       type: 'foldable',
@@ -118,6 +125,7 @@ export const DIY_TEMPLATES: DIYTemplate[] = [
     id: 'ipad-pro',
     name: 'iPad Pro',
     category: 'tablet',
+    brand: 'apple',
     description: 'Thin Bezel',
     options: {
       type: 'tablet',
@@ -134,6 +142,7 @@ export const DIY_TEMPLATES: DIYTemplate[] = [
     id: 'ipad',
     name: 'iPad',
     category: 'tablet',
+    brand: 'apple',
     description: 'Standard Bezel',
     options: {
       type: 'tablet',
@@ -150,6 +159,7 @@ export const DIY_TEMPLATES: DIYTemplate[] = [
     id: 'ipad-mini',
     name: 'iPad Mini',
     category: 'tablet',
+    brand: 'apple',
     description: 'Compact',
     options: {
       type: 'tablet',
@@ -166,6 +176,7 @@ export const DIY_TEMPLATES: DIYTemplate[] = [
     id: 'galaxy-tab',
     name: 'Galaxy Tab',
     category: 'tablet',
+    brand: 'samsung',
     description: 'Standard Bezel',
     options: {
       type: 'tablet',
@@ -184,6 +195,7 @@ export const DIY_TEMPLATES: DIYTemplate[] = [
     id: 'macbook-pro',
     name: 'MacBook Pro',
     category: 'laptop',
+    brand: 'apple',
     description: 'Notch',
     options: {
       type: 'laptop',
@@ -198,6 +210,7 @@ export const DIY_TEMPLATES: DIYTemplate[] = [
     id: 'macbook-air',
     name: 'MacBook Air',
     category: 'laptop',
+    brand: 'apple',
     description: 'No Notch',
     options: {
       type: 'laptop',
@@ -212,6 +225,7 @@ export const DIY_TEMPLATES: DIYTemplate[] = [
     id: 'surface-laptop',
     name: 'Surface Laptop',
     category: 'laptop',
+    brand: 'other',
     description: 'Fabric Base',
     options: {
       type: 'laptop',
@@ -228,6 +242,7 @@ export const DIY_TEMPLATES: DIYTemplate[] = [
     id: 'monitor',
     name: 'Monitor',
     category: 'desktop',
+    brand: 'other',
     description: 'Simple Stand',
     options: {
       type: 'desktop',
@@ -242,6 +257,7 @@ export const DIY_TEMPLATES: DIYTemplate[] = [
     id: 'imac',
     name: 'iMac',
     category: 'desktop',
+    brand: 'apple',
     description: 'All-in-One',
     options: {
       type: 'desktop',
@@ -256,6 +272,7 @@ export const DIY_TEMPLATES: DIYTemplate[] = [
     id: 'studio-display',
     name: 'Studio Display',
     category: 'desktop',
+    brand: 'apple',
     description: 'Apple Stand',
     options: {
       type: 'desktop',
@@ -270,6 +287,7 @@ export const DIY_TEMPLATES: DIYTemplate[] = [
     id: 'pro-display-xdr',
     name: 'Pro Display XDR',
     category: 'desktop',
+    brand: 'apple',
     description: 'Thick Bezel',
     options: {
       type: 'desktop',
@@ -290,6 +308,14 @@ export const getTemplatesByCategory = (category: DIYDeviceType): DIYTemplate[] =
 export const getTemplateById = (id: string): DIYTemplate | undefined =>
   DIY_TEMPLATES.find((t) => t.id === id);
 
+// Helper to get templates by brand
+export const getTemplatesByBrand = (brand: DeviceBrand): DIYTemplate[] =>
+  DIY_TEMPLATES.filter((t) => t.brand === brand);
+
+// Find which brand a template belongs to
+export const findBrandForTemplate = (templateId: string): DeviceBrand | undefined =>
+  DIY_TEMPLATES.find((t) => t.id === templateId)?.brand;
+
 // Base type definitions for the selector
 export const BASE_TYPES: { id: DIYDeviceType; name: string; description: string }[] = [
   { id: 'phone', name: 'Phone', description: 'Standard mobile' },
@@ -309,3 +335,47 @@ export const TEMPLATE_CATEGORIES: DIYDeviceType[] = [
   'laptop',
   'desktop',
 ];
+
+// Brand configuration (mirroring Sidebar.tsx's StoreConfig pattern)
+export interface BrandConfig {
+  id: DeviceBrand;
+  label: string;
+  categories: {
+    category: DIYDeviceType;
+    label: string;
+    templates: DIYTemplate[];
+  }[];
+}
+
+const CATEGORY_ORDER: DIYDeviceType[] = ['phone', 'flip', 'foldable', 'tablet', 'laptop', 'desktop'];
+const CATEGORY_LABELS: Record<DIYDeviceType, string> = {
+  phone: 'Phone',
+  flip: 'Flip',
+  foldable: 'Foldable',
+  tablet: 'Tablet',
+  laptop: 'Laptop',
+  desktop: 'Desktop',
+};
+
+function buildBrands(): BrandConfig[] {
+  const brandMeta: { id: DeviceBrand; label: string }[] = [
+    { id: 'apple', label: 'Apple' },
+    { id: 'samsung', label: 'Samsung' },
+    { id: 'other', label: 'Other' },
+  ];
+
+  return brandMeta.map(({ id, label }) => {
+    const brandTemplates = DIY_TEMPLATES.filter((t) => t.brand === id);
+    const categories = CATEGORY_ORDER
+      .map((cat) => ({
+        category: cat,
+        label: CATEGORY_LABELS[cat],
+        templates: brandTemplates.filter((t) => t.category === cat),
+      }))
+      .filter((c) => c.templates.length > 0);
+
+    return { id, label, categories };
+  });
+}
+
+export const BRANDS: BrandConfig[] = buildBrands();

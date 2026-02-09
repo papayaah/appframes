@@ -20,9 +20,11 @@ import { isGradient, getBackgroundStyle, BACKGROUND_PRESETS } from './Sidebar';
 export interface CanvasSettingsPanelProps {
   settings: CanvasSettings;
   setSettings: (settings: CanvasSettings) => void;
+  hasBackgroundMedia?: boolean;
+  onClearBackgroundMedia?: () => void;
 }
 
-export function CanvasSettingsPanel({ settings, setSettings }: CanvasSettingsPanelProps) {
+export function CanvasSettingsPanel({ settings, setSettings, hasBackgroundMedia, onClearBackgroundMedia }: CanvasSettingsPanelProps) {
   const [customColorOpen, setCustomColorOpen] = useState(false);
   const [customColor, setCustomColor] = useState('#ffffff');
 
@@ -142,6 +144,23 @@ export function CanvasSettingsPanel({ settings, setSettings }: CanvasSettingsPan
           </Popover>
         </SimpleGrid>
       </Box>
+
+      {hasBackgroundMedia && onClearBackgroundMedia && (
+        <Box>
+          <Text size="sm" fw={700} mb="xs">
+            Background Image
+          </Text>
+          <Button
+            size="xs"
+            variant="light"
+            color="red"
+            fullWidth
+            onClick={onClearBackgroundMedia}
+          >
+            Remove Background Image
+          </Button>
+        </Box>
+      )}
     </Stack>
   );
 }

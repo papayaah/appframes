@@ -1,10 +1,10 @@
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Box, Center } from '@mantine/core';
 import { CanvasSettings, Screen } from './AppFrames';
 import { DeviceFrame } from './DeviceFrame';
-import { ResizeHandles, ResizeHandle } from './ResizeHandles';
+// ResizeHandles removed — scale via mouse wheel, rotate via right-click drag
 import { clampFrameTransform } from './types';
 import { getDefaultDIYOptions } from './diy-frames/types';
 import { useInteractionLock } from './InteractionLockContext';
@@ -87,7 +87,7 @@ const DraggableFrame = ({
   rotateZ?: number;
   frameScale?: number;
   isSelected?: boolean;
-  onResizeScale?: (scale: number, handle: ResizeHandle) => void;
+  onResizeScale?: (scale: number) => void;
   onRotate?: (rotateZ: number) => void;
   gestureOwnerKey: string;
 }) => {
@@ -166,6 +166,73 @@ const DraggableFrame = ({
     // Intentionally depends on render-time values via latestRef; this just keeps DOM in sync.
   });
 
+  // --- Mouse wheel → scale (when selected) ---
+  useEffect(() => {
+    const el = frameRef.current;
+    if (!el || !isSelected || !onResizeScale) return;
+
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const delta = -Math.sign(e.deltaY) * 5; // 5% per tick
+      const current = previewScaleRef.current ?? latestRef.current.frameScale;
+      const next = Math.round(clampFrameTransform(current + delta, 'frameScale'));
+      previewScaleRef.current = next;
+      schedulePreview();
+      // Debounced commit — don't clear preview or force DOM update here;
+      // React re-render after commit will sync via the existing useEffect.
+      clearTimeout(wheelCommitTimer.current);
+      wheelCommitTimer.current = window.setTimeout(() => {
+        onResizeScale(previewScaleRef.current ?? next);
+        previewScaleRef.current = null;
+      }, 150);
+    };
+
+    el.addEventListener('wheel', onWheel, { passive: false });
+    return () => el.removeEventListener('wheel', onWheel);
+  }, [isSelected, onResizeScale]);
+
+  const wheelCommitTimer = useRef<ReturnType<typeof setTimeout>>(0 as unknown as ReturnType<typeof setTimeout>);
+
+  // --- Right-click drag → rotate (when selected) ---
+  const rotateStartRef = useRef<{ clientX: number; rotateZ: number } | null>(null);
+
+  const handleContextMenu = useCallback((e: React.MouseEvent) => {
+    if (!isSelected || !onRotate) return;
+    e.preventDefault();
+  }, [isSelected, onRotate]);
+
+  const handleRightMouseDown = useCallback((e: React.MouseEvent) => {
+    if (e.button !== 2 || !isSelected || !onRotate) return;
+    e.preventDefault();
+    e.stopPropagation();
+    rotateStartRef.current = { clientX: e.clientX, rotateZ: latestRef.current.rotateZ };
+
+    const handleMouseMove = (me: MouseEvent) => {
+      const rs = rotateStartRef.current;
+      if (!rs) return;
+      const dx = me.clientX - rs.clientX;
+      const sensitivity = 0.5; // degrees per pixel
+      const next = Math.round(clampFrameTransform(rs.rotateZ + dx * sensitivity, 'rotateZ'));
+      previewRotateRef.current = next;
+      schedulePreview();
+    };
+
+    const handleMouseUp = () => {
+      const finalRotate = previewRotateRef.current;
+      if (finalRotate !== null && onRotate) {
+        previewRotateRef.current = null;
+        schedulePreview();
+        onRotate(finalRotate);
+      }
+      rotateStartRef.current = null;
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+  }, [isSelected, onRotate]);
+
   useEffect(() => {
     const el = frameRef.current;
     if (!el) return;
@@ -205,6 +272,8 @@ const DraggableFrame = ({
         setIsHovered(true);
       }}
       onMouseLeave={() => setIsHovered(false)}
+      onContextMenu={handleContextMenu}
+      onMouseDown={handleRightMouseDown}
       style={{
         ...baseStyleNoTransform,
         willChange: 'transform',
@@ -233,49 +302,20 @@ const DraggableFrame = ({
       }}
     >
       {children}
-      {(isHovered || isSelected) && onResizeScale && (
+      {(isHovered || isSelected) && (
         <Box
+          data-export-hide="true"
           style={{
             position: 'absolute',
-            inset: 0,
+            inset: -2,
+            borderRadius: 6,
+            border: isSelected ? '2px solid #667eea' : '1px solid rgba(102, 126, 234, 0.4)',
             pointerEvents: 'none',
+            transition: 'border 0.15s ease, box-shadow 0.15s ease',
+            boxShadow: isSelected ? '0 0 0 3px rgba(102, 126, 234, 0.15)' : 'none',
             transform: childDragOffset ? `translate3d(${childDragOffset.x}px, ${childDragOffset.y}px, 0)` : undefined,
           }}
-        >
-          <ResizeHandles
-            viewportScale={viewportScale}
-            value={frameScale}
-            onScalePreview={isChildFrameDragging ? () => {} : (next) => {
-              previewScaleRef.current = next;
-              schedulePreview();
-            }}
-            onScaleCommit={isChildFrameDragging ? () => {} : (next) => {
-              previewScaleRef.current = null;
-              schedulePreview(); // snap back to state-driven transform after commit
-              onResizeScale(next, 'bottom-right');
-            }}
-            rotateZ={rotateZ}
-            onRotatePreview={
-              onRotate && !isChildFrameDragging
-                ? (next) => {
-                    previewRotateRef.current = clampFrameTransform(next, 'rotateZ');
-                    schedulePreview();
-                  }
-                : undefined
-            }
-            onRotateCommit={
-              onRotate && !isChildFrameDragging
-                ? (next) => {
-                    previewRotateRef.current = null;
-                    schedulePreview();
-                    onRotate(clampFrameTransform(next, 'rotateZ'));
-                  }
-                : undefined
-            }
-            frameRef={frameRef}
-            gestureOwnerKey={gestureOwnerKey}
-          />
-        </Box>
+        />
       )}
     </Box>
   );
@@ -400,7 +440,7 @@ export function CompositionRenderer({
               tiltY={t0.tiltY}
               rotateZ={t0.rotateZ}
               isSelected={selectedFrameIndex === 0 && !isCleared0}
-              onResizeScale={isCleared0 ? undefined : (next, _handle) => onFrameScaleChange?.(0, next)}
+              onResizeScale={isCleared0 ? undefined : (next) => onFrameScaleChange?.(0, next)}
               onRotate={isCleared0 ? undefined : (next) => onFrameRotateChange?.(0, next)}
               gestureOwnerKey={`frame:${screen.id}:0`}
             >
@@ -435,7 +475,7 @@ export function CompositionRenderer({
               tiltY={dt0.tiltY}
               rotateZ={dt0.rotateZ}
               isSelected={selectedFrameIndex === 0 && !isClearedDual0}
-              onResizeScale={isClearedDual0 ? undefined : (next, _handle) => onFrameScaleChange?.(0, next)}
+              onResizeScale={isClearedDual0 ? undefined : (next) => onFrameScaleChange?.(0, next)}
               onRotate={isClearedDual0 ? undefined : (next) => onFrameRotateChange?.(0, next)}
               gestureOwnerKey={`frame:${screen.id}:0`}
             >
@@ -451,7 +491,7 @@ export function CompositionRenderer({
               tiltY={dt1.tiltY}
               rotateZ={dt1.rotateZ}
               isSelected={selectedFrameIndex === 1 && !isClearedDual1}
-              onResizeScale={isClearedDual1 ? undefined : (next, _handle) => onFrameScaleChange?.(1, next)}
+              onResizeScale={isClearedDual1 ? undefined : (next) => onFrameScaleChange?.(1, next)}
               onRotate={isClearedDual1 ? undefined : (next) => onFrameRotateChange?.(1, next)}
               gestureOwnerKey={`frame:${screen.id}:1`}
             >
@@ -487,7 +527,7 @@ export function CompositionRenderer({
                 tiltY={st0.tiltY}
                 rotateZ={st0.rotateZ}
                 isSelected={selectedFrameIndex === 0 && !isClearedStack0}
-                onResizeScale={isClearedStack0 ? undefined : (next, _handle) => onFrameScaleChange?.(0, next)}
+                onResizeScale={isClearedStack0 ? undefined : (next) => onFrameScaleChange?.(0, next)}
                 onRotate={isClearedStack0 ? undefined : (next) => onFrameRotateChange?.(0, next)}
                 gestureOwnerKey={`frame:${screen.id}:0`}
               >
@@ -506,7 +546,7 @@ export function CompositionRenderer({
                 tiltY={st1.tiltY}
                 rotateZ={st1.rotateZ}
                 isSelected={selectedFrameIndex === 1 && !isClearedStack1}
-                onResizeScale={isClearedStack1 ? undefined : (next, _handle) => onFrameScaleChange?.(1, next)}
+                onResizeScale={isClearedStack1 ? undefined : (next) => onFrameScaleChange?.(1, next)}
                 onRotate={isClearedStack1 ? undefined : (next) => onFrameRotateChange?.(1, next)}
                 gestureOwnerKey={`frame:${screen.id}:1`}
               >
@@ -540,7 +580,7 @@ export function CompositionRenderer({
               tiltY={tt0.tiltY}
               rotateZ={tt0.rotateZ}
               isSelected={selectedFrameIndex === 0 && !isClearedTriple0}
-              onResizeScale={isClearedTriple0 ? undefined : (next, _handle) => onFrameScaleChange?.(0, next)}
+              onResizeScale={isClearedTriple0 ? undefined : (next) => onFrameScaleChange?.(0, next)}
               onRotate={isClearedTriple0 ? undefined : (next) => onFrameRotateChange?.(0, next)}
               gestureOwnerKey={`frame:${screen.id}:0`}
             >
@@ -556,7 +596,7 @@ export function CompositionRenderer({
               tiltY={tt1.tiltY}
               rotateZ={tt1.rotateZ}
               isSelected={selectedFrameIndex === 1 && !isClearedTriple1}
-              onResizeScale={isClearedTriple1 ? undefined : (next, _handle) => onFrameScaleChange?.(1, next)}
+              onResizeScale={isClearedTriple1 ? undefined : (next) => onFrameScaleChange?.(1, next)}
               onRotate={isClearedTriple1 ? undefined : (next) => onFrameRotateChange?.(1, next)}
               gestureOwnerKey={`frame:${screen.id}:1`}
             >
@@ -572,7 +612,7 @@ export function CompositionRenderer({
               tiltY={tt2.tiltY}
               rotateZ={tt2.rotateZ}
               isSelected={selectedFrameIndex === 2 && !isClearedTriple2}
-              onResizeScale={isClearedTriple2 ? undefined : (next, _handle) => onFrameScaleChange?.(2, next)}
+              onResizeScale={isClearedTriple2 ? undefined : (next) => onFrameScaleChange?.(2, next)}
               onRotate={isClearedTriple2 ? undefined : (next) => onFrameRotateChange?.(2, next)}
               gestureOwnerKey={`frame:${screen.id}:2`}
             >
@@ -612,7 +652,7 @@ export function CompositionRenderer({
               tiltY={ft0.tiltY}
               rotateZ={ft0.rotateZ}
               isSelected={selectedFrameIndex === 0 && !isClearedFan0}
-              onResizeScale={isClearedFan0 ? undefined : (next, _handle) => onFrameScaleChange?.(0, next)}
+              onResizeScale={isClearedFan0 ? undefined : (next) => onFrameScaleChange?.(0, next)}
               onRotate={isClearedFan0 ? undefined : (next) => onFrameRotateChange?.(0, next)}
               gestureOwnerKey={`frame:${screen.id}:0`}
             >
@@ -634,7 +674,7 @@ export function CompositionRenderer({
               tiltY={ft1.tiltY}
               rotateZ={ft1.rotateZ}
               isSelected={selectedFrameIndex === 1 && !isClearedFan1}
-              onResizeScale={isClearedFan1 ? undefined : (next, _handle) => onFrameScaleChange?.(1, next)}
+              onResizeScale={isClearedFan1 ? undefined : (next) => onFrameScaleChange?.(1, next)}
               onRotate={isClearedFan1 ? undefined : (next) => onFrameRotateChange?.(1, next)}
               gestureOwnerKey={`frame:${screen.id}:1`}
             >
@@ -656,7 +696,7 @@ export function CompositionRenderer({
               tiltY={ft2.tiltY}
               rotateZ={ft2.rotateZ}
               isSelected={selectedFrameIndex === 2 && !isClearedFan2}
-              onResizeScale={isClearedFan2 ? undefined : (next, _handle) => onFrameScaleChange?.(2, next)}
+              onResizeScale={isClearedFan2 ? undefined : (next) => onFrameScaleChange?.(2, next)}
               onRotate={isClearedFan2 ? undefined : (next) => onFrameRotateChange?.(2, next)}
               gestureOwnerKey={`frame:${screen.id}:2`}
             >

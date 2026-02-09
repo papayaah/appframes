@@ -103,11 +103,15 @@ export type DIYOptions =
   | LaptopDIYOptions
   | DesktopDIYOptions;
 
+// Brand grouping for templates
+export type DeviceBrand = 'apple' | 'samsung' | 'other';
+
 // Template definition
 export interface DIYTemplate {
   id: string;
   name: string;
   category: DIYDeviceType;
+  brand: DeviceBrand;
   description: string;
   options: DIYOptions;
 }

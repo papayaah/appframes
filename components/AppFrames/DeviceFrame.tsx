@@ -1,10 +1,8 @@
 'use client';
 
 import { useEffect, useState, useRef, useCallback } from 'react';
-import { Box, Popover } from '@mantine/core';
-import { IconGripVertical } from '@tabler/icons-react';
+import { Box } from '@mantine/core';
 import { useMediaImage } from '../../hooks/useMediaImage';
-import { QuickMediaPicker } from './QuickMediaPicker';
 import { useInteractionLock } from './InteractionLockContext';
 import type { DIYOptions } from './diy-frames/types';
 import { getDefaultDIYOptions, BEZEL_WIDTHS, CORNER_RADII, BASE_DIMENSIONS } from './diy-frames/types';
@@ -105,7 +103,6 @@ export function DeviceFrame({
   const serverImageUrl = serverMediaPath ? `/api/media/files/${serverMediaPath}` : undefined;
   const displayImage = imageUrl || serverImageUrl || image;
   const [isDragging, setIsDragging] = useState(false);
-  const [pickerOpen, setPickerOpen] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
   const [isFrameDragging, setIsFrameDragging] = useState(false);
   const screenRef = useRef<HTMLDivElement>(null);
@@ -243,6 +240,7 @@ export function DeviceFrame({
   };
 
   const handleMouseDown = (e: React.MouseEvent) => {
+    if (e.button !== 0) return; // Only left mouse button
     if (moveModifierPressedRef.current) {
       if (isInteractiveTarget(e.target)) return;
       if (!(onFramePositionChange || onFrameMove)) return;
@@ -318,8 +316,6 @@ export function DeviceFrame({
     onClick?.();
   };
 
-  const showDragHandle = onFrameMove && isHovered && !isDragging && !isFrameDragging && !isExporting;
-  const showMediaPicker = (onMediaSelect || onPexelsSelect) && isHovered && !isDragging && !isFrameDragging && !isExporting;
   const showGuides = !isLocked || (gestureOwnerKey && isOwnerActive(gestureOwnerKey));
 
   // Render screen content (image layer)
@@ -355,114 +351,14 @@ export function DeviceFrame({
         />
       )}
 
-      {/* Frame drag handle */}
-      {showDragHandle && showGuides && (
-        <Box
-          style={{
-            position: 'absolute',
-            left: '50%',
-            transform: 'translateX(-50%)',
-            ...(frameY >= 20 ? { top: 8 } : { bottom: 8 }),
-            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-            borderRadius: 8,
-            padding: '4px 12px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 4,
-            cursor: 'move',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
-            zIndex: 20,
-          }}
-          onMouseDown={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            onClick?.();
-            if (gestureOwnerKey && !gestureTokenRef.current) {
-              gestureTokenRef.current = begin(gestureOwnerKey, 'frame-move');
-            }
-            handleFrameDragStart(e);
-          }}
-        >
-          <IconGripVertical size={14} color="white" />
-        </Box>
-      )}
-
-      {/* Media picker button */}
-      {showMediaPicker && showGuides && (
-        <Box
-          style={{
-            position: 'absolute',
-            bottom: 8,
-            right: 8,
-            zIndex: 20,
-          }}
-        >
-          <Popover
-            opened={pickerOpen}
-            onChange={setPickerOpen}
-            position="top-end"
-            shadow="md"
-            withArrow
-            zIndex={1100}
-          >
-            <Popover.Target>
-              <Box
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setPickerOpen((o) => !o);
-                }}
-                style={{
-                  width: 32,
-                  height: 32,
-                  borderRadius: 8,
-                  background: 'rgba(0,0,0,0.6)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  cursor: 'pointer',
-                }}
-              >
-                <Box component="span" style={{ fontSize: 16, color: 'white' }}>+</Box>
-              </Box>
-            </Popover.Target>
-            <Popover.Dropdown p="xs">
-              <QuickMediaPicker
-                onSelectMedia={(id: number) => {
-                  onMediaSelect?.(id);
-                  setPickerOpen(false);
-                }}
-                onSelectPexels={(url: string) => {
-                  onPexelsSelect?.(url);
-                  setPickerOpen(false);
-                }}
-                onClose={() => setPickerOpen(false)}
-              />
-            </Popover.Dropdown>
-          </Popover>
-        </Box>
-      )}
-
-      {/* Selection outline */}
-      {effectiveSelected && (
-        <Box
-          style={{
-            position: 'absolute',
-            inset: -2,
-            border: '2px solid #228be6',
-            borderRadius: 'inherit',
-            pointerEvents: 'none',
-            zIndex: 15,
-          }}
-        />
-      )}
-
-      {/* Highlight overlay */}
+      {/* Highlight overlay for drag-drop targeting */}
       {effectiveHighlighted && !effectiveSelected && (
         <Box
+          data-export-hide="true"
           style={{
             position: 'absolute',
             inset: 0,
-            border: '2px dashed #228be6',
+            border: '2px dashed #667eea',
             borderRadius: 'inherit',
             pointerEvents: 'none',
             zIndex: 15,
@@ -502,6 +398,8 @@ export function DeviceFrame({
   return (
     <Box
       ref={frameWrapperRef}
+      data-frame-drop-zone="true"
+      data-frame-index={frameIndex}
       style={{
         position: 'relative',
         display: 'inline-flex',

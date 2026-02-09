@@ -11,7 +11,7 @@ import { MobileBottomNav, MOBILE_NAV_HEIGHT } from './MobileBottomNav';
 import { Canvas } from './Canvas';
 import { ScreensPanel } from './ScreensPanel';
 import { HistorySidebar } from './HistorySidebar';
-import { useFrames, getCanvasDimensions, getCompositionFrameCount } from './FramesContext';
+import { useFrames, getCanvasDimensions, getCanvasSizeLabel, getCompositionFrameCount } from './FramesContext';
 import { Screen, CanvasSettings, ScreenImage, AppFramesActions, clampFrameTransform } from './types';
 import { CrossCanvasDragProvider } from './CrossCanvasDragContext';
 import { InteractionLockProvider } from './InteractionLockContext';
@@ -83,6 +83,9 @@ export function AppFrames() {
     setDownloadFormat,
     setDownloadJpegQuality,
     isInitializing,
+    screensByCanvasSize,
+    currentCanvasSize,
+    switchCanvasSize,
   } = useFrames();
 
   const isMobile = useMediaQuery('(max-width: 48em)');
@@ -497,7 +500,26 @@ export function AppFrames() {
       <AppShell.Header>
         <Header
           onDownload={handleDownload}
-          outputDimensions={`${getCanvasDimensions(settings.canvasSize, settings.orientation).width} × ${getCanvasDimensions(settings.canvasSize, settings.orientation).height}px`}
+          outputDimensions={(() => {
+            const label = getCanvasSizeLabel(settings.canvasSize);
+            const { width, height } = getCanvasDimensions(settings.canvasSize, settings.orientation);
+            const dims = `${width}×${height}`;
+            return label.includes('×') ? label : `${label} (${dims})`;
+          })()}
+          canvasSizes={Object.entries(screensByCanvasSize)
+            .filter(([, s]) => s.length > 0)
+            .map(([size, s]) => {
+              const label = getCanvasSizeLabel(size);
+              const { width, height } = getCanvasDimensions(size, 'portrait');
+              const dims = `${width}×${height}`;
+              return {
+                id: size,
+                label: label.includes('×') ? label : `${label} (${dims})`,
+                screenCount: s.length,
+              };
+            })}
+          currentCanvasSize={currentCanvasSize}
+          onCanvasSizeSwitch={switchCanvasSize}
           zoom={zoom}
           onZoomChange={setZoom}
           selectedCount={selectedScreenIndices.length}
@@ -770,6 +792,12 @@ export function AppFrames() {
           canvasSettings={{
             settings,
             setSettings,
+            hasBackgroundMedia: !!currentScreen?.settings?.canvasBackgroundMediaId,
+            onClearBackgroundMedia: () => {
+              if (currentScreen) {
+                setCanvasBackgroundMedia(activeFrameScreenIndex, undefined);
+              }
+            },
           }}
           imageSettings={{
             screenScale: currentScreen?.settings?.screenScale ?? 50,

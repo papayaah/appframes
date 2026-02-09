@@ -148,7 +148,7 @@ export function ResizeHandles({
         const cy = rect.top + rect.height / 2;
         const angle = Math.atan2(e.clientY - cy, e.clientX - cx) * (180 / Math.PI);
         const delta = angle - rs.angle;
-        const next = rs.rotateZ + delta;
+        const next = Math.round(rs.rotateZ + delta);
         lastRotate.current = next;
         onRotatePreview(next);
         return;
@@ -159,7 +159,7 @@ export function ResizeHandles({
       const dx = (e.clientX - s.x) / (viewportScale || 1);
       const dy = (e.clientY - s.y) / (viewportScale || 1);
       const delta = computeCornerDelta(s.handle, dx, dy);
-      const next = clamp(s.value + delta * SCALE_SENSITIVITY, min, max);
+      const next = Math.round(clamp(s.value + delta * SCALE_SENSITIVITY, min, max));
       lastScale.current = next;
       onScalePreview(next);
     };

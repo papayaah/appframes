@@ -73,7 +73,7 @@ export function TransformControls({
   const knobPos = getKnobPosition(rotation);
 
   const handleScaleStep = (delta: number) => {
-    const newScale = Math.max(20, Math.min(200, scale + delta));
+    const newScale = Math.max(20, Math.min(200, Math.round(scale) + delta));
     onScaleChange(newScale);
   };
 
@@ -152,7 +152,7 @@ export function TransformControls({
             />
           </Box>
           <Text size="xs" c="dimmed" ta="center" mt={4}>
-            {rotation}°
+            {Math.round(rotation)}°
           </Text>
         </Box>
 
@@ -182,8 +182,8 @@ export function TransformControls({
                 justifyContent: 'center',
               }}
             >
-              <Text size="sm" fw={500}>
-                {scale}%
+              <Text size="sm" fw={400}>
+                {Math.round(scale)}%
               </Text>
             </Box>
             <ActionIcon

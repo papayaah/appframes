@@ -7,13 +7,22 @@ import { IconDownload, IconChevronDown, IconPlus, IconEdit, IconTrash, IconFolde
 import { useState, useEffect } from 'react';
 import type { Project } from '@/lib/PersistenceDB';
 
+interface CanvasSizeOption {
+  id: string;
+  label: string;
+  screenCount: number;
+}
+
 interface HeaderProps {
-  onDownload?: () => void; // Download currently visible screens individually
-  outputDimensions?: string; // Display dimensions (e.g., "1242 × 2688px")
+  onDownload?: () => void;
+  outputDimensions?: string;
+  canvasSizes?: CanvasSizeOption[];
+  currentCanvasSize?: string;
+  onCanvasSizeSwitch?: (size: string) => void;
   zoom?: number;
   onZoomChange?: (zoom: number) => void;
-  selectedCount?: number; // Number of currently visible/selected screens
-  totalCount?: number; // Total number of screens in panel
+  selectedCount?: number;
+  totalCount?: number;
   // Project management
   currentProjectName?: string;
   onCreateProject?: (name: string) => Promise<void>;
@@ -30,6 +39,9 @@ interface HeaderProps {
 export function Header({
   onDownload,
   outputDimensions,
+  canvasSizes = [],
+  currentCanvasSize,
+  onCanvasSizeSwitch,
   zoom = 100,
   onZoomChange,
   selectedCount = 1,
@@ -187,11 +199,42 @@ export function Header({
             </Menu.Dropdown>
           </Menu>
 
-          {outputDimensions && (
+          {outputDimensions && canvasSizes.length > 1 ? (
+            <Menu shadow="md" width={280}>
+              <Menu.Target>
+                <Button
+                  variant="subtle"
+                  size="xs"
+                  color="gray"
+                  rightSection={<IconChevronDown size={12} />}
+                  styles={{ root: { fontWeight: 400 } }}
+                >
+                  {outputDimensions}
+                </Button>
+              </Menu.Target>
+              <Menu.Dropdown>
+                <Menu.Label>Canvas Sizes</Menu.Label>
+                {canvasSizes.map((cs) => (
+                  <Menu.Item
+                    key={cs.id}
+                    onClick={() => onCanvasSizeSwitch?.(cs.id)}
+                    style={{
+                      backgroundColor: cs.id === currentCanvasSize ? 'var(--mantine-color-blue-0)' : undefined,
+                    }}
+                  >
+                    <Group justify="space-between">
+                      <Text size="sm">{cs.label}</Text>
+                      <Text size="xs" c="dimmed">{cs.screenCount} screen{cs.screenCount !== 1 ? 's' : ''}</Text>
+                    </Group>
+                  </Menu.Item>
+                ))}
+              </Menu.Dropdown>
+            </Menu>
+          ) : outputDimensions ? (
             <Text size="xs" c="dimmed">
               {outputDimensions}
             </Text>
-          )}
+          ) : null}
         </Group>
 
       <Group gap="md" style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)' }}>
