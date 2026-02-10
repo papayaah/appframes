@@ -1,14 +1,18 @@
 'use client';
 
 import { useCallback, useRef, useState } from 'react';
-import { Box, Text, ActionIcon, Group, Tooltip } from '@mantine/core';
+import { Box, Text, ActionIcon, Group, Tooltip, Divider } from '@mantine/core';
 import { IconMinus, IconPlus, IconRefresh } from '@tabler/icons-react';
+import { TiltControl } from './TiltControl';
 
 interface TransformControlsProps {
   rotation: number;
   scale: number;
+  tiltX?: number;
+  tiltY?: number;
   onRotationChange: (rotation: number) => void;
   onScaleChange: (scale: number) => void;
+  onTiltChange?: (tiltX: number, tiltY: number) => void;
   onReset?: () => void;
 }
 
@@ -18,14 +22,17 @@ const KNOB_SIZE = 12;
 export function TransformControls({
   rotation,
   scale,
+  tiltX = 0,
+  tiltY = 0,
   onRotationChange,
   onScaleChange,
+  onTiltChange,
   onReset,
 }: TransformControlsProps) {
   const dialRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
 
-  const hasChanges = rotation !== 0 || scale !== 100;
+  const hasChanges = rotation !== 0 || scale !== 100 || tiltX !== 0 || tiltY !== 0;
 
   // Convert angle to position on dial circumference
   const getKnobPosition = (angle: number) => {
@@ -233,6 +240,19 @@ export function TransformControls({
           </Tooltip>
         )}
       </Group>
+
+      {/* 3D Tilt Control */}
+      {onTiltChange && (
+        <>
+          <Divider my="md" />
+          <TiltControl
+            tiltX={tiltX}
+            tiltY={tiltY}
+            onTiltChange={onTiltChange}
+            onReset={tiltX !== 0 || tiltY !== 0 ? () => onTiltChange(0, 0) : undefined}
+          />
+        </>
+      )}
     </Box>
   );
 }

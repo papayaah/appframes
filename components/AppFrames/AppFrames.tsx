@@ -76,6 +76,7 @@ export function AppFrames() {
     addFramePositionDelta,
     setFrameScale,
     setFrameRotate,
+    setFrameTilt,
     setFrameColor,
     setImageRotation,
     downloadFormat,
@@ -844,10 +845,17 @@ export function AppFrames() {
               if (selectedFrameIndex === null || selectedFrameIndex === undefined) return;
               setFrameScale(activeFrameScreenIndex, selectedFrameIndex, clampFrameTransform(scale, 'frameScale'));
             },
+            frameTiltX: currentFrameData?.tiltX ?? 0,
+            frameTiltY: currentFrameData?.tiltY ?? 0,
+            onFrameTiltChange: (tiltX, tiltY) => {
+              if (selectedFrameIndex === null || selectedFrameIndex === undefined) return;
+              setFrameTilt(activeFrameScreenIndex, selectedFrameIndex, tiltX, tiltY);
+            },
             onResetTransforms: () => {
               if (selectedFrameIndex === null || selectedFrameIndex === undefined) return;
               setFrameRotate(activeFrameScreenIndex, selectedFrameIndex, 0);
               setFrameScale(activeFrameScreenIndex, selectedFrameIndex, 100);
+              setFrameTilt(activeFrameScreenIndex, selectedFrameIndex, 0, 0);
             },
             diyOptions: currentDiyOptions,
             onDIYOptionsChange: (options: DIYOptions) => {

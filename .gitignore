@@ -129,3 +129,4 @@ next-env.d.ts
 # Local media storage (uploaded files for dev)
 media/
 media-uploads/
+tmp/

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useRef, ReactNode, useCallback, useEffect, useMemo } from 'react';
-import { Screen, ScreenImage, CanvasSettings, DEFAULT_TEXT_STYLE, TextElement, TextStyle } from './types';
+import { Screen, ScreenImage, CanvasSettings, DEFAULT_TEXT_STYLE, TextElement, TextStyle, clampFrameTransform } from './types';
 import type { DIYOptions } from './diy-frames/types';
 import { getDefaultDIYOptions } from './diy-frames/types';
 import { persistenceDB, Project } from '@/lib/PersistenceDB';
@@ -265,6 +265,7 @@ interface FramesContextType {
   addFramePositionDelta: (screenIndex: number, frameIndex: number, dx: number, dy: number) => void;
   setFrameScale: (screenIndex: number, frameIndex: number, frameScale: number) => void;
   setFrameRotate: (screenIndex: number, frameIndex: number, rotateZ: number) => void;
+  setFrameTilt: (screenIndex: number, frameIndex: number, tiltX: number, tiltY: number) => void;
   setFrameColor: (screenIndex: number, frameIndex: number, frameColor: string | undefined) => void;
   setImageRotation: (screenIndex: number, frameIndex: number, imageRotation: number) => void;
 }
@@ -905,6 +906,20 @@ export function FramesProvider({ children }: { children: ReactNode }) {
     });
   }, [commitCurrentScreens]);
 
+  const setFrameTilt = useCallback((screenIndex: number, frameIndex: number, tiltX: number, tiltY: number) => {
+    commitCurrentScreens('Tilt frame', (list) => {
+      const screen = list[screenIndex];
+      if (!screen) return;
+      if (!screen.images) screen.images = [];
+      while (screen.images.length <= frameIndex) screen.images.push({});
+      screen.images[frameIndex] = {
+        ...(screen.images[frameIndex] || {}),
+        tiltX: clampFrameTransform(tiltX, 'tiltX'),
+        tiltY: clampFrameTransform(tiltY, 'tiltY'),
+      };
+    });
+  }, [commitCurrentScreens]);
+
   const setFrameColor = useCallback((screenIndex: number, frameIndex: number, frameColor: string | undefined) => {
     commitCurrentScreens('Change frame color', (list) => {
       const screen = list[screenIndex];
@@ -1459,6 +1474,7 @@ export function FramesProvider({ children }: { children: ReactNode }) {
         addFramePositionDelta,
         setFrameScale,
         setFrameRotate,
+        setFrameTilt,
         setFrameColor,
         setImageRotation,
       }}

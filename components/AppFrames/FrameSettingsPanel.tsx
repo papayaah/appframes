@@ -45,6 +45,12 @@ export interface FrameSettingsPanelProps {
   frameScale?: number;
   /** Callback when frame scale changes */
   onFrameScaleChange?: (scale: number) => void;
+  /** Current frame tiltX in degrees (-60 to 60) */
+  frameTiltX?: number;
+  /** Current frame tiltY in degrees (-60 to 60) */
+  frameTiltY?: number;
+  /** Callback when frame tilt changes */
+  onFrameTiltChange?: (tiltX: number, tiltY: number) => void;
   /** Callback to reset frame transforms to defaults */
   onResetTransforms?: () => void;
   /** Current DIY options */
@@ -61,6 +67,9 @@ export function FrameSettingsPanel({
   onFrameRotationChange,
   frameScale = 100,
   onFrameScaleChange,
+  frameTiltX = 0,
+  frameTiltY = 0,
+  onFrameTiltChange,
   onResetTransforms,
   diyOptions,
   onDIYOptionsChange,
@@ -175,8 +184,11 @@ export function FrameSettingsPanel({
           <TransformControls
             rotation={frameRotation}
             scale={frameScale}
+            tiltX={frameTiltX}
+            tiltY={frameTiltY}
             onRotationChange={onFrameRotationChange}
             onScaleChange={onFrameScaleChange}
+            onTiltChange={onFrameTiltChange}
             onReset={onResetTransforms}
           />
         </Box>
