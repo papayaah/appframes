@@ -191,7 +191,7 @@ const DraggableFrame = ({
     return () => el.removeEventListener('wheel', onWheel);
   }, [isSelected, onResizeScale]);
 
-  const wheelCommitTimer = useRef<ReturnType<typeof setTimeout>>(0 as unknown as ReturnType<typeof setTimeout>);
+  const wheelCommitTimer = useRef<number>(0);
 
   // --- Right-click drag → rotate (when selected) ---
   const rotateStartRef = useRef<{ clientX: number; rotateZ: number } | null>(null);

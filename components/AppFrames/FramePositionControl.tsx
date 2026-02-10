@@ -4,38 +4,41 @@ import { useCallback, useRef, useState } from 'react';
 import { Box, Text, Group, Tooltip, ActionIcon } from '@mantine/core';
 import { IconRefresh } from '@tabler/icons-react';
 
-interface TiltControlProps {
-  tiltX: number;
-  tiltY: number;
-  onTiltChange: (tiltX: number, tiltY: number) => void;
+interface FramePositionControlProps {
+  frameX: number; // pixels, 0 = centered
+  frameY: number; // pixels, 0 = centered
+  onPositionChange: (frameX: number, frameY: number) => void;
   onReset?: () => void;
 }
 
 const PAD_SIZE = 100;
 const INDICATOR_SIZE = 14;
-const MAX_TILT = 60;
+const MAX_OFFSET = 200; // pixels - range will be -200 to +200
 
-export function TiltControl({
-  tiltX,
-  tiltY,
-  onTiltChange,
+export function FramePositionControl({
+  frameX,
+  frameY,
+  onPositionChange,
   onReset,
-}: TiltControlProps) {
+}: FramePositionControlProps) {
   const padRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
 
-  const hasChanges = tiltX !== 0 || tiltY !== 0;
+  const hasChanges = Math.round(frameX) !== 0 || Math.round(frameY) !== 0;
 
-  // Convert tilt values (-60 to 60) to position on pad (0 to PAD_SIZE)
+  // Convert frame position (pixels) to indicator position on pad
+  // frameX/frameY of 0 = center of pad
   const getIndicatorPosition = () => {
-    const x = ((tiltY + MAX_TILT) / (MAX_TILT * 2)) * PAD_SIZE;
-    const y = ((-tiltX + MAX_TILT) / (MAX_TILT * 2)) * PAD_SIZE;
+    const clampedX = Math.max(-MAX_OFFSET, Math.min(MAX_OFFSET, frameX));
+    const clampedY = Math.max(-MAX_OFFSET, Math.min(MAX_OFFSET, frameY));
+    const x = ((clampedX + MAX_OFFSET) / (MAX_OFFSET * 2)) * PAD_SIZE;
+    const y = ((clampedY + MAX_OFFSET) / (MAX_OFFSET * 2)) * PAD_SIZE;
     return { x, y };
   };
 
-  // Convert mouse position to tilt values
-  const getTiltFromPosition = (clientX: number, clientY: number) => {
-    if (!padRef.current) return { tiltX, tiltY };
+  // Convert mouse position to frame position (pixels)
+  const getPositionFromMouse = (clientX: number, clientY: number) => {
+    if (!padRef.current) return { frameX, frameY };
     const rect = padRef.current.getBoundingClientRect();
     const relX = clientX - rect.left;
     const relY = clientY - rect.top;
@@ -44,28 +47,26 @@ export function TiltControl({
     const clampedX = Math.max(0, Math.min(PAD_SIZE, relX));
     const clampedY = Math.max(0, Math.min(PAD_SIZE, relY));
 
-    // Convert to tilt values
-    // X position -> tiltY (left = negative, right = positive)
-    // Y position -> tiltX (top = positive, bottom = negative)
-    const newTiltY = Math.round((clampedX / PAD_SIZE) * MAX_TILT * 2 - MAX_TILT);
-    const newTiltX = Math.round(MAX_TILT - (clampedY / PAD_SIZE) * MAX_TILT * 2);
+    // Convert to frame position (pixels, -MAX_OFFSET to +MAX_OFFSET)
+    const newFrameX = Math.round((clampedX / PAD_SIZE) * MAX_OFFSET * 2 - MAX_OFFSET);
+    const newFrameY = Math.round((clampedY / PAD_SIZE) * MAX_OFFSET * 2 - MAX_OFFSET);
 
-    return { tiltX: newTiltX, tiltY: newTiltY };
+    return { frameX: newFrameX, frameY: newFrameY };
   };
 
   const handlePointerDown = useCallback((e: React.PointerEvent) => {
     e.preventDefault();
     setIsDragging(true);
     (e.target as HTMLElement).setPointerCapture(e.pointerId);
-    const { tiltX: newTiltX, tiltY: newTiltY } = getTiltFromPosition(e.clientX, e.clientY);
-    onTiltChange(newTiltX, newTiltY);
-  }, [onTiltChange]);
+    const { frameX: newX, frameY: newY } = getPositionFromMouse(e.clientX, e.clientY);
+    onPositionChange(newX, newY);
+  }, [onPositionChange]);
 
   const handlePointerMove = useCallback((e: React.PointerEvent) => {
     if (!isDragging) return;
-    const { tiltX: newTiltX, tiltY: newTiltY } = getTiltFromPosition(e.clientX, e.clientY);
-    onTiltChange(newTiltX, newTiltY);
-  }, [isDragging, onTiltChange]);
+    const { frameX: newX, frameY: newY } = getPositionFromMouse(e.clientX, e.clientY);
+    onPositionChange(newX, newY);
+  }, [isDragging, onPositionChange]);
 
   const handlePointerUp = useCallback((e: React.PointerEvent) => {
     setIsDragging(false);
@@ -76,11 +77,11 @@ export function TiltControl({
 
   return (
     <Box>
-      <Text size="xs" c="dimmed" mb={4} tt="uppercase" ta="center">
-        3D Tilt
-      </Text>
-      <Group justify={onReset ? "space-between" : "center"} align="flex-start">
+      <Group justify="space-between" align="flex-start">
         <Box>
+          <Text size="xs" c="dimmed" mb={4} tt="uppercase" ta="center">
+            Frame Position
+          </Text>
 
           {/* Trackpad container */}
           <Box
@@ -101,20 +102,37 @@ export function TiltControl({
               overflow: 'hidden',
             }}
           >
-            {/* 3D tilted plane visualization */}
+            {/* Canvas outline (static rectangle) */}
             <Box
               style={{
                 position: 'absolute',
                 top: '50%',
                 left: '50%',
-                width: 60,
-                height: 40,
-                transform: `translate(-50%, -50%) perspective(200px) rotateX(${tiltX}deg) rotateY(${tiltY}deg)`,
-                backgroundColor: '#228be6',
+                transform: 'translate(-50%, -50%)',
+                width: 70,
+                height: 70,
+                border: '1px dashed #adb5bd',
                 borderRadius: 4,
+                backgroundColor: 'transparent',
+                pointerEvents: 'none',
+              }}
+            />
+
+            {/* Frame representation (moves based on position) */}
+            <Box
+              style={{
+                position: 'absolute',
+                top: '50%',
+                left: '50%',
+                transform: `translate(calc(-50% + ${(frameX / MAX_OFFSET) * 25}px), calc(-50% + ${(frameY / MAX_OFFSET) * 25}px))`,
+                width: 24,
+                height: 36,
+                backgroundColor: '#228be6',
+                borderRadius: 3,
                 opacity: 0.3,
-                boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                border: '2px solid #228be6',
                 transition: isDragging ? 'none' : 'transform 0.1s ease-out',
+                pointerEvents: 'none',
               }}
             />
 
@@ -127,6 +145,7 @@ export function TiltControl({
                 right: 0,
                 height: 1,
                 backgroundColor: '#dee2e6',
+                pointerEvents: 'none',
               }}
             />
             <Box
@@ -137,29 +156,9 @@ export function TiltControl({
                 bottom: 0,
                 width: 1,
                 backgroundColor: '#dee2e6',
+                pointerEvents: 'none',
               }}
             />
-
-            {/* Corner tick marks for orientation */}
-            {[
-              { x: 0, y: 0, label: 'Back-Left' },
-              { x: PAD_SIZE, y: 0, label: 'Back-Right' },
-              { x: 0, y: PAD_SIZE, label: 'Front-Left' },
-              { x: PAD_SIZE, y: PAD_SIZE, label: 'Front-Right' },
-            ].map(({ x, y }, i) => (
-              <Box
-                key={i}
-                style={{
-                  position: 'absolute',
-                  left: x - 3,
-                  top: y - 3,
-                  width: 6,
-                  height: 6,
-                  borderRadius: '50%',
-                  backgroundColor: '#dee2e6',
-                }}
-              />
-            ))}
 
             {/* Position indicator (draggable dot) */}
             <Box
@@ -181,17 +180,17 @@ export function TiltControl({
           {/* Value display */}
           <Group gap={8} justify="center" mt={4}>
             <Text size="xs" c="dimmed">
-              X: {Math.round(tiltX)}°
+              X: {Math.round(frameX)}px
             </Text>
             <Text size="xs" c="dimmed">
-              Y: {Math.round(tiltY)}°
+              Y: {Math.round(frameY)}px
             </Text>
           </Group>
         </Box>
 
         {/* Reset Button */}
         {onReset && (
-          <Tooltip label="Reset tilt" position="top">
+          <Tooltip label="Center frame" position="top">
             <ActionIcon
               variant="light"
               color="gray"

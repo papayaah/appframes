@@ -74,6 +74,7 @@ export function AppFrames() {
     setFrameDIYOptions,
     setFramePan,
     addFramePositionDelta,
+    setFramePosition,
     setFrameScale,
     setFrameRotate,
     setFrameTilt,
@@ -851,11 +852,18 @@ export function AppFrames() {
               if (selectedFrameIndex === null || selectedFrameIndex === undefined) return;
               setFrameTilt(activeFrameScreenIndex, selectedFrameIndex, tiltX, tiltY);
             },
+            frameX: currentFrameData?.frameX ?? 0,
+            frameY: currentFrameData?.frameY ?? 0,
+            onFramePositionChange: (frameX, frameY) => {
+              if (selectedFrameIndex === null || selectedFrameIndex === undefined) return;
+              setFramePosition(activeFrameScreenIndex, selectedFrameIndex, frameX, frameY);
+            },
             onResetTransforms: () => {
               if (selectedFrameIndex === null || selectedFrameIndex === undefined) return;
               setFrameRotate(activeFrameScreenIndex, selectedFrameIndex, 0);
               setFrameScale(activeFrameScreenIndex, selectedFrameIndex, 100);
               setFrameTilt(activeFrameScreenIndex, selectedFrameIndex, 0, 0);
+              setFramePosition(activeFrameScreenIndex, selectedFrameIndex, 0, 0);
             },
             diyOptions: currentDiyOptions,
             onDIYOptionsChange: (options: DIYOptions) => {

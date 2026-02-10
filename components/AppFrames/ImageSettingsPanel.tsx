@@ -1,8 +1,10 @@
 'use client';
 
 import { useCallback, useRef, useState } from 'react';
-import { Box, Text, NumberInput, Group, ActionIcon, Tooltip } from '@mantine/core';
-import { IconMinus, IconPlus, IconRefresh } from '@tabler/icons-react';
+import { Box, Text, Button, SimpleGrid } from '@mantine/core';
+import { IconRefresh } from '@tabler/icons-react';
+import { PanControl } from './PanControl';
+import { ScaleControl } from './ScaleControl';
 
 export interface ImageSettingsPanelProps {
   /** Current scale value (0-100) */
@@ -84,195 +86,127 @@ export function ImageSettingsPanel({
 
   const knobPos = getKnobPosition(imageRotation);
 
-  const handleScaleStep = (delta: number) => {
-    const newScale = Math.max(0, Math.min(100, Math.round(screenScale) + delta));
-    onScaleChange(newScale);
-  };
-
   return (
     <Box>
-      <Group justify="space-between" align="flex-start" gap="md">
-        {/* Rotation Dial */}
-        <Box>
-          <Text size="xs" c="dimmed" mb={4} tt="uppercase" ta="center">
-            Rotation
-          </Text>
-          <Box
-            ref={dialRef}
-            onPointerDown={handlePointerDown}
-            onPointerMove={handlePointerMove}
-            onPointerUp={handlePointerUp}
-            onPointerCancel={handlePointerUp}
-            style={{
-              width: DIAL_SIZE,
-              height: DIAL_SIZE,
-              borderRadius: '50%',
-              border: '2px solid #e9ecef',
-              backgroundColor: '#f8f9fa',
-              position: 'relative',
-              cursor: 'grab',
-              touchAction: 'none',
-            }}
-          >
-            {/* Center dot */}
-            <Box
-              style={{
-                position: 'absolute',
-                top: '50%',
-                left: '50%',
-                transform: 'translate(-50%, -50%)',
-                width: 4,
-                height: 4,
-                borderRadius: '50%',
-                backgroundColor: '#adb5bd',
-              }}
-            />
-            {/* Tick marks at 0, 90, 180, 270 */}
-            {[0, 90, 180, 270].map((angle) => {
-              const rad = ((angle - 90) * Math.PI) / 180;
-              const innerR = DIAL_SIZE / 2 - 8;
-              const outerR = DIAL_SIZE / 2 - 4;
-              return (
-                <Box
-                  key={angle}
-                  style={{
-                    position: 'absolute',
-                    left: Math.cos(rad) * innerR + DIAL_SIZE / 2,
-                    top: Math.sin(rad) * innerR + DIAL_SIZE / 2,
-                    width: outerR - innerR,
-                    height: 2,
-                    backgroundColor: '#dee2e6',
-                    transform: `rotate(${angle}deg)`,
-                    transformOrigin: 'left center',
-                  }}
-                />
-              );
-            })}
-            {/* Knob */}
-            <Box
-              style={{
-                position: 'absolute',
-                left: knobPos.x,
-                top: knobPos.y,
-                width: KNOB_SIZE,
-                height: KNOB_SIZE,
-                borderRadius: '50%',
-                backgroundColor: '#228be6',
-                boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
-                cursor: isDragging ? 'grabbing' : 'grab',
-              }}
-            />
-          </Box>
-          <Text size="xs" c="dimmed" ta="center" mt={4}>
-            {Math.round(imageRotation)}°
-          </Text>
-        </Box>
+      {/* Reset Button - Full Width at Top */}
+      <Button
+        variant="light"
+        color="gray"
+        size="sm"
+        onClick={onReset}
+        disabled={!hasChanges}
+        fullWidth
+        leftSection={<IconRefresh size={14} />}
+        style={{ marginBottom: 12 }}
+      >
+        Reset to Default
+      </Button>
 
-        {/* Scale Control */}
-        <Box style={{ flex: 1 }}>
-          <Text size="xs" c="dimmed" mb={4} tt="uppercase" ta="center">
-            Scale
-          </Text>
-          <Group gap={4} justify="center">
-            <ActionIcon
-              variant="light"
-              size="sm"
-              onClick={() => handleScaleStep(-10)}
-              disabled={screenScale <= 0}
-            >
-              <IconMinus size={14} />
-            </ActionIcon>
+      {/* 2x2 Grid Layout */}
+      <SimpleGrid cols={2} spacing="sm">
+        {/* 1. Rotation Dial */}
+        <Box style={{ display: 'flex', justifyContent: 'center' }}>
+          <Box>
+            <Text size="xs" c="dimmed" mb={4} tt="uppercase" ta="center">
+              Rotation
+            </Text>
             <Box
+              ref={dialRef}
+              onPointerDown={handlePointerDown}
+              onPointerMove={handlePointerMove}
+              onPointerUp={handlePointerUp}
+              onPointerCancel={handlePointerUp}
               style={{
-                width: 52,
-                height: 28,
-                borderRadius: 6,
-                border: '1px solid #dee2e6',
+                width: DIAL_SIZE,
+                height: DIAL_SIZE,
+                borderRadius: '50%',
+                border: '2px solid #e9ecef',
                 backgroundColor: '#f8f9fa',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
+                position: 'relative',
+                cursor: 'grab',
+                touchAction: 'none',
+                margin: '0 auto',
               }}
             >
-              <Text size="sm" fw={400}>
-                {Math.round(screenScale)}%
-              </Text>
-            </Box>
-            <ActionIcon
-              variant="light"
-              size="sm"
-              onClick={() => handleScaleStep(10)}
-              disabled={screenScale >= 100}
-            >
-              <IconPlus size={14} />
-            </ActionIcon>
-          </Group>
-          {/* Quick scale buttons */}
-          <Group gap={4} justify="center" mt={8}>
-            {[0, 50, 100].map((s) => (
+              {/* Center dot */}
               <Box
-                key={s}
-                onClick={() => onScaleChange(s)}
                 style={{
-                  padding: '2px 8px',
-                  borderRadius: 4,
-                  backgroundColor: Math.round(screenScale) === s ? '#228be6' : '#e9ecef',
-                  color: Math.round(screenScale) === s ? 'white' : '#495057',
-                  fontSize: 10,
-                  cursor: 'pointer',
-                  fontWeight: Math.round(screenScale) === s ? 600 : 400,
+                  position: 'absolute',
+                  top: '50%',
+                  left: '50%',
+                  transform: 'translate(-50%, -50%)',
+                  width: 4,
+                  height: 4,
+                  borderRadius: '50%',
+                  backgroundColor: '#adb5bd',
                 }}
-              >
-                {s}%
-              </Box>
-            ))}
-          </Group>
+              />
+              {/* Tick marks at 0, 90, 180, 270 */}
+              {[0, 90, 180, 270].map((angle) => {
+                const rad = ((angle - 90) * Math.PI) / 180;
+                const innerR = DIAL_SIZE / 2 - 8;
+                const outerR = DIAL_SIZE / 2 - 4;
+                return (
+                  <Box
+                    key={angle}
+                    style={{
+                      position: 'absolute',
+                      left: Math.cos(rad) * innerR + DIAL_SIZE / 2,
+                      top: Math.sin(rad) * innerR + DIAL_SIZE / 2,
+                      width: outerR - innerR,
+                      height: 2,
+                      backgroundColor: '#dee2e6',
+                      transform: `rotate(${angle}deg)`,
+                      transformOrigin: 'left center',
+                    }}
+                  />
+                );
+              })}
+              {/* Knob */}
+              <Box
+                style={{
+                  position: 'absolute',
+                  left: knobPos.x,
+                  top: knobPos.y,
+                  width: KNOB_SIZE,
+                  height: KNOB_SIZE,
+                  borderRadius: '50%',
+                  backgroundColor: '#228be6',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
+                  cursor: isDragging ? 'grabbing' : 'grab',
+                }}
+              />
+            </Box>
+            <Text size="xs" c="dimmed" ta="center" mt={4}>
+              {Math.round(imageRotation)}°
+            </Text>
+          </Box>
         </Box>
 
-        {/* Reset Button */}
-        <Tooltip label="Reset" position="top">
-          <ActionIcon
-            variant="light"
-            color="gray"
-            size="sm"
-            onClick={onReset}
-            disabled={!hasChanges}
-            style={{ alignSelf: 'center', marginTop: 16 }}
-          >
-            <IconRefresh size={14} />
-          </ActionIcon>
-        </Tooltip>
-      </Group>
+        {/* 2. Zoom Control */}
+        <Box style={{ display: 'flex', justifyContent: 'center' }}>
+          <ScaleControl
+            scale={screenScale}
+            min={0}
+            max={100}
+            defaultValue={0}
+            label="Zoom"
+            onScaleChange={onScaleChange}
+          />
+        </Box>
 
-      {/* Pan Controls */}
-      <Group grow mt="md">
-        <Box>
-          <Text size="xs" c="dimmed" mb={4}>
-            Pan X
-          </Text>
-          <NumberInput
-            size="xs"
-            value={Math.round(screenPanX)}
-            onChange={(value) => onPanXChange(Math.round(Number(value)))}
-            min={0}
-            max={100}
-            step={1}
+        {/* 3. Pan Control - spans to center if odd */}
+        <Box style={{ display: 'flex', justifyContent: 'center', gridColumn: 'span 2' }}>
+          <PanControl
+            panX={screenPanX}
+            panY={screenPanY}
+            onPanChange={(newPanX, newPanY) => {
+              onPanXChange(newPanX);
+              onPanYChange(newPanY);
+            }}
           />
         </Box>
-        <Box>
-          <Text size="xs" c="dimmed" mb={4}>
-            Pan Y
-          </Text>
-          <NumberInput
-            size="xs"
-            value={Math.round(screenPanY)}
-            onChange={(value) => onPanYChange(Math.round(Number(value)))}
-            min={0}
-            max={100}
-            step={1}
-          />
-        </Box>
-      </Group>
+      </SimpleGrid>
     </Box>
   );
 }

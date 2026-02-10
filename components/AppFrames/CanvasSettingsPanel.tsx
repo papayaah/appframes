@@ -29,7 +29,7 @@ export function CanvasSettingsPanel({ settings, setSettings, hasBackgroundMedia,
   const [customColor, setCustomColor] = useState('#ffffff');
 
   return (
-    <Stack gap="lg">
+    <Stack gap="md">
       <Box>
         <Text size="sm" fw={700} mb="xs">
           Canvas Orientation
@@ -56,7 +56,7 @@ export function CanvasSettingsPanel({ settings, setSettings, hasBackgroundMedia,
         <Text size="sm" fw={700} mb="xs">
           Background Color
         </Text>
-        <SimpleGrid cols={4} spacing="xs">
+        <SimpleGrid cols={6} spacing={4}>
           {BACKGROUND_PRESETS.map((color) => (
             <Box
               key={color}

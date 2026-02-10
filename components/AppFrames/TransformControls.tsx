@@ -1,18 +1,23 @@
 'use client';
 
 import { useCallback, useRef, useState } from 'react';
-import { Box, Text, ActionIcon, Group, Tooltip, Divider } from '@mantine/core';
-import { IconMinus, IconPlus, IconRefresh } from '@tabler/icons-react';
+import { Box, Text, Button, SimpleGrid } from '@mantine/core';
+import { IconRefresh } from '@tabler/icons-react';
 import { TiltControl } from './TiltControl';
+import { ScaleControl } from './ScaleControl';
+import { FramePositionControl } from './FramePositionControl';
 
 interface TransformControlsProps {
   rotation: number;
   scale: number;
   tiltX?: number;
   tiltY?: number;
+  frameX?: number;
+  frameY?: number;
   onRotationChange: (rotation: number) => void;
   onScaleChange: (scale: number) => void;
   onTiltChange?: (tiltX: number, tiltY: number) => void;
+  onFramePositionChange?: (frameX: number, frameY: number) => void;
   onReset?: () => void;
 }
 
@@ -24,15 +29,18 @@ export function TransformControls({
   scale,
   tiltX = 0,
   tiltY = 0,
+  frameX = 0,
+  frameY = 0,
   onRotationChange,
   onScaleChange,
   onTiltChange,
+  onFramePositionChange,
   onReset,
 }: TransformControlsProps) {
   const dialRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
 
-  const hasChanges = rotation !== 0 || scale !== 100 || tiltX !== 0 || tiltY !== 0;
+  const hasChanges = rotation !== 0 || scale !== 100 || tiltX !== 0 || tiltY !== 0 || frameX !== 0 || frameY !== 0;
 
   // Convert angle to position on dial circumference
   const getKnobPosition = (angle: number) => {
@@ -79,180 +87,138 @@ export function TransformControls({
 
   const knobPos = getKnobPosition(rotation);
 
-  const handleScaleStep = (delta: number) => {
-    const newScale = Math.max(20, Math.min(200, Math.round(scale) + delta));
-    onScaleChange(newScale);
-  };
-
   return (
     <Box>
-      <Group justify="space-between" align="flex-start" gap="md">
-        {/* Rotation Dial */}
-        <Box>
-          <Text size="xs" c="dimmed" mb={4} tt="uppercase" ta="center">
-            Rotation
-          </Text>
-          <Box
-            ref={dialRef}
-            onPointerDown={handlePointerDown}
-            onPointerMove={handlePointerMove}
-            onPointerUp={handlePointerUp}
-            onPointerCancel={handlePointerUp}
-            style={{
-              width: DIAL_SIZE,
-              height: DIAL_SIZE,
-              borderRadius: '50%',
-              border: '2px solid #e9ecef',
-              backgroundColor: '#f8f9fa',
-              position: 'relative',
-              cursor: 'grab',
-              touchAction: 'none',
-            }}
-          >
-            {/* Center dot */}
+      {/* Reset Button - Full Width at Top */}
+      {onReset && (
+        <Button
+          variant="light"
+          color="gray"
+          size="sm"
+          onClick={onReset}
+          disabled={!hasChanges}
+          fullWidth
+          leftSection={<IconRefresh size={14} />}
+          style={{ marginBottom: 12 }}
+        >
+          Reset to Default
+        </Button>
+      )}
+
+      {/* 2x2 Grid Layout */}
+      <SimpleGrid cols={2} spacing="sm">
+        {/* 1. Rotation Dial */}
+        <Box style={{ display: 'flex', justifyContent: 'center' }}>
+          <Box>
+            <Text size="xs" c="dimmed" mb={4} tt="uppercase" ta="center">
+              Rotation
+            </Text>
             <Box
+              ref={dialRef}
+              onPointerDown={handlePointerDown}
+              onPointerMove={handlePointerMove}
+              onPointerUp={handlePointerUp}
+              onPointerCancel={handlePointerUp}
               style={{
-                position: 'absolute',
-                top: '50%',
-                left: '50%',
-                transform: 'translate(-50%, -50%)',
-                width: 4,
-                height: 4,
+                width: DIAL_SIZE,
+                height: DIAL_SIZE,
                 borderRadius: '50%',
-                backgroundColor: '#adb5bd',
+                border: '2px solid #e9ecef',
+                backgroundColor: '#f8f9fa',
+                position: 'relative',
+                cursor: 'grab',
+                touchAction: 'none',
+                margin: '0 auto',
               }}
-            />
-            {/* Tick marks */}
-            {[0, 90, 180, 270].map((angle) => {
-              const rad = ((angle - 90) * Math.PI) / 180;
-              const innerR = DIAL_SIZE / 2 - 8;
-              const outerR = DIAL_SIZE / 2 - 4;
-              return (
-                <Box
-                  key={angle}
-                  style={{
-                    position: 'absolute',
-                    left: Math.cos(rad) * innerR + DIAL_SIZE / 2,
-                    top: Math.sin(rad) * innerR + DIAL_SIZE / 2,
-                    width: outerR - innerR,
-                    height: 2,
-                    backgroundColor: '#dee2e6',
-                    transform: `rotate(${angle}deg)`,
-                    transformOrigin: 'left center',
-                  }}
-                />
-              );
-            })}
-            {/* Knob */}
-            <Box
-              style={{
-                position: 'absolute',
-                left: knobPos.x,
-                top: knobPos.y,
-                width: KNOB_SIZE,
-                height: KNOB_SIZE,
-                borderRadius: '50%',
-                backgroundColor: '#228be6',
-                boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
-                cursor: isDragging ? 'grabbing' : 'grab',
-              }}
+            >
+              {/* Center dot */}
+              <Box
+                style={{
+                  position: 'absolute',
+                  top: '50%',
+                  left: '50%',
+                  transform: 'translate(-50%, -50%)',
+                  width: 4,
+                  height: 4,
+                  borderRadius: '50%',
+                  backgroundColor: '#adb5bd',
+                }}
+              />
+              {/* Tick marks */}
+              {[0, 90, 180, 270].map((angle) => {
+                const rad = ((angle - 90) * Math.PI) / 180;
+                const innerR = DIAL_SIZE / 2 - 8;
+                const outerR = DIAL_SIZE / 2 - 4;
+                return (
+                  <Box
+                    key={angle}
+                    style={{
+                      position: 'absolute',
+                      left: Math.cos(rad) * innerR + DIAL_SIZE / 2,
+                      top: Math.sin(rad) * innerR + DIAL_SIZE / 2,
+                      width: outerR - innerR,
+                      height: 2,
+                      backgroundColor: '#dee2e6',
+                      transform: `rotate(${angle}deg)`,
+                      transformOrigin: 'left center',
+                    }}
+                  />
+                );
+              })}
+              {/* Knob */}
+              <Box
+                style={{
+                  position: 'absolute',
+                  left: knobPos.x,
+                  top: knobPos.y,
+                  width: KNOB_SIZE,
+                  height: KNOB_SIZE,
+                  borderRadius: '50%',
+                  backgroundColor: '#228be6',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
+                  cursor: isDragging ? 'grabbing' : 'grab',
+                }}
+              />
+            </Box>
+            <Text size="xs" c="dimmed" ta="center" mt={4}>
+              {Math.round(rotation)}°
+            </Text>
+          </Box>
+        </Box>
+
+        {/* 2. Scale Control */}
+        <Box style={{ display: 'flex', justifyContent: 'center' }}>
+          <ScaleControl
+            scale={scale}
+            min={20}
+            max={200}
+            defaultValue={100}
+            onScaleChange={onScaleChange}
+          />
+        </Box>
+
+        {/* 3. 3D Tilt Control */}
+        {onTiltChange && (
+          <Box style={{ display: 'flex', justifyContent: 'center' }}>
+            <TiltControl
+              tiltX={tiltX}
+              tiltY={tiltY}
+              onTiltChange={onTiltChange}
             />
           </Box>
-          <Text size="xs" c="dimmed" ta="center" mt={4}>
-            {Math.round(rotation)}°
-          </Text>
-        </Box>
-
-        {/* Scale Control */}
-        <Box style={{ flex: 1 }}>
-          <Text size="xs" c="dimmed" mb={4} tt="uppercase" ta="center">
-            Scale
-          </Text>
-          <Group gap={4} justify="center">
-            <ActionIcon
-              variant="light"
-              size="sm"
-              onClick={() => handleScaleStep(-10)}
-              disabled={scale <= 20}
-            >
-              <IconMinus size={14} />
-            </ActionIcon>
-            <Box
-              style={{
-                width: 52,
-                height: 28,
-                borderRadius: 6,
-                border: '1px solid #dee2e6',
-                backgroundColor: '#f8f9fa',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              <Text size="sm" fw={400}>
-                {Math.round(scale)}%
-              </Text>
-            </Box>
-            <ActionIcon
-              variant="light"
-              size="sm"
-              onClick={() => handleScaleStep(10)}
-              disabled={scale >= 200}
-            >
-              <IconPlus size={14} />
-            </ActionIcon>
-          </Group>
-          {/* Quick scale buttons */}
-          <Group gap={4} justify="center" mt={8}>
-            {[50, 100, 150].map((s) => (
-              <Box
-                key={s}
-                onClick={() => onScaleChange(s)}
-                style={{
-                  padding: '2px 8px',
-                  borderRadius: 4,
-                  backgroundColor: scale === s ? '#228be6' : '#e9ecef',
-                  color: scale === s ? 'white' : '#495057',
-                  fontSize: 10,
-                  cursor: 'pointer',
-                  fontWeight: scale === s ? 600 : 400,
-                }}
-              >
-                {s}%
-              </Box>
-            ))}
-          </Group>
-        </Box>
-
-        {/* Reset Button */}
-        {onReset && (
-          <Tooltip label="Reset" position="top">
-            <ActionIcon
-              variant="light"
-              color="gray"
-              size="sm"
-              onClick={onReset}
-              disabled={!hasChanges}
-              style={{ alignSelf: 'center', marginTop: 16 }}
-            >
-              <IconRefresh size={14} />
-            </ActionIcon>
-          </Tooltip>
         )}
-      </Group>
 
-      {/* 3D Tilt Control */}
-      {onTiltChange && (
-        <>
-          <Divider my="md" />
-          <TiltControl
-            tiltX={tiltX}
-            tiltY={tiltY}
-            onTiltChange={onTiltChange}
-            onReset={tiltX !== 0 || tiltY !== 0 ? () => onTiltChange(0, 0) : undefined}
-          />
-        </>
-      )}
+        {/* 4. Frame Position Control */}
+        {onFramePositionChange && (
+          <Box style={{ display: 'flex', justifyContent: 'center' }}>
+            <FramePositionControl
+              frameX={frameX}
+              frameY={frameY}
+              onPositionChange={onFramePositionChange}
+            />
+          </Box>
+        )}
+      </SimpleGrid>
     </Box>
   );
 }

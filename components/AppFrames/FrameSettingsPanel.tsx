@@ -51,6 +51,12 @@ export interface FrameSettingsPanelProps {
   frameTiltY?: number;
   /** Callback when frame tilt changes */
   onFrameTiltChange?: (tiltX: number, tiltY: number) => void;
+  /** Current frame X position in pixels */
+  frameX?: number;
+  /** Current frame Y position in pixels */
+  frameY?: number;
+  /** Callback when frame position changes */
+  onFramePositionChange?: (frameX: number, frameY: number) => void;
   /** Callback to reset frame transforms to defaults */
   onResetTransforms?: () => void;
   /** Current DIY options */
@@ -70,6 +76,9 @@ export function FrameSettingsPanel({
   frameTiltX = 0,
   frameTiltY = 0,
   onFrameTiltChange,
+  frameX = 0,
+  frameY = 0,
+  onFramePositionChange,
   onResetTransforms,
   diyOptions,
   onDIYOptionsChange,
@@ -82,7 +91,7 @@ export function FrameSettingsPanel({
       <Text size="xs" c="dimmed" mb="xs" tt="uppercase">
         Frame Color
       </Text>
-      <SimpleGrid cols={4} spacing="xs">
+      <SimpleGrid cols={6} spacing={4}>
         {FRAME_COLOR_PRESETS.map((color, index) => {
           const isDefault = color === undefined;
           const displayColor = isDefault ? defaultFrameColor : color;
@@ -178,7 +187,7 @@ export function FrameSettingsPanel({
         Reset to Default
       </Button>
 
-      {/* Frame Transform Controls */}
+      {/* Frame Transform Controls (2x2 grid: Rotation, Scale, Tilt, Position) */}
       {onFrameRotationChange && onFrameScaleChange && (
         <Box mt="md">
           <TransformControls
@@ -186,9 +195,12 @@ export function FrameSettingsPanel({
             scale={frameScale}
             tiltX={frameTiltX}
             tiltY={frameTiltY}
+            frameX={frameX}
+            frameY={frameY}
             onRotationChange={onFrameRotationChange}
             onScaleChange={onFrameScaleChange}
             onTiltChange={onFrameTiltChange}
+            onFramePositionChange={onFramePositionChange}
             onReset={onResetTransforms}
           />
         </Box>

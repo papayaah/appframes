@@ -4,38 +4,39 @@ import { useCallback, useRef, useState } from 'react';
 import { Box, Text, Group, Tooltip, ActionIcon } from '@mantine/core';
 import { IconRefresh } from '@tabler/icons-react';
 
-interface TiltControlProps {
-  tiltX: number;
-  tiltY: number;
-  onTiltChange: (tiltX: number, tiltY: number) => void;
+interface PanControlProps {
+  panX: number; // 0-100, 50 = centered
+  panY: number; // 0-100, 50 = centered
+  onPanChange: (panX: number, panY: number) => void;
   onReset?: () => void;
 }
 
 const PAD_SIZE = 100;
 const INDICATOR_SIZE = 14;
-const MAX_TILT = 60;
+const FRAME_WIDTH = 40;
+const FRAME_HEIGHT = 60;
 
-export function TiltControl({
-  tiltX,
-  tiltY,
-  onTiltChange,
+export function PanControl({
+  panX,
+  panY,
+  onPanChange,
   onReset,
-}: TiltControlProps) {
+}: PanControlProps) {
   const padRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
 
-  const hasChanges = tiltX !== 0 || tiltY !== 0;
+  const hasChanges = Math.round(panX) !== 50 || Math.round(panY) !== 50;
 
-  // Convert tilt values (-60 to 60) to position on pad (0 to PAD_SIZE)
+  // Convert pan values (0-100) to indicator position on pad
   const getIndicatorPosition = () => {
-    const x = ((tiltY + MAX_TILT) / (MAX_TILT * 2)) * PAD_SIZE;
-    const y = ((-tiltX + MAX_TILT) / (MAX_TILT * 2)) * PAD_SIZE;
+    const x = (panX / 100) * PAD_SIZE;
+    const y = (panY / 100) * PAD_SIZE;
     return { x, y };
   };
 
-  // Convert mouse position to tilt values
-  const getTiltFromPosition = (clientX: number, clientY: number) => {
-    if (!padRef.current) return { tiltX, tiltY };
+  // Convert mouse position to pan values
+  const getPanFromPosition = (clientX: number, clientY: number) => {
+    if (!padRef.current) return { panX, panY };
     const rect = padRef.current.getBoundingClientRect();
     const relX = clientX - rect.left;
     const relY = clientY - rect.top;
@@ -44,28 +45,26 @@ export function TiltControl({
     const clampedX = Math.max(0, Math.min(PAD_SIZE, relX));
     const clampedY = Math.max(0, Math.min(PAD_SIZE, relY));
 
-    // Convert to tilt values
-    // X position -> tiltY (left = negative, right = positive)
-    // Y position -> tiltX (top = positive, bottom = negative)
-    const newTiltY = Math.round((clampedX / PAD_SIZE) * MAX_TILT * 2 - MAX_TILT);
-    const newTiltX = Math.round(MAX_TILT - (clampedY / PAD_SIZE) * MAX_TILT * 2);
+    // Convert to pan values (0-100)
+    const newPanX = Math.round((clampedX / PAD_SIZE) * 100);
+    const newPanY = Math.round((clampedY / PAD_SIZE) * 100);
 
-    return { tiltX: newTiltX, tiltY: newTiltY };
+    return { panX: newPanX, panY: newPanY };
   };
 
   const handlePointerDown = useCallback((e: React.PointerEvent) => {
     e.preventDefault();
     setIsDragging(true);
     (e.target as HTMLElement).setPointerCapture(e.pointerId);
-    const { tiltX: newTiltX, tiltY: newTiltY } = getTiltFromPosition(e.clientX, e.clientY);
-    onTiltChange(newTiltX, newTiltY);
-  }, [onTiltChange]);
+    const { panX: newPanX, panY: newPanY } = getPanFromPosition(e.clientX, e.clientY);
+    onPanChange(newPanX, newPanY);
+  }, [onPanChange]);
 
   const handlePointerMove = useCallback((e: React.PointerEvent) => {
     if (!isDragging) return;
-    const { tiltX: newTiltX, tiltY: newTiltY } = getTiltFromPosition(e.clientX, e.clientY);
-    onTiltChange(newTiltX, newTiltY);
-  }, [isDragging, onTiltChange]);
+    const { panX: newPanX, panY: newPanY } = getPanFromPosition(e.clientX, e.clientY);
+    onPanChange(newPanX, newPanY);
+  }, [isDragging, onPanChange]);
 
   const handlePointerUp = useCallback((e: React.PointerEvent) => {
     setIsDragging(false);
@@ -74,10 +73,17 @@ export function TiltControl({
 
   const indicatorPos = getIndicatorPosition();
 
+  // Calculate the visual offset for the "image" representation
+  // When panX=0, image is shifted right (showing left edge)
+  // When panX=100, image is shifted left (showing right edge)
+  // When panX=50, image is centered
+  const imageOffsetX = (50 - panX) * 0.4; // Scale down for visual
+  const imageOffsetY = (50 - panY) * 0.4;
+
   return (
     <Box>
       <Text size="xs" c="dimmed" mb={4} tt="uppercase" ta="center">
-        3D Tilt
+        Pan
       </Text>
       <Group justify={onReset ? "space-between" : "center"} align="flex-start">
         <Box>
@@ -101,20 +107,36 @@ export function TiltControl({
               overflow: 'hidden',
             }}
           >
-            {/* 3D tilted plane visualization */}
+            {/* Device frame outline (static) */}
             <Box
               style={{
                 position: 'absolute',
                 top: '50%',
                 left: '50%',
-                width: 60,
-                height: 40,
-                transform: `translate(-50%, -50%) perspective(200px) rotateX(${tiltX}deg) rotateY(${tiltY}deg)`,
-                backgroundColor: '#228be6',
+                transform: 'translate(-50%, -50%)',
+                width: FRAME_WIDTH,
+                height: FRAME_HEIGHT,
+                border: '2px solid #adb5bd',
                 borderRadius: 4,
-                opacity: 0.3,
-                boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                backgroundColor: 'transparent',
+                pointerEvents: 'none',
+              }}
+            />
+
+            {/* Image representation (moves based on pan) */}
+            <Box
+              style={{
+                position: 'absolute',
+                top: '50%',
+                left: '50%',
+                transform: `translate(calc(-50% + ${imageOffsetX}px), calc(-50% + ${imageOffsetY}px))`,
+                width: FRAME_WIDTH + 20,
+                height: FRAME_HEIGHT + 20,
+                backgroundColor: '#228be6',
+                borderRadius: 2,
+                opacity: 0.25,
                 transition: isDragging ? 'none' : 'transform 0.1s ease-out',
+                pointerEvents: 'none',
               }}
             />
 
@@ -127,6 +149,7 @@ export function TiltControl({
                 right: 0,
                 height: 1,
                 backgroundColor: '#dee2e6',
+                pointerEvents: 'none',
               }}
             />
             <Box
@@ -137,29 +160,9 @@ export function TiltControl({
                 bottom: 0,
                 width: 1,
                 backgroundColor: '#dee2e6',
+                pointerEvents: 'none',
               }}
             />
-
-            {/* Corner tick marks for orientation */}
-            {[
-              { x: 0, y: 0, label: 'Back-Left' },
-              { x: PAD_SIZE, y: 0, label: 'Back-Right' },
-              { x: 0, y: PAD_SIZE, label: 'Front-Left' },
-              { x: PAD_SIZE, y: PAD_SIZE, label: 'Front-Right' },
-            ].map(({ x, y }, i) => (
-              <Box
-                key={i}
-                style={{
-                  position: 'absolute',
-                  left: x - 3,
-                  top: y - 3,
-                  width: 6,
-                  height: 6,
-                  borderRadius: '50%',
-                  backgroundColor: '#dee2e6',
-                }}
-              />
-            ))}
 
             {/* Position indicator (draggable dot) */}
             <Box
@@ -181,17 +184,17 @@ export function TiltControl({
           {/* Value display */}
           <Group gap={8} justify="center" mt={4}>
             <Text size="xs" c="dimmed">
-              X: {Math.round(tiltX)}°
+              X: {Math.round(panX)}
             </Text>
             <Text size="xs" c="dimmed">
-              Y: {Math.round(tiltY)}°
+              Y: {Math.round(panY)}
             </Text>
           </Group>
         </Box>
 
         {/* Reset Button */}
         {onReset && (
-          <Tooltip label="Reset tilt" position="top">
+          <Tooltip label="Center image" position="top">
             <ActionIcon
               variant="light"
               color="gray"

@@ -263,6 +263,7 @@ interface FramesContextType {
   setFrameDIYOptions: (screenIndex: number, frameIndex: number, options: DIYOptions, templateId?: string) => void;
   setFramePan: (screenIndex: number, frameIndex: number, panX: number, panY: number) => void;
   addFramePositionDelta: (screenIndex: number, frameIndex: number, dx: number, dy: number) => void;
+  setFramePosition: (screenIndex: number, frameIndex: number, frameX: number, frameY: number) => void;
   setFrameScale: (screenIndex: number, frameIndex: number, frameScale: number) => void;
   setFrameRotate: (screenIndex: number, frameIndex: number, rotateZ: number) => void;
   setFrameTilt: (screenIndex: number, frameIndex: number, tiltX: number, tiltY: number) => void;
@@ -886,6 +887,16 @@ export function FramesProvider({ children }: { children: ReactNode }) {
     });
   }, [commitCurrentScreens]);
 
+  const setFramePosition = useCallback((screenIndex: number, frameIndex: number, frameX: number, frameY: number) => {
+    commitCurrentScreens('Move frame', (list) => {
+      const screen = list[screenIndex];
+      if (!screen) return;
+      if (!screen.images) screen.images = [];
+      while (screen.images.length <= frameIndex) screen.images.push({});
+      screen.images[frameIndex] = { ...(screen.images[frameIndex] || {}), frameX, frameY };
+    });
+  }, [commitCurrentScreens]);
+
   const setFrameScale = useCallback((screenIndex: number, frameIndex: number, frameScale: number) => {
     commitCurrentScreens('Scale frame', (list) => {
       const screen = list[screenIndex];
@@ -1472,6 +1483,7 @@ export function FramesProvider({ children }: { children: ReactNode }) {
         setFrameDIYOptions,
         setFramePan,
         addFramePositionDelta,
+        setFramePosition,
         setFrameScale,
         setFrameRotate,
         setFrameTilt,
