@@ -47,6 +47,7 @@ export function AppFrames() {
     setSettings,
     addScreen,
     removeScreen,
+    duplicateScreen,
     handleScreenSelect,
     replaceScreen,
     currentProjectName,
@@ -115,6 +116,9 @@ export function AppFrames() {
   // We check primarySelectedIndex because that's where text editing happens, not activeFrameScreenIndex
   const primaryScreen = screens[primarySelectedIndex];
   const hasTextSelected = primaryScreen?.settings?.selectedTextId != null;
+  const selectedTextElement = hasTextSelected
+    ? primaryScreen?.textElements?.find(t => t.id === primaryScreen?.settings?.selectedTextId)
+    : undefined;
 
   // Check if frame is selected and valid (for settings sidebar)
   // Hide when text is selected or when frame is not explicitly selected (frameSelectionVisible)
@@ -128,7 +132,7 @@ export function AppFrames() {
 
   // Check if frame has an actual image (for image settings section in sidebar)
   const hasImage = hasValidFrame &&
-    (currentFrameData?.mediaId != null || currentFrameData?.image != null);
+    (!!currentFrameData?.mediaId || !!currentFrameData?.image);
 
   // Default diyOptions for frames from older projects that don't have them saved
   const currentDiyOptions = currentFrameData?.diyOptions ?? getDefaultDIYOptions('phone');
@@ -773,6 +777,7 @@ export function AppFrames() {
             screens={screens}
             addScreen={addScreen}
             removeScreen={removeScreen}
+            duplicateScreen={duplicateScreen}
             selectedIndices={selectedScreenIndices}
             onSelectScreen={handleScreenSelect}
             onReorderScreens={reorderScreens}
@@ -783,10 +788,13 @@ export function AppFrames() {
 
         {/* Settings sidebar — overlays canvas, does not push content */}
         <SettingsSidebar
-          isOpen={!!hasValidFrame || canvasSelected}
+          isOpen={!!hasValidFrame || canvasSelected || hasTextSelected}
           onClose={() => {
             setFrameSelectionVisible(false);
             setCanvasSelected(false);
+            if (hasTextSelected && primaryScreen) {
+              selectTextElement(null);
+            }
           }}
           mode={hasValidFrame ? 'frame' : 'canvas'}
           slotLabel={hasValidFrame ? `Slot ${(selectedFrameIndex ?? 0) + 1}` : undefined}
@@ -870,6 +878,12 @@ export function AppFrames() {
               if (selectedFrameIndex === null || selectedFrameIndex === undefined) return;
               setFrameDIYOptions(activeFrameScreenIndex, selectedFrameIndex, options);
             },
+          }}
+          hasTextSelected={hasTextSelected}
+          selectedTextStyle={selectedTextElement?.style}
+          onTextStyleChange={(updates) => {
+            if (!primaryScreen || !selectedTextElement) return;
+            updateTextElement(primaryScreen.id, selectedTextElement.id, { style: { ...selectedTextElement.style, ...updates } });
           }}
         />
       </AppShell.Main>

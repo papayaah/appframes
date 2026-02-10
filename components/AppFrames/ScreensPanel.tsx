@@ -2,7 +2,7 @@
 
 import { memo, useEffect, useRef, useState } from 'react';
 import { Box, Group, Text, ActionIcon } from '@mantine/core';
-import { IconPlus, IconX, IconCheck } from '@tabler/icons-react';
+import { IconPlus, IconX, IconCheck, IconCopy } from '@tabler/icons-react';
 import { Screen, CanvasSettings } from './AppFrames';
 import { CompositionRenderer } from './CompositionRenderer';
 import { getCanvasSizeLabel } from './FramesContext';
@@ -12,6 +12,7 @@ interface ScreensPanelProps {
   screens: Screen[];
   addScreen: (imageOrMediaId: string | number) => void;
   removeScreen: (id: string) => void;
+  duplicateScreen?: (screenIndex: number) => void;
   selectedIndices: number[];
   onSelectScreen: (index: number, multi: boolean) => void;
   onReorderScreens?: (fromIndex: number, toIndex: number) => void;
@@ -126,6 +127,7 @@ export function ScreensPanel({
   screens,
   addScreen,
   removeScreen,
+  duplicateScreen,
   selectedIndices,
   onSelectScreen,
   onReorderScreens,
@@ -298,6 +300,8 @@ export function ScreensPanel({
                   if (deleteConfirmId !== screen.id) {
                     const deleteBtn = e.currentTarget.querySelector('.delete-btn') as HTMLElement;
                     if (deleteBtn) deleteBtn.style.opacity = '1';
+                    const cloneBtn = e.currentTarget.querySelector('.clone-btn') as HTMLElement;
+                    if (cloneBtn) cloneBtn.style.opacity = '1';
                     const screenNumber = e.currentTarget.querySelector('.screen-number') as HTMLElement;
                     if (screenNumber) screenNumber.style.opacity = '1';
                   }
@@ -306,6 +310,8 @@ export function ScreensPanel({
                   if (deleteConfirmId !== screen.id) {
                     const deleteBtn = e.currentTarget.querySelector('.delete-btn') as HTMLElement;
                     if (deleteBtn) deleteBtn.style.opacity = '0';
+                    const cloneBtn = e.currentTarget.querySelector('.clone-btn') as HTMLElement;
+                    if (cloneBtn) cloneBtn.style.opacity = '0';
                     const screenNumber = e.currentTarget.querySelector('.screen-number') as HTMLElement;
                     if (screenNumber) screenNumber.style.opacity = '0';
                   }
@@ -350,27 +356,51 @@ export function ScreensPanel({
                     </ActionIcon>
                   </Box>
                 ) : (
-                  // Show delete button
-                  <ActionIcon
-                    className="delete-btn"
-                    size="xs"
-                    color="red"
-                    variant="filled"
-                    style={{
-                      position: 'absolute',
-                      top: 4,
-                      right: 4,
-                      opacity: 0,
-                      transition: 'opacity 0.2s',
-                      pointerEvents: 'auto',
-                    }}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setDeleteConfirmId(screen.id);
-                    }}
-                  >
-                    <IconX size={12} />
-                  </ActionIcon>
+                  // Show clone and delete buttons
+                  <>
+                    {duplicateScreen && (
+                      <ActionIcon
+                        className="clone-btn"
+                        size="xs"
+                        color="blue"
+                        variant="filled"
+                        style={{
+                          position: 'absolute',
+                          top: 4,
+                          left: 4,
+                          opacity: 0,
+                          transition: 'opacity 0.2s',
+                          pointerEvents: 'auto',
+                        }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          duplicateScreen(index);
+                        }}
+                      >
+                        <IconCopy size={12} />
+                      </ActionIcon>
+                    )}
+                    <ActionIcon
+                      className="delete-btn"
+                      size="xs"
+                      color="red"
+                      variant="filled"
+                      style={{
+                        position: 'absolute',
+                        top: 4,
+                        right: 4,
+                        opacity: 0,
+                        transition: 'opacity 0.2s',
+                        pointerEvents: 'auto',
+                      }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setDeleteConfirmId(screen.id);
+                      }}
+                    >
+                      <IconX size={12} />
+                    </ActionIcon>
+                  </>
                 )}
                 
                 {/* Floating number on hover */}

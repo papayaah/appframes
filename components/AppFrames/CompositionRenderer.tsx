@@ -386,7 +386,7 @@ export function CompositionRenderer({
   const getFrameProps = (index: number, scaleMultiplier: number = 1, baseRotateZ: number = 0) => {
     const { panX, panY } = getFramePan(index);
     const { frameY } = getFrameOffset(index);
-    const { frameScale, rotateZ } = getFrameTransforms(index);
+    const { frameScale, tiltX, tiltY, rotateZ } = getFrameTransforms(index);
     // Convert pixel offset to a percentage-like value for handle positioning
     // Negative frameY means frame moved up, so handle should go to bottom
     // We use a threshold of -100 pixels to trigger bottom handle
@@ -401,6 +401,8 @@ export function CompositionRenderer({
       viewportScale,
       dragRotateZ: baseRotateZ + rotateZ,
       dragScale: BASE_COMPOSITION_SCALE * (frameScale / 100),
+      dragTiltX: tiltX,
+      dragTiltY: tiltY,
       gestureOwnerKey: `frame:${screen.id}:${index}`,
       screenScale: settings.screenScale,
       panX,

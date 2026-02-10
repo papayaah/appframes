@@ -6,6 +6,8 @@ import { IconSettings } from '@tabler/icons-react';
 import { ImageSettingsPanel, type ImageSettingsPanelProps } from './ImageSettingsPanel';
 import { FrameSettingsPanel, type FrameSettingsPanelProps } from './FrameSettingsPanel';
 import { CanvasSettingsPanel, type CanvasSettingsPanelProps } from './CanvasSettingsPanel';
+import { TextStylePanel } from './TextStylePanel';
+import type { TextStyle } from './types';
 import { MOBILE_NAV_HEIGHT } from './MobileBottomNav';
 
 export type SettingsMode = 'frame' | 'canvas';
@@ -19,6 +21,10 @@ export interface SettingsSidebarProps {
   imageSettings: ImageSettingsPanelProps;
   frameSettings: FrameSettingsPanelProps;
   canvasSettings?: CanvasSettingsPanelProps;
+  // Text settings
+  hasTextSelected?: boolean;
+  selectedTextStyle?: TextStyle;
+  onTextStyleChange?: (updates: Partial<TextStyle>) => void;
 }
 
 function SettingsContent({
@@ -28,7 +34,22 @@ function SettingsContent({
   imageSettings,
   frameSettings,
   canvasSettings,
-}: Pick<SettingsSidebarProps, 'mode' | 'slotLabel' | 'hasImage' | 'imageSettings' | 'frameSettings' | 'canvasSettings'>) {
+  hasTextSelected,
+  selectedTextStyle,
+  onTextStyleChange,
+}: Pick<SettingsSidebarProps, 'mode' | 'slotLabel' | 'hasImage' | 'imageSettings' | 'frameSettings' | 'canvasSettings' | 'hasTextSelected' | 'selectedTextStyle' | 'onTextStyleChange'>) {
+  // Text mode: show text settings
+  if (hasTextSelected && selectedTextStyle && onTextStyleChange) {
+    return (
+      <Stack gap={0}>
+        <Box p="md">
+          <Text size="xs" fw={600} c="dimmed" mb="sm" tt="uppercase">Text Style</Text>
+          <TextStylePanel style={selectedTextStyle} onStyleChange={onTextStyleChange} />
+        </Box>
+      </Stack>
+    );
+  }
+
   if (mode === 'canvas' && canvasSettings) {
     return (
       <Stack gap={0}>
@@ -69,10 +90,13 @@ export function SettingsSidebar({
   imageSettings,
   frameSettings,
   canvasSettings,
+  hasTextSelected,
+  selectedTextStyle,
+  onTextStyleChange,
 }: SettingsSidebarProps) {
   const isMobile = useMediaQuery('(max-width: 48em)');
 
-  const headerLabel = mode === 'canvas' ? 'Canvas' : 'Settings';
+  const headerLabel = hasTextSelected ? 'Text' : mode === 'canvas' ? 'Canvas' : 'Settings';
 
   // Mobile: render as bottom drawer
   if (isMobile) {
@@ -148,6 +172,9 @@ export function SettingsSidebar({
             imageSettings={imageSettings}
             frameSettings={frameSettings}
             canvasSettings={canvasSettings}
+            hasTextSelected={hasTextSelected}
+            selectedTextStyle={selectedTextStyle}
+            onTextStyleChange={onTextStyleChange}
           />
         </Box>
       </Drawer>
@@ -250,6 +277,9 @@ export function SettingsSidebar({
           imageSettings={imageSettings}
           frameSettings={frameSettings}
           canvasSettings={canvasSettings}
+          hasTextSelected={hasTextSelected}
+          selectedTextStyle={selectedTextStyle}
+          onTextStyleChange={onTextStyleChange}
         />
       </Box>
     </Box>

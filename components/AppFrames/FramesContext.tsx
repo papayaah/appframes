@@ -205,6 +205,7 @@ interface FramesContextType {
   updateSelectedScreenSettings: (updates: Partial<Omit<CanvasSettings, 'selectedScreenIndex'>>) => void;
   setSettings: (newSettings: CanvasSettings | ((prev: CanvasSettings) => CanvasSettings)) => void;
   removeScreen: (id: string) => void;
+  duplicateScreen: (screenIndex: number) => void;
   replaceScreen: (index: number, imageOrMediaId: string | number, imageSlotIndex?: number) => void;
   // Media Cache
   mediaCache: Record<number, string>;
@@ -535,6 +536,45 @@ export function FramesProvider({ children }: { children: ReactNode }) {
     setSelectedScreenIndices([screens.length]);
     setSelectedFrameIndex(0);
     setFrameSelectionVisible(false); // New screen: nothing selected
+  };
+
+  const duplicateScreen = (screenIndex: number) => {
+    const sourceScreen = screens[screenIndex];
+    if (!sourceScreen) return;
+
+    screenIdCounter.current += 1;
+    const newScreen: Screen = {
+      id: `screen-${screenIdCounter.current}`,
+      images: sourceScreen.images
+        ? sourceScreen.images.map((img) =>
+            img
+              ? {
+                  ...img,
+                  // Deep copy diyOptions to avoid shared state
+                  diyOptions: img.diyOptions ? { ...img.diyOptions } : undefined,
+                }
+              : {}
+          )
+        : [],
+      name: `${sourceScreen.name} (copy)`,
+      settings: { ...sourceScreen.settings, selectedTextId: undefined },
+      textElements: sourceScreen.textElements
+        ? sourceScreen.textElements.map((el) => ({
+            ...el,
+            id: `text-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+            style: { ...el.style },
+          }))
+        : [],
+    };
+
+    commitCurrentScreens('Duplicate screen', (list) => {
+      // Insert the duplicate right after the source screen
+      list.splice(screenIndex + 1, 0, newScreen);
+    });
+    // Select the newly duplicated screen
+    setSelectedScreenIndices([screenIndex + 1]);
+    setSelectedFrameIndex(0);
+    setFrameSelectionVisible(false);
   };
 
   // Update settings for the currently selected screen(s)
@@ -1434,6 +1474,7 @@ export function FramesProvider({ children }: { children: ReactNode }) {
         updateSelectedScreenSettings,
         setSettings,
         removeScreen,
+        duplicateScreen,
         replaceScreen,
         mediaCache,
         setCachedMedia,

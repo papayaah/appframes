@@ -48,6 +48,8 @@ interface DeviceFrameProps {
   viewportScale?: number;
   dragRotateZ?: number;
   dragScale?: number;
+  dragTiltX?: number; // Frame's X tilt in degrees
+  dragTiltY?: number; // Frame's Y tilt in degrees
   gestureOwnerKey?: string;
   screenScale: number;
   panX: number;
@@ -96,6 +98,8 @@ export function DeviceFrame({
   viewportScale = 1,
   dragRotateZ = 0,
   dragScale = 1,
+  dragTiltX = 0,
+  dragTiltY = 0,
   gestureOwnerKey,
   screenScale,
   panX,
@@ -240,6 +244,9 @@ export function DeviceFrame({
     const handleMove = (moveEvent: MouseEvent) => {
       const rawDx = (moveEvent.clientX - startX) / totalScale;
       const rawDy = (moveEvent.clientY - startY) / totalScale;
+      // Apply rotateZ compensation for visual (to align with rotated frame)
+      // Note: Tilt compensation is NOT applied for frame drag because the frame center
+      // (at rotation origin) doesn't shift with perspective transforms
       const localDx = rawDx * cos - rawDy * sin;
       const localDy = rawDx * sin + rawDy * cos;
       pendingFrameOffsetRef.current = { x: rawDx, y: rawDy };
@@ -295,11 +302,34 @@ export function DeviceFrame({
       const startY = e.clientY;
       const startPanX = panX;
       const startPanY = panY;
-      const rect = screenRef.current.getBoundingClientRect();
+
+      // Use offsetWidth/Height for untransformed dimensions (before rotation/tilt)
+      // This gives us the actual element size, not the transformed bounding box
+      const elementWidth = screenRef.current.offsetWidth;
+      const elementHeight = screenRef.current.offsetHeight;
+
+      // Pre-calculate rotation matrix for rotateZ compensation
+      const radians = (dragRotateZ * Math.PI) / 180;
+      const cos = Math.cos(-radians);
+      const sin = Math.sin(-radians);
+
+      const totalScale = viewportScale * dragScale;
 
       const handleMove = (moveEvent: MouseEvent) => {
-        const deltaX = ((moveEvent.clientX - startX) / rect.width) * 100;
-        const deltaY = ((moveEvent.clientY - startY) / rect.height) * 100;
+        // Get raw screen-space delta
+        const screenDx = moveEvent.clientX - startX;
+        const screenDy = moveEvent.clientY - startY;
+
+        // Apply rotateZ compensation (counter-rotate to get local-space delta)
+        // This aligns the drag direction with the rotated frame's axes
+        const localDx = screenDx * cos - screenDy * sin;
+        const localDy = screenDx * sin + screenDy * cos;
+
+        // Convert to percentage of element dimensions, accounting for all transforms
+        // We divide by totalScale because the element appears scaled on screen
+        const deltaX = (localDx / (elementWidth * totalScale)) * 100;
+        const deltaY = (localDy / (elementHeight * totalScale)) * 100;
+
         const newPanX = Math.round(Math.max(0, Math.min(100, startPanX + deltaX)));
         const newPanY = Math.round(Math.max(0, Math.min(100, startPanY + deltaY)));
         pendingPanRef.current = { x: newPanX, y: newPanY };

@@ -3,7 +3,6 @@
 import { useMemo, useState } from 'react';
 import { ActionIcon, Box, Button, Divider, Group, ScrollArea, Stack, Text, TextInput } from '@mantine/core';
 import { IconArrowBarDown, IconArrowBarUp, IconCopy, IconEye, IconEyeOff, IconPlus, IconTrash } from '@tabler/icons-react';
-import { TextStylePanel } from './TextStylePanel';
 import { useFrames } from './FramesContext';
 
 export function TextTab() {
@@ -30,11 +29,6 @@ export function TextTab() {
     // Render top-most first
     return list.sort((a, b) => (b.zIndex ?? 0) - (a.zIndex ?? 0));
   }, [screen?.textElements]);
-
-  const selected = useMemo(() => {
-    if (!selectedTextId) return null;
-    return (screen?.textElements ?? []).find(t => t.id === selectedTextId) ?? null;
-  }, [screen?.textElements, selectedTextId]);
 
   const startRename = (id: string, current: string) => {
     setRenamingId(id);
@@ -231,18 +225,6 @@ export function TextTab() {
           </Stack>
         )}
 
-        <Divider label="Style" labelPosition="center" />
-
-        {screen && selected ? (
-          <TextStylePanel
-            style={selected.style}
-            onStyleChange={(updates) => updateTextElement(screen.id, selected.id, { style: updates })}
-          />
-        ) : (
-          <Text size="sm" c="dimmed">
-            Select a text layer to edit its style.
-          </Text>
-        )}
       </Stack>
     </ScrollArea>
   );
