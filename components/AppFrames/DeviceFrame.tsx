@@ -14,6 +14,29 @@ import {
   LaptopRenderer,
   DesktopRenderer,
 } from './diy-frames/DeviceRenderers';
+import { FeatureTip, useFeatureTip, type TipItem } from './FeatureTip';
+import { useAppStore } from '../../stores/useAppStore';
+
+const FRAME_TIPS: TipItem[] = [
+  {
+    animationBase: 'doodle-outline-690-computer-mouse-left-click',
+    title: 'Move your frame',
+    description: 'Click and drag anywhere on the frame to reposition it',
+  },
+  {
+    animationBase: 'doodle-outline-690-computer-mouse-left-click',
+    title: 'Rotate your frame',
+    description: 'Use the rotation dial in the settings panel to rotate',
+  },
+];
+
+const IMAGE_TIPS: TipItem[] = [
+  {
+    animationBase: 'doodle-outline-690-computer-mouse-left-click',
+    title: 'Reposition your image',
+    description: 'Hold Space + drag to pan the image inside the frame',
+  },
+];
 
 interface DeviceFrameProps {
   diyOptions?: DIYOptions;
@@ -117,6 +140,21 @@ export function DeviceFrame({
   const isFrameDraggingRef = useRef(false);
   const moveModifierPressedRef = useRef(false);
   const gestureTokenRef = useRef<string | null>(null);
+
+  // Feature tips: frame tips first, then image tips after frame tips are dismissed
+  const frameTipsDismissed = useAppStore((s) => s.dismissedTips.includes('frame-basics'));
+
+  const { visible: frameTipVisible, dismiss: frameTipDismiss } = useFeatureTip({
+    tipKey: 'frame-basics',
+    enabled: effectiveSelected,
+    delay: 800,
+  });
+
+  const { visible: imageTipVisible, dismiss: imageTipDismiss } = useFeatureTip({
+    tipKey: 'image-pan',
+    enabled: !!displayImage && effectiveSelected && frameTipsDismissed,
+    delay: 800,
+  });
 
   // Use default options if not provided
   const options = diyOptions ?? getDefaultDIYOptions('phone');
@@ -409,6 +447,24 @@ export function DeviceFrame({
       onDragLeave={onDragLeave}
     >
       {getRenderer()}
+      {frameTipVisible && (
+        <FeatureTip
+          visible={frameTipVisible}
+          onDismiss={frameTipDismiss}
+          tips={FRAME_TIPS}
+          position="right"
+          anchorRef={frameWrapperRef}
+        />
+      )}
+      {imageTipVisible && (
+        <FeatureTip
+          visible={imageTipVisible}
+          onDismiss={imageTipDismiss}
+          tips={IMAGE_TIPS}
+          position="right"
+          anchorRef={frameWrapperRef}
+        />
+      )}
     </Box>
   );
 }

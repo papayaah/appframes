@@ -305,14 +305,14 @@ const DraggableFrame = ({
       {(isHovered || isSelected) && (
         <Box
           data-export-hide="true"
+          className={isSelected ? 'frame-selection-glow' : undefined}
           style={{
             position: 'absolute',
-            inset: -2,
-            borderRadius: 6,
-            border: isSelected ? '2px solid #667eea' : '1px solid rgba(102, 126, 234, 0.4)',
+            inset: isSelected ? -3 : -2,
+            borderRadius: 8,
+            border: isSelected ? undefined : '1px solid rgba(102, 126, 234, 0.4)',
             pointerEvents: 'none',
-            transition: 'border 0.15s ease, box-shadow 0.15s ease',
-            boxShadow: isSelected ? '0 0 0 3px rgba(102, 126, 234, 0.15)' : 'none',
+            transition: 'border 0.15s ease, box-shadow 0.15s ease, inset 0.15s ease',
             transform: childDragOffset ? `translate3d(${childDragOffset.x}px, ${childDragOffset.y}px, 0)` : undefined,
           }}
         />

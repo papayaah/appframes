@@ -13,6 +13,12 @@ interface AppState {
   welcomeModalDismissed: boolean;
   dismissWelcomeModal: () => void;
   resetWelcomeModal: () => void;
+
+  // Feature tips
+  dismissedTips: string[];
+  dismissTip: (tipKey: string) => void;
+  isTipDismissed: (tipKey: string) => boolean;
+  resetTips: () => void;
 }
 
 export const useAppStore = create<AppState>()(
@@ -38,6 +44,16 @@ export const useAppStore = create<AppState>()(
       welcomeModalDismissed: false,
       dismissWelcomeModal: () => set({ welcomeModalDismissed: true }),
       resetWelcomeModal: () => set({ welcomeModalDismissed: false }),
+
+      // Feature tips
+      dismissedTips: [],
+      dismissTip: (tipKey) => set((state) => ({
+        dismissedTips: state.dismissedTips.includes(tipKey)
+          ? state.dismissedTips
+          : [...state.dismissedTips, tipKey],
+      })),
+      isTipDismissed: (tipKey) => get().dismissedTips.includes(tipKey),
+      resetTips: () => set({ dismissedTips: [] }),
     }),
     {
       name: 'appframes-storage',

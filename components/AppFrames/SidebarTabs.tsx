@@ -1,8 +1,9 @@
 'use client';
 
 import { useCallback, useRef, useState } from 'react';
-import { Box, Text, Stack, Select, Slider, Group, Tooltip } from '@mantine/core';
+import { Box, Text, Stack, Select, Slider, Group, Tooltip, Button, Divider } from '@mantine/core';
 import { IconLayout, IconDeviceMobile, IconPhoto, IconTypography, IconSettings, IconStack } from '@tabler/icons-react';
+import { useAppStore } from '../../stores/useAppStore';
 import { Sidebar } from './Sidebar';
 import { DeviceTab } from './DeviceTab';
 import { TextTab } from './TextTab';
@@ -35,6 +36,25 @@ const tabs: { id: TabId; icon: typeof IconLayout; label: string }[] = [
 ];
 
 const TRANSITION = 'width 0.2s ease, min-width 0.2s ease, max-width 0.2s ease';
+
+function ResetTipsButton() {
+  const dismissedTips = useAppStore((s) => s.dismissedTips);
+  const resetTips = useAppStore((s) => s.resetTips);
+  if (dismissedTips.length === 0) return null;
+  return (
+    <>
+      <Divider />
+      <Text fw={700}>Tips</Text>
+      <Button
+        variant="light"
+        size="xs"
+        onClick={resetTips}
+      >
+        Reset feature tips ({dismissedTips.length} dismissed)
+      </Button>
+    </>
+  );
+}
 
 export function SidebarTabs({
   settings,
@@ -339,6 +359,7 @@ export function SidebarTabs({
               <Text size="xs" c="dimmed">
                 Tip: App Store screenshot uploads often reject alpha. Use JPG or set a solid Background Color.
               </Text>
+              <ResetTipsButton />
             </Stack>
           </Box>
         );
