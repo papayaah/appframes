@@ -129,7 +129,7 @@ function StaticCanvas({
 
 export function StorePreviewRenderer() {
   const router = useRouter();
-  const { screensByCanvasSize, switchCanvasSize } = useFrames();
+  const { screensByCanvasSize, switchCanvasSize, sharedBackgrounds } = useFrames();
   const [exportOpened, setExportOpened] = useState(false);
   const [quickExporting, setQuickExporting] = useState(false);
 
@@ -168,6 +168,7 @@ export function StorePreviewRenderer() {
         90,
         undefined,
         { cancelled: false },
+        sharedBackgrounds,
       );
       exportService.downloadBlob(zipBlob, `appframes-export-all-${Date.now()}.zip`);
       notifications.show({
@@ -194,7 +195,8 @@ export function StorePreviewRenderer() {
     try {
       if (screens.length === 1) {
         const s = screens[0];
-        const blob = await exportService.exportScreen(s, canvasSize, 'png', 90);
+        const sharedBg = sharedBackgrounds?.[canvasSize];
+        const blob = await exportService.exportScreen(s, canvasSize, 'png', 90, screens, sharedBg);
         exportService.downloadBlob(blob, `${(s.name || 'screen').replace(/\s+/g, ' ').trim()}.png`);
         notifications.show({
           title: 'Export complete',
@@ -209,6 +211,9 @@ export function StorePreviewRenderer() {
         [canvasSize],
         'png',
         90,
+        undefined,
+        undefined,
+        sharedBackgrounds,
       );
       exportService.downloadBlob(zipBlob, `appframes-export-${canvasSize}-${Date.now()}.zip`);
       notifications.show({
@@ -383,6 +388,7 @@ export function StorePreviewRenderer() {
         opened={exportOpened}
         onClose={() => setExportOpened(false)}
         screensByCanvasSize={screensByCanvasSize}
+        sharedBackgrounds={sharedBackgrounds}
       />
     </Box>
   );

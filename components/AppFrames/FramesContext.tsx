@@ -1,7 +1,8 @@
 'use client';
 
 import React, { createContext, useContext, useState, useRef, ReactNode, useCallback, useEffect, useMemo } from 'react';
-import { Screen, ScreenImage, CanvasSettings, DEFAULT_TEXT_STYLE, TextElement, TextStyle, clampFrameTransform } from './types';
+import { Screen, ScreenImage, CanvasSettings, DEFAULT_TEXT_STYLE, TextElement, TextStyle, clampFrameTransform, SharedBackground } from './types';
+import { reorderScreenIds, insertScreenIdInOrder, createDefaultSharedBackground } from './sharedBackgroundUtils';
 import type { DIYOptions } from './diy-frames/types';
 import { getDefaultDIYOptions } from './diy-frames/types';
 import { persistenceDB, Project } from '@/lib/PersistenceDB';
@@ -270,6 +271,11 @@ interface FramesContextType {
   setFrameTilt: (screenIndex: number, frameIndex: number, tiltX: number, tiltY: number) => void;
   setFrameColor: (screenIndex: number, frameIndex: number, frameColor: string | undefined) => void;
   setImageRotation: (screenIndex: number, frameIndex: number, imageRotation: number) => void;
+  // Shared backgrounds
+  sharedBackgrounds: Record<string, SharedBackground>;
+  currentSharedBackground: SharedBackground | undefined;
+  setSharedBackground: (canvasSize: string, sharedBg: SharedBackground | undefined) => void;
+  toggleScreenInSharedBackground: (screenId: string) => void;
 }
 
 const FramesContext = createContext<FramesContextType | undefined>(undefined);
@@ -298,6 +304,7 @@ export function FramesProvider({ children }: { children: ReactNode }) {
   type UndoableDoc = {
     name: string;
     screensByCanvasSize: Record<string, Screen[]>;
+    sharedBackgrounds?: Record<string, SharedBackground>;
   };
 
   const createInitialDoc = useCallback((): UndoableDoc => {
@@ -350,6 +357,8 @@ export function FramesProvider({ children }: { children: ReactNode }) {
   const [downloadJpegQuality, setDownloadJpegQuality] = useState<number>(90);
 
   const screens = useMemo(() => doc.screensByCanvasSize[currentCanvasSize] || [], [doc.screensByCanvasSize, currentCanvasSize]);
+  const sharedBackgrounds = useMemo(() => doc.sharedBackgrounds || {}, [doc.sharedBackgrounds]);
+  const currentSharedBackground = useMemo(() => doc.sharedBackgrounds?.[currentCanvasSize], [doc.sharedBackgrounds, currentCanvasSize]);
   const [zoom, setZoom] = useState<number>(100);
   // Support multi-selection
   const [selectedScreenIndices, setSelectedScreenIndices] = useState<number[]>([0]);
@@ -691,9 +700,22 @@ export function FramesProvider({ children }: { children: ReactNode }) {
     const indexToRemove = screens.findIndex(s => s.id === id);
     if (indexToRemove === -1) return;
 
-    commitCurrentScreens('Delete screen', (list) => {
-      const idx = list.findIndex((s) => s.id === id);
-      if (idx !== -1) list.splice(idx, 1);
+    commitDoc('Delete screen', (draft) => {
+      const size = currentCanvasSizeRef.current;
+      const list = draft.screensByCanvasSize[size];
+      if (list) {
+        const idx = list.findIndex((s) => s.id === id);
+        if (idx !== -1) list.splice(idx, 1);
+      }
+      // Also remove from shared background if present
+      const sharedBg = draft.sharedBackgrounds?.[size];
+      if (sharedBg) {
+        sharedBg.screenIds = sharedBg.screenIds.filter(sid => sid !== id);
+        // If less than 2 screens remain, disable shared background
+        if (sharedBg.screenIds.length < 2) {
+          delete draft.sharedBackgrounds![size];
+        }
+      }
     });
 
     // Adjust selected indices
@@ -1004,6 +1026,62 @@ export function FramesProvider({ children }: { children: ReactNode }) {
     });
   }, [commitCurrentScreens]);
 
+  const setSharedBackground = useCallback((canvasSize: string, sharedBg: SharedBackground | undefined) => {
+    const label = sharedBg ? 'Update shared background' : 'Remove shared background';
+    commitDoc(label, (draft) => {
+      if (!draft.sharedBackgrounds) draft.sharedBackgrounds = {};
+      if (sharedBg) {
+        draft.sharedBackgrounds[canvasSize] = sharedBg;
+      } else {
+        delete draft.sharedBackgrounds[canvasSize];
+      }
+    });
+  }, [commitDoc]);
+
+  const toggleScreenInSharedBackground = useCallback((screenId: string) => {
+    const size = currentCanvasSizeRef.current;
+    const allScreens = doc.screensByCanvasSize[size] || [];
+    const existing = doc.sharedBackgrounds?.[size];
+
+    if (!existing) {
+      // Create new shared background with this screen
+      commitDoc('Enable shared background', (draft) => {
+        if (!draft.sharedBackgrounds) draft.sharedBackgrounds = {};
+        draft.sharedBackgrounds[size] = createDefaultSharedBackground([screenId]);
+      });
+      return;
+    }
+
+    const isInGroup = existing.screenIds.includes(screenId);
+
+    if (isInGroup) {
+      // Remove from group
+      const newIds = existing.screenIds.filter(id => id !== screenId);
+      if (newIds.length < 2) {
+        // Less than 2 screens - disable shared background
+        commitDoc('Disable shared background', (draft) => {
+          if (draft.sharedBackgrounds) {
+            delete draft.sharedBackgrounds[size];
+          }
+        });
+      } else {
+        commitDoc('Remove screen from shared background', (draft) => {
+          if (draft.sharedBackgrounds?.[size]) {
+            draft.sharedBackgrounds[size].screenIds = newIds;
+          }
+        });
+      }
+    } else {
+      // Add to group in correct order
+      const newIds = insertScreenIdInOrder(existing.screenIds, screenId, allScreens);
+      commitDoc('Add screen to shared background', (draft) => {
+        if (draft.sharedBackgrounds?.[size]) {
+          draft.sharedBackgrounds[size].screenIds = newIds;
+        }
+      });
+    }
+  }, [commitDoc, doc.screensByCanvasSize, doc.sharedBackgrounds]);
+
   // Get screens for current canvas size
   const getCurrentScreens = useCallback((): Screen[] => {
     return doc.screensByCanvasSize[currentCanvasSize] || [];
@@ -1041,31 +1119,44 @@ export function FramesProvider({ children }: { children: ReactNode }) {
   }, [commitDoc, doc.screensByCanvasSize]);
 
   const reorderScreens = useCallback((fromIndex: number, toIndex: number) => {
-    setScreens((prev) => {
-      if (fromIndex === toIndex) return prev;
-      if (fromIndex < 0 || toIndex < 0) return prev;
-      if (fromIndex >= prev.length || toIndex >= prev.length) return prev;
+    commitDoc('Reorder screens', (draft) => {
+      const size = currentCanvasSizeRef.current;
+      const prev = draft.screensByCanvasSize[size];
+      if (!prev) return;
+      if (fromIndex === toIndex) return;
+      if (fromIndex < 0 || toIndex < 0) return;
+      if (fromIndex >= prev.length || toIndex >= prev.length) return;
 
+      const [moved] = prev.splice(fromIndex, 1);
+      prev.splice(toIndex, 0, moved);
+
+      // Also reorder screenIds in shared background if present
+      const sharedBg = draft.sharedBackgrounds?.[size];
+      if (sharedBg) {
+        sharedBg.screenIds = reorderScreenIds(sharedBg, prev);
+      }
+    });
+
+    // Preserve selection by screen id(s), not by raw index.
+    setSelectedScreenIndices((prevSel) => {
+      const size = currentCanvasSizeRef.current;
+      const prev = doc.screensByCanvasSize[size] || [];
+      const selectedIds = prevSel.map((i) => prev[i]?.id).filter(Boolean) as string[];
+      if (selectedIds.length === 0) return prevSel;
+
+      // Compute new order
       const next = [...prev];
       const [moved] = next.splice(fromIndex, 1);
       next.splice(toIndex, 0, moved);
 
-      // Preserve selection by screen id(s), not by raw index.
-      setSelectedScreenIndices((prevSel) => {
-        const selectedIds = prevSel.map((i) => prev[i]?.id).filter(Boolean) as string[];
-        if (selectedIds.length === 0) return prevSel;
+      const idToIndex = new Map(next.map((s, i) => [s.id, i]));
+      const remapped = selectedIds
+        .map((id) => idToIndex.get(id))
+        .filter((i): i is number => typeof i === 'number');
 
-        const idToIndex = new Map(next.map((s, i) => [s.id, i]));
-        const remapped = selectedIds
-          .map((id) => idToIndex.get(id))
-          .filter((i): i is number => typeof i === 'number');
-
-        return remapped.length > 0 ? remapped : prevSel;
-      });
-
-      return next;
+      return remapped.length > 0 ? remapped : prevSel;
     });
-  }, []);
+  }, [commitDoc, doc.screensByCanvasSize]);
 
   // Load project data into React state
   const loadProjectIntoState = useCallback((project: Project) => {
@@ -1579,6 +1670,10 @@ export function FramesProvider({ children }: { children: ReactNode }) {
         setFrameTilt,
         setFrameColor,
         setImageRotation,
+        sharedBackgrounds,
+        currentSharedBackground,
+        setSharedBackground,
+        toggleScreenInSharedBackground,
       }}
     >
       {children}

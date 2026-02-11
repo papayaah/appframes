@@ -12,7 +12,7 @@ import { Canvas } from './Canvas';
 import { ScreensPanel } from './ScreensPanel';
 import { HistorySidebar } from './HistorySidebar';
 import { useFrames, getCanvasDimensions, getCanvasSizeLabel, getCompositionFrameCount } from './FramesContext';
-import { Screen, CanvasSettings, ScreenImage, AppFramesActions, clampFrameTransform } from './types';
+import { Screen, CanvasSettings, ScreenImage, AppFramesActions, clampFrameTransform, SharedBackground } from './types';
 import { CrossCanvasDragProvider } from './CrossCanvasDragContext';
 import { InteractionLockProvider } from './InteractionLockContext';
 import { exportService } from '@/lib/ExportService';
@@ -21,7 +21,7 @@ import { SettingsSidebar } from './SettingsSidebar';
 import { getDefaultDIYOptions, type DIYOptions } from './diy-frames/types';
 
 // Re-export types for compatibility
-export type { Screen, CanvasSettings, ScreenImage, AppFramesActions };
+export type { Screen, CanvasSettings, ScreenImage, AppFramesActions, SharedBackground };
 
 const isEditableTarget = (target: EventTarget | null): boolean => {
   if (!target || !(target instanceof HTMLElement)) return false;
@@ -91,6 +91,9 @@ export function AppFrames() {
     screensByCanvasSize,
     currentCanvasSize,
     switchCanvasSize,
+    currentSharedBackground,
+    setSharedBackground,
+    toggleScreenInSharedBackground,
   } = useFrames();
 
   const isMobile = useMediaQuery('(max-width: 48em)');
@@ -595,6 +598,7 @@ export function AppFrames() {
             selectedScreenIndices={selectedScreenIndices}
             selectedFrameIndex={selectedFrameIndex}
             frameSelectionVisible={frameSelectionVisible}
+            sharedBackground={currentSharedBackground}
             onSelectFrame={(screenIndex, frameIndex) => {
               // Track which screen the selected frame belongs to (for floating panels)
               // This doesn't change the canvas order - just tracks where the frame is
@@ -789,6 +793,7 @@ export function AppFrames() {
             onSelectScreen={handleScreenSelect}
             onReorderScreens={reorderScreens}
             onMediaUpload={handleMediaUpload}
+            sharedBackground={currentSharedBackground}
           />
         </Box>
         )}
@@ -815,6 +820,10 @@ export function AppFrames() {
                 setCanvasBackgroundMedia(activeFrameScreenIndex, undefined);
               }
             },
+            screens,
+            sharedBackground: currentSharedBackground,
+            onSharedBackgroundChange: (sharedBg) => setSharedBackground(currentCanvasSize, sharedBg),
+            onToggleScreenInSharedBg: toggleScreenInSharedBackground,
           }}
           imageSettings={{
             screenScale: currentScreen?.settings?.screenScale ?? 0,

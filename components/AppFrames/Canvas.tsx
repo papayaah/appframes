@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { Box } from '@mantine/core';
-import { CanvasSettings, Screen } from './AppFrames';
+import { CanvasSettings, Screen, SharedBackground } from './AppFrames';
 import { CompositionRenderer } from './CompositionRenderer';
 import { useCrossCanvasDrag } from './CrossCanvasDragContext';
 import { OverflowDeviceRenderer } from './OverflowDeviceRenderer';
@@ -10,6 +10,7 @@ import { getCanvasDimensions } from './FramesContext';
 import { useMediaImage } from '../../hooks/useMediaImage';
 import { TextElement as CanvasTextElement } from './TextElement';
 import { getBackgroundStyle } from './Sidebar';
+import { SharedCanvasBackground } from './SharedCanvasBackground';
 
 interface CanvasProps {
   settings: CanvasSettings;
@@ -17,6 +18,7 @@ interface CanvasProps {
   selectedScreenIndices: number[];
   selectedFrameIndex?: number;
   frameSelectionVisible?: boolean;
+  sharedBackground?: SharedBackground;
   onSelectFrame?: (screenIndex: number, frameIndex: number) => void;
   onSelectScreen?: (index: number, multi: boolean) => void;
   onReplaceScreen?: (files: File[], targetFrameIndex?: number, screenIndex?: number) => void;
@@ -60,6 +62,7 @@ export function Canvas({
   selectedScreenIndices,
   selectedFrameIndex,
   frameSelectionVisible = false,
+  sharedBackground,
   onSelectFrame,
   onSelectScreen,
   onReplaceScreen,
@@ -479,7 +482,18 @@ export function Canvas({
                     }}
                   />
                 )}
-                <CanvasBackground mediaId={screenSettings.canvasBackgroundMediaId} />
+                {/* Render shared background if this screen is part of a shared background group */}
+                {sharedBackground?.enabled && sharedBackground.screenIds.includes(screen.id) ? (
+                  <SharedCanvasBackground
+                    screenId={screen.id}
+                    allScreens={screens}
+                    sharedBackground={sharedBackground}
+                    screenWidth={canvasDimensions.width}
+                    screenHeight={canvasDimensions.height}
+                  />
+                ) : (
+                  <CanvasBackground mediaId={screenSettings.canvasBackgroundMediaId} />
+                )}
                 <Box style={{ position: 'relative', zIndex: 1, width: '100%', height: '100%' }}>
                   <CompositionRenderer
                     settings={screenSettings}

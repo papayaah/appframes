@@ -1,8 +1,9 @@
 import React from 'react';
-import type { Screen } from '@/components/AppFrames/types';
+import type { Screen, SharedBackground } from '@/components/AppFrames/types';
 import { getCanvasDimensions } from '@/components/AppFrames/FramesContext';
 import { CompositionRenderer } from '@/components/AppFrames/CompositionRenderer';
 import { TextElement as CanvasTextElement } from '@/components/AppFrames/TextElement';
+import { SharedCanvasBackground } from '@/components/AppFrames/SharedCanvasBackground';
 import { useMediaImage } from '@/hooks/useMediaImage';
 import { MantineProvider } from '@mantine/core';
 import { theme } from '@/theme';
@@ -153,18 +154,25 @@ function ExportSurface({
   width,
   height,
   isPro,
+  allScreens,
+  sharedBackground,
 }: {
   screen: Screen;
   canvasSize: string;
   width: number;
   height: number;
   isPro: boolean;
+  allScreens?: Screen[];
+  sharedBackground?: SharedBackground;
 }) {
   const screenSettings = {
     ...screen.settings,
     selectedScreenIndex: 0,
     canvasSize,
   };
+
+  // Check if this screen is part of a shared background
+  const isInSharedBg = sharedBackground?.enabled && sharedBackground.screenIds.includes(screen.id);
 
   return (
     <div
@@ -176,7 +184,18 @@ function ExportSurface({
         overflow: 'hidden',
       }}
     >
-      <CanvasBackground mediaId={screenSettings.canvasBackgroundMediaId} />
+      {/* Render shared background if this screen is part of a shared background group */}
+      {isInSharedBg && allScreens && sharedBackground ? (
+        <SharedCanvasBackground
+          screenId={screen.id}
+          allScreens={allScreens}
+          sharedBackground={sharedBackground}
+          screenWidth={width}
+          screenHeight={height}
+        />
+      ) : (
+        <CanvasBackground mediaId={screenSettings.canvasBackgroundMediaId} />
+      )}
       <div style={{ position: 'relative', zIndex: 1, width: '100%', height: '100%' }}>
         <CompositionRenderer
           // CompositionRenderer expects the CanvasSettings shape; screenSettings matches it.
@@ -269,8 +288,10 @@ export class ExportService {
     canvasSize: string,
     format: ExportFormat,
     quality: number = 90,
+    allScreens?: Screen[],
+    sharedBackground?: SharedBackground,
   ): Promise<Blob> {
-    return this.renderScreenToImage(screen, canvasSize, format, quality);
+    return this.renderScreenToImage(screen, canvasSize, format, quality, allScreens, sharedBackground);
   }
 
   async exportScreensToZip(
@@ -280,6 +301,7 @@ export class ExportService {
     quality: number = 90,
     onProgress?: (current: number, total: number, screenName: string) => void,
     cancelToken?: CancelToken,
+    sharedBackgrounds?: Record<string, SharedBackground>,
   ): Promise<Blob> {
     const JSZip = (await import('jszip')).default;
     const zip = new JSZip();
@@ -309,7 +331,8 @@ export class ExportService {
         const name = screen?.name || `Screen ${i + 1}`;
 
         try {
-          const blob = await this.exportScreen(screen, canvasSize, format, quality);
+          const sharedBg = sharedBackgrounds?.[canvasSize];
+          const blob = await this.exportScreen(screen, canvasSize, format, quality, screens, sharedBg);
           folder.file(this.generateFilename(screen, i, format), blob);
           successCount += 1;
         } catch (err) {
@@ -341,6 +364,8 @@ export class ExportService {
     canvasSize: string,
     format: ExportFormat,
     quality: number,
+    allScreens?: Screen[],
+    sharedBackground?: SharedBackground,
   ): Promise<Blob> {
     const { createRoot } = await import('react-dom/client');
     // Prefer toBlob when available to avoid data URL edge cases.
@@ -376,6 +401,8 @@ export class ExportService {
               width={width}
               height={height}
               isPro={isPro}
+              allScreens={allScreens}
+              sharedBackground={sharedBackground}
             />
           </InteractionLockProvider>
         </MantineProvider>

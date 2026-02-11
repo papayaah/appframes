@@ -19,7 +19,7 @@ import {
 } from '@mantine/core';
 import { IconAlertCircle, IconDownload, IconX } from '@tabler/icons-react';
 import { notifications } from '@mantine/notifications';
-import type { Screen } from './types';
+import type { Screen, SharedBackground } from './types';
 import { getCanvasDimensions, getCanvasSizeLabel } from './FramesContext';
 import { exportService, type ExportFormat, type CancelToken } from '@/lib/ExportService';
 
@@ -61,10 +61,12 @@ export function ExportModal({
   opened,
   onClose,
   screensByCanvasSize,
+  sharedBackgrounds,
 }: {
   opened: boolean;
   onClose: () => void;
   screensByCanvasSize: Record<string, Screen[]>;
+  sharedBackgrounds?: Record<string, SharedBackground>;
 }) {
   const nonEmptyCanvasSizes = useMemo(() => {
     return Object.entries(screensByCanvasSize)
@@ -163,6 +165,7 @@ export function ExportModal({
           setProgress({ current, total, currentScreenName: screenName });
         },
         cancelTokenRef.current,
+        sharedBackgrounds,
       );
 
       if (cancelTokenRef.current.cancelled) {

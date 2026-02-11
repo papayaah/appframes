@@ -117,6 +117,23 @@ export interface AppFramesActions {
   removeScreen: (id: string) => void;
 }
 
+// Shared Background - spans across multiple screens for panoramic effect
+export interface SharedBackground {
+  enabled: boolean;
+  screenIds: string[];  // Participating screens in visual order
+  type: 'gradient' | 'image';
+  // For gradient type
+  gradient?: {
+    stops: Array<{ color: string; position: number }>;  // position: 0-100
+    direction: 'horizontal' | 'vertical' | 'diagonal-down' | 'diagonal-up';
+  };
+  // For image type
+  mediaId?: number;  // References media library
+  imageFit?: 'fill' | 'fit';  // Default: 'fill'
+  imageVerticalAlign?: 'top' | 'center' | 'bottom';  // Default: 'center'
+  imageHorizontalAlign?: 'left' | 'center' | 'right';  // Default: 'center'
+}
+
 export type FrameTransformProperty = 'tiltX' | 'tiltY' | 'rotateZ' | 'frameScale';
 
 export function clampFrameTransform(value: number, property: FrameTransformProperty): number {

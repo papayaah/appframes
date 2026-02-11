@@ -3,11 +3,12 @@
 import { memo, useEffect, useRef, useState } from 'react';
 import { Box, Group, Text, ActionIcon } from '@mantine/core';
 import { IconPlus, IconX, IconCheck, IconCopy } from '@tabler/icons-react';
-import { Screen, CanvasSettings } from './AppFrames';
+import { Screen, CanvasSettings, SharedBackground } from './AppFrames';
 import { CompositionRenderer } from './CompositionRenderer';
-import { getCanvasSizeLabel } from './FramesContext';
+import { getCanvasSizeLabel, getCanvasDimensions } from './FramesContext';
 import { getBackgroundStyle } from './Sidebar';
 import { useMediaImage } from '../../hooks/useMediaImage';
+import { SharedCanvasBackground } from './SharedCanvasBackground';
 
 function ThumbnailCanvasBackground({ mediaId }: { mediaId?: number }) {
   const { imageUrl } = useMediaImage(mediaId);
@@ -37,6 +38,7 @@ interface ScreensPanelProps {
   onSelectScreen: (index: number, multi: boolean) => void;
   onReorderScreens?: (fromIndex: number, toIndex: number) => void;
   onMediaUpload?: (file: File) => Promise<number | null>;
+  sharedBackground?: SharedBackground;
 }
 
 // Component to render mini composition preview for a specific screen
@@ -45,17 +47,23 @@ interface ScreensPanelProps {
 const ScreenThumbnail = memo(function ScreenThumbnail({
   screen,
   allScreens,
-  screenIndex
+  screenIndex,
+  sharedBackground,
 }: {
   screen: Screen;
   allScreens: Screen[]; // All screens needed for multi-screen compositions
   screenIndex: number; // Index of this screen
+  sharedBackground?: SharedBackground;
 }) {
   // Create full settings object with selectedScreenIndex (not used in thumbnails but required by type)
   const settings: CanvasSettings = {
     ...screen.settings,
     selectedScreenIndex: screenIndex, // Use this screen's index
   };
+
+  // Check if this screen is part of a shared background
+  const isInSharedBg = sharedBackground?.enabled && sharedBackground.screenIds.includes(screen.id);
+  const canvasDims = getCanvasDimensions(screen.settings.canvasSize || 'iphone-6.5', screen.settings.orientation || 'portrait');
 
   return (
     <Box
@@ -72,8 +80,18 @@ const ScreenThumbnail = memo(function ScreenThumbnail({
         pointerEvents: 'none', // Disable pointer events for the content to allow the parent to be clickable
       }}
     >
-      {/* Canvas background image — rendered in the outer container so it fills the thumbnail */}
-      <ThumbnailCanvasBackground mediaId={screen.settings.canvasBackgroundMediaId} />
+      {/* Canvas background — shared or per-screen */}
+      {isInSharedBg && sharedBackground ? (
+        <SharedCanvasBackground
+          screenId={screen.id}
+          allScreens={allScreens}
+          sharedBackground={sharedBackground}
+          screenWidth={canvasDims.width}
+          screenHeight={canvasDims.height}
+        />
+      ) : (
+        <ThumbnailCanvasBackground mediaId={screen.settings.canvasBackgroundMediaId} />
+      )}
       <Box
         style={{
           transform: 'scale(0.12)',
@@ -142,8 +160,11 @@ const ScreenThumbnail = memo(function ScreenThumbnail({
     prevProps.screen.settings.screenPanX !== nextProps.screen.settings.screenPanX ||
     prevProps.screen.settings.screenPanY !== nextProps.screen.settings.screenPanY;
 
+  // Check if shared background changed
+  const sharedBgChanged = prevProps.sharedBackground !== nextProps.sharedBackground;
+
   // Return true if nothing changed (skip re-render), false if something changed (re-render)
-  return !screenChanged && !settingsChanged;
+  return !screenChanged && !settingsChanged && !sharedBgChanged;
 });
 
 export function ScreensPanel({
@@ -155,6 +176,7 @@ export function ScreensPanel({
   onSelectScreen,
   onReorderScreens,
   onMediaUpload,
+  sharedBackground,
 }: ScreensPanelProps) {
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const panelRef = useRef<HTMLDivElement | null>(null);
@@ -340,7 +362,7 @@ export function ScreensPanel({
                   }
                 }}
               >
-                <ScreenThumbnail screen={screen} allScreens={screens} screenIndex={index} />
+                <ScreenThumbnail screen={screen} allScreens={screens} screenIndex={index} sharedBackground={sharedBackground} />
                 
                 {deleteConfirmId === screen.id ? (
                   // Show confirmation buttons
