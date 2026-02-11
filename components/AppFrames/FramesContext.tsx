@@ -369,7 +369,12 @@ export function FramesProvider({ children }: { children: ReactNode }) {
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
 
   // Initialize project sync hook (handles auth state, background sync)
-  const { syncStatus, isSignedIn, syncProject, syncAll } = useProjectSync();
+  // Use a custom event to bridge sync → React since loadProjectIntoState is declared below
+  const { syncStatus, isSignedIn, syncProject, syncAll } = useProjectSync({
+    onProjectsPulled: useCallback((pulledIds: string[]) => {
+      window.dispatchEvent(new CustomEvent('appframes:projects-pulled', { detail: pulledIds }));
+    }, []),
+  });
 
   // Initialize persistence hook with error handling
   const { debouncedSave } = usePersistence({
@@ -648,6 +653,12 @@ export function FramesProvider({ children }: { children: ReactNode }) {
       if (!s) return;
       s.settings = { ...s.settings, composition: nextComposition };
       const imgs = [...(s.images || [])];
+      // Ensure existing cleared (frameless) slots get device options when adding frames
+      for (let i = 0; i < imgs.length; i++) {
+        if (imgs[i]?.cleared && !imgs[i]?.diyOptions) {
+          imgs[i] = { ...imgs[i], cleared: false, diyOptions: getDefaultDIYOptions('phone') };
+        }
+      }
       while (imgs.length < nextCount) imgs.push({ diyOptions: getDefaultDIYOptions('phone'), frameX: 0, frameY: 0 });
       s.images = imgs.slice(0, nextCount);
     });
@@ -1104,16 +1115,25 @@ export function FramesProvider({ children }: { children: ReactNode }) {
         if (project) {
           loadProjectIntoState(project);
         } else {
-          // Project was deleted, create new default project
-          const newProject = await persistenceDB.createProject('My Project');
-          loadProjectIntoState(newProject);
+          // Project was deleted — try to fall back to an existing project
+          // instead of blindly creating another "My Project"
+          const existing = await persistenceDB.getAllProjects();
+          if (existing.length > 0) {
+            const recent = existing.sort((a, b) =>
+              b.lastAccessedAt.getTime() - a.lastAccessedAt.getTime()
+            )[0];
+            loadProjectIntoState(recent);
+          } else {
+            const newProject = await persistenceDB.createProject('My Project');
+            loadProjectIntoState(newProject);
+          }
         }
       } else {
         // No current project, check if any projects exist
         const projects = await persistenceDB.getAllProjects();
         if (projects.length > 0) {
           // Load most recently accessed project
-          const recent = projects.sort((a, b) => 
+          const recent = projects.sort((a, b) =>
             b.lastAccessedAt.getTime() - a.lastAccessedAt.getTime()
           )[0];
           loadProjectIntoState(recent);
@@ -1177,6 +1197,35 @@ export function FramesProvider({ children }: { children: ReactNode }) {
     sidebarPanelOpen,
     sidebarTab,
   ]);
+
+  // Reload UI when sync pulls projects from server
+  useEffect(() => {
+    const handler = async (e: Event) => {
+      const pulledIds = (e as CustomEvent<string[]>).detail;
+      if (!pulledIds?.length) return;
+
+      if (currentProjectId && pulledIds.includes(currentProjectId)) {
+        // Current project was updated on server — reload it into state
+        const updated = await persistenceDB.loadProject(currentProjectId);
+        if (updated) loadProjectIntoState(updated);
+      } else if (currentProjectId) {
+        // Check if current project was deleted by claimLocalProjects
+        const current = await persistenceDB.loadProject(currentProjectId);
+        if (!current) {
+          // Switch to most recent available project
+          const all = await persistenceDB.getAllProjects();
+          if (all.length > 0) {
+            const recent = all.sort((a, b) =>
+              b.lastAccessedAt.getTime() - a.lastAccessedAt.getTime()
+            )[0];
+            loadProjectIntoState(recent);
+          }
+        }
+      }
+    };
+    window.addEventListener('appframes:projects-pulled', handler);
+    return () => window.removeEventListener('appframes:projects-pulled', handler);
+  }, [currentProjectId, loadProjectIntoState]);
 
   // Save project state (debounced)
   // Don't use useCallback - we need fresh values on each call

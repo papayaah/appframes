@@ -7,6 +7,26 @@ import { Screen, CanvasSettings } from './AppFrames';
 import { CompositionRenderer } from './CompositionRenderer';
 import { getCanvasSizeLabel } from './FramesContext';
 import { getBackgroundStyle } from './Sidebar';
+import { useMediaImage } from '../../hooks/useMediaImage';
+
+function ThumbnailCanvasBackground({ mediaId }: { mediaId?: number }) {
+  const { imageUrl } = useMediaImage(mediaId);
+  if (!imageUrl) return null;
+  return (
+    <Box
+      style={{
+        position: 'absolute',
+        inset: 0,
+        backgroundImage: `url(${imageUrl})`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat',
+        pointerEvents: 'none',
+        zIndex: 0,
+      }}
+    />
+  );
+}
 
 interface ScreensPanelProps {
   screens: Screen[];
@@ -52,6 +72,8 @@ const ScreenThumbnail = memo(function ScreenThumbnail({
         pointerEvents: 'none', // Disable pointer events for the content to allow the parent to be clickable
       }}
     >
+      {/* Canvas background image — rendered in the outer container so it fills the thumbnail */}
+      <ThumbnailCanvasBackground mediaId={screen.settings.canvasBackgroundMediaId} />
       <Box
         style={{
           transform: 'scale(0.12)',
@@ -115,6 +137,7 @@ const ScreenThumbnail = memo(function ScreenThumbnail({
   const settingsChanged =
     prevProps.screen.settings.composition !== nextProps.screen.settings.composition ||
     prevProps.screen.settings.backgroundColor !== nextProps.screen.settings.backgroundColor ||
+    prevProps.screen.settings.canvasBackgroundMediaId !== nextProps.screen.settings.canvasBackgroundMediaId ||
     prevProps.screen.settings.screenScale !== nextProps.screen.settings.screenScale ||
     prevProps.screen.settings.screenPanX !== nextProps.screen.settings.screenPanX ||
     prevProps.screen.settings.screenPanY !== nextProps.screen.settings.screenPanY;

@@ -37,10 +37,11 @@ export interface ProjectSyncConfig {
   autoSync?: boolean;
   syncIntervalMs?: number;
   onSyncStatusChange?: (status: SyncStatus) => void;
+  onProjectsPulled?: (pulledProjectIds: string[]) => void;
   onError?: (error: Error) => void;
 }
 
-const DEFAULT_CONFIG: Required<Omit<ProjectSyncConfig, 'onSyncStatusChange' | 'onError'>> = {
+const DEFAULT_CONFIG: Required<Omit<ProjectSyncConfig, 'onSyncStatusChange' | 'onProjectsPulled' | 'onError'>> = {
   apiBaseUrl: '/api',
   autoSync: true,
   syncIntervalMs: 30000, // 30 seconds
@@ -164,7 +165,7 @@ async function resolveProjectMedia(
  * ProjectSyncService manages background sync between IndexedDB and Postgres
  */
 export class ProjectSyncService {
-  private config: Required<Omit<ProjectSyncConfig, 'onSyncStatusChange' | 'onError'>> & Pick<ProjectSyncConfig, 'onSyncStatusChange' | 'onError'>;
+  private config: Required<Omit<ProjectSyncConfig, 'onSyncStatusChange' | 'onProjectsPulled' | 'onError'>> & Pick<ProjectSyncConfig, 'onSyncStatusChange' | 'onProjectsPulled' | 'onError'>;
   private syncIntervalId: ReturnType<typeof setInterval> | null = null;
   private isSyncing = false;
   private status: SyncStatus = 'idle';
@@ -187,14 +188,16 @@ export class ProjectSyncService {
       // Initial sync
       this.syncAll();
 
-      // Periodic sync
+      // Periodic sync — pull + push so changes from other devices appear
       this.syncIntervalId = setInterval(() => {
-        this.processQueue();
+        this.syncAll();
       }, this.config.syncIntervalMs);
 
       // Sync on online event
       if (typeof window !== 'undefined') {
         window.addEventListener('online', this.handleOnline);
+        // Sync when tab becomes visible (user switches back from another device)
+        document.addEventListener('visibilitychange', this.handleVisibilityChange);
       }
     }
   }
@@ -216,6 +219,7 @@ export class ProjectSyncService {
 
     if (typeof window !== 'undefined') {
       window.removeEventListener('online', this.handleOnline);
+      document.removeEventListener('visibilitychange', this.handleVisibilityChange);
     }
 
     this.setStatus('idle');
@@ -223,6 +227,12 @@ export class ProjectSyncService {
 
   private handleOnline = (): void => {
     this.syncAll();
+  };
+
+  private handleVisibilityChange = (): void => {
+    if (document.visibilityState === 'visible') {
+      this.syncAll();
+    }
   };
 
   private setStatus(status: SyncStatus): void {
@@ -464,6 +474,7 @@ export class ProjectSyncService {
       const localProjects = await persistenceDB.getAllProjects();
       const state = await persistenceDB.getSyncState();
       const queue = state?.syncQueue ?? [];
+      const pulledIds: string[] = [];
 
       // Process each server project
       for (const serverItem of serverProjects) {
@@ -479,6 +490,7 @@ export class ProjectSyncService {
         // Server has newer version - pull full project
         if (serverItem.revision > lastSyncedRevision) {
           await this.pullProject(serverItem.id);
+          pulledIds.push(serverItem.id);
         }
 
         // Handle server deletions
@@ -486,6 +498,11 @@ export class ProjectSyncService {
           // Server deleted, local exists, no pending changes - delete locally
           await persistenceDB.deleteProject(serverItem.id);
         }
+      }
+
+      // Notify that projects were pulled (so UI can reload)
+      if (pulledIds.length > 0) {
+        this.config.onProjectsPulled?.(pulledIds);
       }
 
       // Projects that exist only locally (not on server) stay local
@@ -572,8 +589,23 @@ export class ProjectSyncService {
       // Get all local projects
       const localProjects = await persistenceDB.getAllProjects();
 
+      // Deduplicate: if multiple pristine/empty "My Project" exist, keep only the newest
+      const defaultDupes = localProjects.filter(
+        p => p.name === 'My Project' && (p.pristine || this.isProjectEmpty(p))
+      );
+      if (defaultDupes.length > 1) {
+        // Keep the newest, delete the rest
+        defaultDupes.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+        for (let i = 1; i < defaultDupes.length; i++) {
+          await persistenceDB.deleteProject(defaultDupes[i].id);
+        }
+      }
+
+      // Re-fetch after dedup (some may have been deleted)
+      const remainingProjects = await persistenceDB.getAllProjects();
+
       // Process local projects
-      for (const localProject of localProjects) {
+      for (const localProject of remainingProjects) {
         const existsOnServer = serverProjectIds.has(localProject.id);
 
         // Check if project is empty (no screens with content)

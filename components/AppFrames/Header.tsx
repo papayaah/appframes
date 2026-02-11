@@ -3,14 +3,16 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { Group, Text, ActionIcon, Box, Slider, Tooltip, Menu, Button, Modal, TextInput, Stack, Badge } from '@mantine/core';
-import { IconDownload, IconChevronDown, IconPlus, IconEdit, IconTrash, IconFolder, IconCheck, IconAlertCircle, IconUser, IconHistory } from '@tabler/icons-react';
-import { useState, useEffect } from 'react';
+import { IconDownload, IconChevronDown, IconPlus, IconEdit, IconTrash, IconFolder, IconAlertCircle, IconUser, IconHistory, IconCloud, IconRefresh } from '@tabler/icons-react';
+import { useState, useEffect, useRef } from 'react';
+import type { SyncStatus } from '@/lib/ProjectSyncService';
 import type { Project } from '@/lib/PersistenceDB';
 
 interface CanvasSizeOption {
   id: string;
   label: string;
   screenCount: number;
+  frameCount: number;
 }
 
 interface HeaderProps {
@@ -24,16 +26,85 @@ interface HeaderProps {
   selectedCount?: number;
   totalCount?: number;
   // Project management
+  currentProjectId?: string | null;
   currentProjectName?: string;
   onCreateProject?: (name: string) => Promise<void>;
   onSwitchProject?: (projectId: string) => Promise<void>;
   onRenameProject?: (newName: string) => Promise<void>;
   onDeleteProject?: (projectId: string) => Promise<void>;
   onGetAllProjects?: () => Promise<Project[]>;
-  // Save status
+  // Save & sync status
   saveStatus?: 'idle' | 'saving' | 'saved' | 'error';
+  syncStatus?: SyncStatus;
   historyOpen?: boolean;
   onToggleHistory?: () => void;
+}
+
+function SyncStatusIcon({ saveStatus, syncStatus }: { saveStatus: string; syncStatus: string }) {
+  const [visible, setVisible] = useState(false);
+  const [fading, setFading] = useState(false);
+  const fadeTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+
+  const isActive = saveStatus === 'saving' || syncStatus === 'syncing';
+  const isSuccess = saveStatus === 'saved' || syncStatus === 'synced';
+  const isError = saveStatus === 'error' || syncStatus === 'error';
+
+  useEffect(() => {
+    clearTimeout(fadeTimerRef.current);
+
+    if (isActive || isError) {
+      setVisible(true);
+      setFading(false);
+    } else if (isSuccess) {
+      setVisible(true);
+      setFading(false);
+      fadeTimerRef.current = setTimeout(() => {
+        setFading(true);
+        fadeTimerRef.current = setTimeout(() => setVisible(false), 600);
+      }, 1500);
+    } else {
+      setVisible(false);
+      setFading(false);
+    }
+
+    return () => clearTimeout(fadeTimerRef.current);
+  }, [isActive, isSuccess, isError]);
+
+  if (!visible) return null;
+
+  const color = isError ? 'var(--mantine-color-red-6)' :
+    isActive ? 'var(--mantine-color-blue-5)' :
+    'var(--mantine-color-green-6)';
+
+  const tooltip = isError ? 'Sync error' :
+    saveStatus === 'saving' ? 'Saving...' :
+    syncStatus === 'syncing' ? 'Syncing...' :
+    'Saved';
+
+  return (
+    <Tooltip label={tooltip} openDelay={300}>
+      <Box
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          width: 28,
+          height: 28,
+          opacity: fading ? 0 : 1,
+          transition: 'opacity 0.6s ease',
+          color,
+        }}
+      >
+        {isError ? (
+          <IconAlertCircle size={16} />
+        ) : isActive ? (
+          <IconRefresh size={16} style={{ animation: 'header-sync-spin 1.2s linear infinite' }} />
+        ) : (
+          <IconCloud size={16} />
+        )}
+      </Box>
+    </Tooltip>
+  );
 }
 
 export function Header({
@@ -46,6 +117,7 @@ export function Header({
   onZoomChange,
   selectedCount = 1,
   totalCount = 1,
+  currentProjectId,
   currentProjectName = 'My Project',
   onCreateProject,
   onSwitchProject,
@@ -53,6 +125,7 @@ export function Header({
   onDeleteProject,
   onGetAllProjects,
   saveStatus = 'idle',
+  syncStatus = 'idle',
   historyOpen = false,
   onToggleHistory,
 }: HeaderProps) {
@@ -147,25 +220,28 @@ export function Header({
             <Menu.Dropdown>
               <Menu.Label>Projects</Menu.Label>
               
-              {projects.map((project) => (
-                <Menu.Item
-                  key={project.id}
-                  onClick={() => onSwitchProject?.(project.id)}
-                  style={{
-                    backgroundColor: project.name === currentProjectName ? 'var(--mantine-color-blue-0)' : undefined,
-                  }}
-                >
-                  <Group justify="space-between">
-                    <Text size="sm">{project.name}</Text>
-                    {project.name === currentProjectName && (
-                      <Text size="xs" c="dimmed">(current)</Text>
-                    )}
-                  </Group>
-                  <Text size="xs" c="dimmed">
-                    Last accessed: {new Date(project.lastAccessedAt).toLocaleDateString()}
-                  </Text>
-                </Menu.Item>
-              ))}
+              {projects.map((project) => {
+                const isCurrent = project.id === currentProjectId;
+                return (
+                  <Menu.Item
+                    key={project.id}
+                    onClick={() => onSwitchProject?.(project.id)}
+                    style={{
+                      backgroundColor: isCurrent ? 'var(--mantine-color-blue-0)' : undefined,
+                    }}
+                  >
+                    <Group justify="space-between">
+                      <Text size="sm">{project.name}</Text>
+                      {isCurrent && (
+                        <Text size="xs" c="dimmed">(current)</Text>
+                      )}
+                    </Group>
+                    <Text size="xs" c="dimmed">
+                      Last accessed: {new Date(project.lastAccessedAt).toLocaleDateString()}
+                    </Text>
+                  </Menu.Item>
+                );
+              })}
 
               <Menu.Divider />
 
@@ -187,9 +263,8 @@ export function Header({
                 leftSection={<IconTrash size={16} />}
                 color="red"
                 onClick={() => {
-                  const currentProject = projects.find(p => p.name === currentProjectName);
-                  if (currentProject) {
-                    setProjectToDelete(currentProject.id);
+                  if (currentProjectId) {
+                    setProjectToDelete(currentProjectId);
                     setShowDeleteModal(true);
                   }
                 }}
@@ -200,7 +275,7 @@ export function Header({
           </Menu>
 
           {outputDimensions && canvasSizes.length > 1 ? (
-            <Menu shadow="md" width={280}>
+            <Menu shadow="md" width={320}>
               <Menu.Target>
                 <Button
                   variant="subtle"
@@ -213,8 +288,7 @@ export function Header({
                 </Button>
               </Menu.Target>
               <Menu.Dropdown>
-                <Menu.Label>Canvas Sizes</Menu.Label>
-                {canvasSizes.map((cs) => (
+                {[...canvasSizes].sort((a, b) => b.frameCount - a.frameCount).map((cs) => (
                   <Menu.Item
                     key={cs.id}
                     onClick={() => onCanvasSizeSwitch?.(cs.id)}
@@ -222,9 +296,11 @@ export function Header({
                       backgroundColor: cs.id === currentCanvasSize ? 'var(--mantine-color-blue-0)' : undefined,
                     }}
                   >
-                    <Group justify="space-between">
-                      <Text size="sm">{cs.label}</Text>
-                      <Text size="xs" c="dimmed">{cs.screenCount} screen{cs.screenCount !== 1 ? 's' : ''}</Text>
+                    <Group justify="space-between" wrap="nowrap">
+                      <Text size="sm" truncate>{cs.label}</Text>
+                      <Badge size="xs" variant="light" color={cs.frameCount > 0 ? 'blue' : 'gray'} style={{ flexShrink: 0 }}>
+                        {cs.screenCount} screen{cs.screenCount !== 1 ? 's' : ''}
+                      </Badge>
                     </Group>
                   </Menu.Item>
                 ))}
@@ -256,32 +332,8 @@ export function Header({
       </Group>
 
         <Group gap="xs">
-          {/* Save Status Indicator */}
-          {saveStatus !== 'idle' && (
-            <Badge
-              size="xs"
-              variant="light"
-              color={
-                saveStatus === 'saving' ? 'blue' :
-                saveStatus === 'saved' ? 'green' :
-                'red'
-              }
-              leftSection={
-                saveStatus === 'saved' ? <IconCheck size={10} /> :
-                saveStatus === 'error' ? <IconAlertCircle size={10} /> :
-                null
-              }
-              style={{
-                padding: '4px 8px',
-                fontSize: '11px',
-                height: 'auto',
-              }}
-            >
-              {saveStatus === 'saving' ? 'Saving...' :
-               saveStatus === 'saved' ? 'Saved' :
-               'Error'}
-            </Badge>
-          )}
+          {/* Save & Sync Status Icon */}
+          <SyncStatusIcon saveStatus={saveStatus} syncStatus={syncStatus} />
           
           <Tooltip label={`Download${selectedCount > 1 ? ` (${selectedCount} screens)` : ''} • For full export, use Preview`}>
             <ActionIcon

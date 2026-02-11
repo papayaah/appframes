@@ -50,6 +50,7 @@ export function AppFrames() {
     duplicateScreen,
     handleScreenSelect,
     replaceScreen,
+    currentProjectId,
     currentProjectName,
     createNewProject,
     switchProject,
@@ -57,6 +58,7 @@ export function AppFrames() {
     renameProject,
     getAllProjects,
     saveStatus,
+    syncStatus,
     updateTextElement,
     deleteTextElement,
     selectTextElement,
@@ -518,10 +520,13 @@ export function AppFrames() {
               const label = getCanvasSizeLabel(size);
               const { width, height } = getCanvasDimensions(size, 'portrait');
               const dims = `${width}×${height}`;
+              const frameCount = s.reduce((count, screen) =>
+                count + screen.images.filter(img => !img.cleared && (img.mediaId || img.image || img.serverMediaPath)).length, 0);
               return {
                 id: size,
                 label: label.includes('×') ? label : `${label} (${dims})`,
                 screenCount: s.length,
+                frameCount,
               };
             })}
           currentCanvasSize={currentCanvasSize}
@@ -530,6 +535,7 @@ export function AppFrames() {
           onZoomChange={setZoom}
           selectedCount={selectedScreenIndices.length}
           totalCount={screens.length}
+          currentProjectId={currentProjectId}
           currentProjectName={currentProjectName}
           onCreateProject={createNewProject}
           onSwitchProject={switchProject}
@@ -537,6 +543,7 @@ export function AppFrames() {
           onDeleteProject={deleteProject}
           onGetAllProjects={getAllProjects}
           saveStatus={saveStatus}
+          syncStatus={syncStatus}
           historyOpen={historyPanelOpen}
           onToggleHistory={() => setHistoryPanelOpen((v) => !v)}
         />

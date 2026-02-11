@@ -20,6 +20,7 @@ import {
 export interface UseProjectSyncOptions {
   autoSync?: boolean;
   syncIntervalMs?: number;
+  onProjectsPulled?: (pulledProjectIds: string[]) => void;
 }
 
 export interface UseProjectSyncResult {
@@ -35,6 +36,8 @@ export function useProjectSync(options: UseProjectSyncOptions = {}): UseProjectS
   const [syncStatus, setSyncStatus] = useState<SyncStatus>('idle');
   const syncServiceRef = useRef<ProjectSyncService | null>(null);
   const hasClaimedProjects = useRef(false);
+  const onProjectsPulledRef = useRef(options.onProjectsPulled);
+  onProjectsPulledRef.current = options.onProjectsPulled;
 
   const isSignedIn = !!session?.user?.id;
 
@@ -45,6 +48,7 @@ export function useProjectSync(options: UseProjectSyncOptions = {}): UseProjectS
         autoSync: options.autoSync ?? true,
         syncIntervalMs: options.syncIntervalMs ?? 30000,
         onSyncStatusChange: setSyncStatus,
+        onProjectsPulled: (ids) => onProjectsPulledRef.current?.(ids),
         onError: (error) => {
           console.error('Sync error:', error);
         },
