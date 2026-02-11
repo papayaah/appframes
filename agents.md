@@ -93,5 +93,90 @@ We then:
 
 - **Preview** (mousemove): refs + rAF + direct DOM style updates
 - **Commit** (mouseup): single React state update (and persistence)
-- **Rotation-aware dragging**: inverse-transform the preview delta so the cursor “feels right” at any rotateZ
+- **Rotation-aware dragging**: inverse-transform the preview delta so the cursor "feels right" at any rotateZ
+
+## Server troubleshooting
+
+Production server details are in `terraform/terraform.tfvars`:
+- **Server IP**: `5.223.53.140`
+- **Domain**: `appframes.dev`
+- **Deploy dir**: `/srv/appframes`
+
+### SSH access
+
+```bash
+ssh root@5.223.53.140
+```
+
+### Database queries (PostgreSQL)
+
+Run psql commands via docker compose:
+
+```bash
+ssh root@5.223.53.140 "cd /srv/appframes && docker compose exec -T postgres psql -U postgres -d appframes -c 'YOUR_QUERY'"
+```
+
+**Common queries:**
+
+```sql
+-- Count media assets
+SELECT COUNT(*) FROM media_assets;
+
+-- Media per user
+SELECT u.email, COUNT(*) as count
+FROM media_assets m
+LEFT JOIN "user" u ON m.user_id = u.id
+GROUP BY u.email;
+
+-- Recent media uploads
+SELECT file_name, file_type, size/1024 as kb, created_at
+FROM media_assets
+ORDER BY created_at DESC
+LIMIT 20;
+
+-- List all users
+SELECT id, email, created_at FROM "user";
+
+-- Count projects per user
+SELECT u.email, COUNT(*) as count
+FROM projects p
+LEFT JOIN "user" u ON p.user_id = u.id
+WHERE p.deleted_at IS NULL
+GROUP BY u.email;
+```
+
+### Media storage
+
+Media files are in a Docker volume mounted at `/srv/appframes/media/` inside the container.
+
+```bash
+# Count files on disk
+ssh root@5.223.53.140 "cd /srv/appframes && docker compose exec -T web find /srv/appframes/media/ -type f | wc -l"
+
+# List media directories (organized by user ID)
+ssh root@5.223.53.140 "cd /srv/appframes && docker compose exec -T web ls -la /srv/appframes/media/"
+```
+
+### Logs
+
+```bash
+# App logs
+ssh root@5.223.53.140 "cd /srv/appframes && docker compose logs -f web"
+
+# Database logs
+ssh root@5.223.53.140 "cd /srv/appframes && docker compose logs -f postgres"
+```
+
+### Container management
+
+```bash
+# Restart app
+ssh root@5.223.53.140 "cd /srv/appframes && docker compose restart web"
+
+# Rebuild and restart
+ssh root@5.223.53.140 "cd /srv/appframes && docker compose up -d --build"
+
+# Run migrations
+ssh root@5.223.53.140 "cd /srv/appframes && docker compose exec -T web npm run db:migrate"
+```
 
