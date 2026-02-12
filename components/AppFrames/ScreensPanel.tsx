@@ -63,7 +63,7 @@ const ScreenThumbnail = memo(function ScreenThumbnail({
   };
 
   // Check if this screen is part of a shared background
-  const isInSharedBg = sharedBackground?.enabled && sharedBackground.screenIds.includes(screen.id);
+  const isInSharedBg = sharedBackground?.screenIds.includes(screen.id) ?? false;
   const canvasDims = getCanvasDimensions(screen.settings.canvasSize || 'iphone-6.5', screen.settings.orientation || 'portrait');
 
   return (
@@ -159,7 +159,8 @@ const ScreenThumbnail = memo(function ScreenThumbnail({
     prevProps.screen.settings.canvasBackgroundMediaId !== nextProps.screen.settings.canvasBackgroundMediaId ||
     prevProps.screen.settings.screenScale !== nextProps.screen.settings.screenScale ||
     prevProps.screen.settings.screenPanX !== nextProps.screen.settings.screenPanX ||
-    prevProps.screen.settings.screenPanY !== nextProps.screen.settings.screenPanY;
+    prevProps.screen.settings.screenPanY !== nextProps.screen.settings.screenPanY ||
+    prevProps.screen.settings.backgroundEffects !== nextProps.screen.settings.backgroundEffects;
 
   // Check if shared background changed
   const sharedBgChanged = prevProps.sharedBackground !== nextProps.sharedBackground;

@@ -113,38 +113,34 @@ export function getScreenBackgroundImageStyle(
   const bgWidthPercent = (renderWidth / screenWidth) * 100;
   const bgHeightPercent = (renderHeight / screenHeight) * 100;
 
-  // CSS background-position percentages work as:
-  // position = (container_size - background_size) * percentage / 100
+  // CSS background-position percentage formula:
+  //   pixel_offset = (container_size - bg_size) * percentage / 100
+  //   visible_start = -pixel_offset = (bg_size - container_size) * percentage / 100
   //
-  // For a panoramic image spanning N screens at 300% width:
-  // - Screen 0 (left): 0% positions left edge of image at left edge of container
-  // - Screen N-1 (right): 100% positions right edge of image at right edge of container
-  // - Middle screens are interpolated
+  // For seamless panoramic tiling, each screen must show exactly screenWidth
+  // of adjacent image content. Screen i should display:
+  //   visible_start_i = i * screenWidth + globalOffset
   //
-  // The formula: sliceIndex / (totalSlices - 1) * 100
-  // This correctly maps: 0 -> 0%, 1 -> 50%, 2 -> 100% for 3 screens
+  // Solving for percentage:
+  //   P_i = (i * screenWidth + globalOffset) / (renderWidth - screenWidth) * 100
+  //
+  // globalOffset controls alignment within any excess image width:
+  //   left:   0
+  //   center: (renderWidth - combinedWidth) / 2
+  //   right:  renderWidth - combinedWidth
 
   let bgPosXPercent: number;
-  if (totalSlices <= 1) {
-    // Single screen - use alignment
+  if (totalSlices <= 1 || renderWidth <= screenWidth) {
+    // Single screen or image smaller than one screen — use simple alignment
     bgPosXPercent = horizontalAlign === 'left' ? 0 : horizontalAlign === 'right' ? 100 : 50;
   } else {
-    // Multiple screens - interpolate position across the panorama
-    const basePosition = (sliceIndex / (totalSlices - 1)) * 100;
+    // Multiple screens, image wider than one screen — panoramic calculation
+    const excess = renderWidth - combinedWidth;
+    const globalOffset = horizontalAlign === 'left' ? 0
+      : horizontalAlign === 'right' ? excess
+      : excess / 2; // center
 
-    // Adjust for alignment if image is wider than combined canvas
-    if (renderWidth > combinedWidth) {
-      const excessRatio = (renderWidth - combinedWidth) / (renderWidth - screenWidth);
-      if (horizontalAlign === 'left') {
-        bgPosXPercent = basePosition * (1 - excessRatio);
-      } else if (horizontalAlign === 'right') {
-        bgPosXPercent = basePosition + (100 - basePosition) * excessRatio;
-      } else {
-        bgPosXPercent = basePosition; // center - no adjustment needed
-      }
-    } else {
-      bgPosXPercent = basePosition;
-    }
+    bgPosXPercent = (sliceIndex * screenWidth + globalOffset) / (renderWidth - screenWidth) * 100;
   }
 
   // Vertical position based on alignment
@@ -210,7 +206,6 @@ export function getRecommendedImageDimensions(
  */
 export function createDefaultSharedBackground(screenIds: string[]): SharedBackground {
   return {
-    enabled: true,
     screenIds,
     type: 'gradient',
     gradient: {

@@ -11,6 +11,7 @@ import { useMediaImage } from '../../hooks/useMediaImage';
 import { TextElement as CanvasTextElement } from './TextElement';
 import { getBackgroundStyle } from './Sidebar';
 import { SharedCanvasBackground } from './SharedCanvasBackground';
+import { BackgroundEffectsOverlay } from './BackgroundEffectsOverlay';
 
 interface CanvasProps {
   settings: CanvasSettings;
@@ -38,18 +39,21 @@ interface CanvasProps {
   onZoomChange?: (zoom: number) => void;
 }
 
-function CanvasBackground({ mediaId }: { mediaId?: number }) {
+function CanvasBackground({ mediaId, blur }: { mediaId?: number; blur?: number }) {
   const { imageUrl } = useMediaImage(mediaId);
   if (!imageUrl) return null;
+  const hasBlur = blur != null && blur > 0;
   return (
     <Box
       style={{
         position: 'absolute',
-        inset: 0,
+        inset: hasBlur ? `-${blur}px` : 0,
+        clipPath: hasBlur ? `inset(${blur}px)` : undefined,
         backgroundImage: `url(${imageUrl})`,
         backgroundSize: 'cover',
         backgroundPosition: 'center',
         backgroundRepeat: 'no-repeat',
+        filter: hasBlur ? `blur(${blur}px)` : undefined,
         pointerEvents: 'none',
         zIndex: 0,
       }}
@@ -449,12 +453,9 @@ export function Canvas({
                   width: '100%',
                   maxWidth: aspectRatio > 1 ? '90%' : 600,
                   aspectRatio: `${aspectRatio}`,
-                  ...getBackgroundStyle(screenSettings.backgroundColor),
                   position: 'relative',
                   boxShadow: '0 10px 40px rgba(0,0,0,0.15)',
                   borderRadius: 8,
-                  // Clip content that goes outside the canvas boundaries
-                  // The overflow will be rendered in adjacent canvases via OverflowDeviceRenderer
                   overflow: 'hidden',
                 }}
                 onMouseDown={(e) => {
@@ -465,7 +466,7 @@ export function Canvas({
                   if (!isOnFrame && !isOnText) {
                     onClickCanvas?.(screenIndex);
                   }
-                  if (!isPrimaryScreen) return;
+                  // Clear text selection on any canvas click (not just primary)
                   onSelectTextElement?.(screenIndex, null);
                 }}
               >
@@ -483,18 +484,44 @@ export function Canvas({
                     }}
                   />
                 )}
+                {/* Background color/gradient layer (separate div for blur support) */}
+                {(() => {
+                  const blurAmount = screenSettings.backgroundEffects?.blur ?? 0;
+                  const hasBlur = blurAmount > 0;
+                  return (
+                    <Box
+                      style={{
+                        position: 'absolute',
+                        inset: hasBlur ? `-${blurAmount}px` : 0,
+                        clipPath: hasBlur ? `inset(${blurAmount}px)` : undefined,
+                        ...getBackgroundStyle(screenSettings.backgroundColor),
+                        filter: hasBlur ? `blur(${blurAmount}px)` : undefined,
+                        pointerEvents: 'none',
+                        zIndex: 0,
+                      }}
+                    />
+                  );
+                })()}
                 {/* Render shared background if this screen is part of a shared background group */}
-                {sharedBackground?.enabled && sharedBackground.screenIds.includes(screen.id) ? (
+                {sharedBackground && sharedBackground.screenIds.includes(screen.id) ? (
                   <SharedCanvasBackground
                     screenId={screen.id}
                     allScreens={screens}
                     sharedBackground={sharedBackground}
                     screenWidth={canvasDimensions.width}
                     screenHeight={canvasDimensions.height}
+                    blur={screenSettings.backgroundEffects?.blur}
                   />
                 ) : (
-                  <CanvasBackground mediaId={screenSettings.canvasBackgroundMediaId} />
+                  <CanvasBackground
+                    mediaId={screenSettings.canvasBackgroundMediaId}
+                    blur={screenSettings.backgroundEffects?.blur}
+                  />
                 )}
+                <BackgroundEffectsOverlay
+                  effects={screenSettings.backgroundEffects}
+                  screenId={screen.id}
+                />
                 <Box style={{ position: 'relative', zIndex: 1, width: '100%', height: '100%' }}>
                   <CompositionRenderer
                     settings={screenSettings}

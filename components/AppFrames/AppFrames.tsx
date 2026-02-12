@@ -12,7 +12,7 @@ import { Canvas } from './Canvas';
 import { ScreensPanel } from './ScreensPanel';
 import { HistorySidebar } from './HistorySidebar';
 import { useFrames, getCanvasDimensions, getCanvasSizeLabel, getCompositionFrameCount } from './FramesContext';
-import { Screen, CanvasSettings, ScreenImage, AppFramesActions, clampFrameTransform, SharedBackground } from './types';
+import { Screen, CanvasSettings, ScreenImage, AppFramesActions, clampFrameTransform, SharedBackground, TextElement } from './types';
 import { CrossCanvasDragProvider } from './CrossCanvasDragContext';
 import { InteractionLockProvider } from './InteractionLockContext';
 import { exportService } from '@/lib/ExportService';
@@ -63,6 +63,7 @@ export function AppFrames() {
     deleteTextElement,
     selectTextElement,
     selectTextElementOnScreen,
+    pasteTextElement,
     reorderScreens,
     mediaCache,
     undo,
@@ -94,6 +95,7 @@ export function AppFrames() {
     currentSharedBackground,
     setSharedBackground,
     toggleScreenInSharedBackground,
+    applyBackgroundEffectsToAll,
   } = useFrames();
 
   const isMobile = useMediaQuery('(max-width: 48em)');
@@ -103,6 +105,7 @@ export function AppFrames() {
   const [aiSidebarOpen, setAiSidebarOpen] = useState(false);
   const [historyPanelOpen, setHistoryPanelOpen] = useState(false);
   const [canvasSelected, setCanvasSelected] = useState(false);
+  const copiedTextElementRef = useRef<TextElement | null>(null);
 
   // Track which screen the currently selected frame belongs to (for settings sidebar)
   // This is separate from primarySelectedIndex to avoid reordering canvases when clicking frames
@@ -117,13 +120,20 @@ export function AppFrames() {
   const currentScreen = screens[activeFrameScreenIndex];
   const currentFrameData = currentScreen?.images?.[selectedFrameIndex ?? 0];
 
-  // Check if a text element is selected on the PRIMARY screen (hide frame panels when text is selected)
-  // We check primarySelectedIndex because that's where text editing happens, not activeFrameScreenIndex
-  const primaryScreen = screens[primarySelectedIndex];
-  const hasTextSelected = primaryScreen?.settings?.selectedTextId != null;
-  const selectedTextElement = hasTextSelected
-    ? primaryScreen?.textElements?.find(t => t.id === primaryScreen?.settings?.selectedTextId)
-    : undefined;
+  // Check if a text element is selected on ANY selected screen (hide frame panels when text is selected)
+  const textSelectionInfo = (() => {
+    for (const idx of selectedScreenIndices) {
+      const screen = screens[idx];
+      const textId = screen?.settings?.selectedTextId;
+      if (textId) {
+        const textEl = screen.textElements?.find(t => t.id === textId);
+        if (textEl) return { screen, textElement: textEl };
+      }
+    }
+    return null;
+  })();
+  const hasTextSelected = textSelectionInfo != null;
+  const selectedTextElement = textSelectionInfo?.textElement;
 
   // Check if frame is selected and valid (for settings sidebar)
   // Hide when text is selected or when frame is not explicitly selected (frameSelectionVisible)
@@ -205,7 +215,7 @@ export function AppFrames() {
     }
   }, []);
 
-  // Paste clipboard screenshots/images into the currently selected frame
+  // Paste clipboard screenshots/images into the selected frame, or canvas background if no frame is selected
   useEffect(() => {
     const onPaste = async (e: ClipboardEvent) => {
       try {
@@ -245,11 +255,15 @@ export function AppFrames() {
           return;
         }
 
-        // Paste into the currently selected frame slot of the primary selected screen
-        const targetScreen = screens[primarySelectedIndex];
-        const frameCount = targetScreen ? getCompositionFrameCount(targetScreen.settings.composition) : 1;
-        const safeFrameIndex = Math.max(0, Math.min(selectedFrameIndex, frameCount - 1));
-        replaceScreen(primarySelectedIndex, mediaId, safeFrameIndex);
+        // If a frame is explicitly selected, paste into it; otherwise set as canvas background
+        if (frameSelectionVisible) {
+          const targetScreen = screens[primarySelectedIndex];
+          const frameCount = targetScreen ? getCompositionFrameCount(targetScreen.settings.composition) : 1;
+          const safeFrameIndex = Math.max(0, Math.min(selectedFrameIndex, frameCount - 1));
+          replaceScreen(primarySelectedIndex, mediaId, safeFrameIndex);
+        } else {
+          setCanvasBackgroundMedia(primarySelectedIndex, mediaId);
+        }
       } catch (error) {
         // eslint-disable-next-line no-console
         console.error('Error handling paste:', error);
@@ -258,7 +272,7 @@ export function AppFrames() {
 
     window.addEventListener('paste', onPaste);
     return () => window.removeEventListener('paste', onPaste);
-  }, [addScreen, handleMediaUpload, primarySelectedIndex, replaceScreen, screens, selectedFrameIndex]);
+  }, [addScreen, frameSelectionVisible, handleMediaUpload, primarySelectedIndex, replaceScreen, screens, selectedFrameIndex, setCanvasBackgroundMedia]);
 
   // Delete selected text element (Delete/Backspace) when not editing
   useEffect(() => {
@@ -285,6 +299,57 @@ export function AppFrames() {
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [deleteTextElement, primarySelectedIndex, screens, selectedFrameIndex, setScreens]);
+
+  // Copy selected text element (Cmd/Ctrl+C)
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (!(e.metaKey || e.ctrlKey) || e.key !== 'c') return;
+      if (isEditableTarget(e.target)) return;
+
+      const screen = screens[primarySelectedIndex];
+      const selectedTextId = screen?.settings?.selectedTextId;
+      if (!screen || !selectedTextId) return;
+
+      const textEl = screen.textElements?.find(t => t.id === selectedTextId);
+      if (!textEl) return;
+
+      // Deep copy the text element for pasting later
+      copiedTextElementRef.current = { ...textEl, style: { ...textEl.style } };
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [primarySelectedIndex, screens]);
+
+  // Paste copied text element (Cmd/Ctrl+V) — only when no image is in clipboard
+  // The image paste handler (above) runs first via the 'paste' event; this uses 'keydown'
+  // to catch Cmd+V when clipboard has no image and we have a copied text element.
+  useEffect(() => {
+    const onKeyDown = async (e: KeyboardEvent) => {
+      if (!(e.metaKey || e.ctrlKey) || e.key !== 'v') return;
+      if (isEditableTarget(e.target)) return;
+      if (!copiedTextElementRef.current) return;
+
+      const screen = screens[primarySelectedIndex];
+      if (!screen) return;
+
+      // Check if system clipboard has an image — if so, let the paste handler deal with it
+      try {
+        const items = await navigator.clipboard.read();
+        for (const item of items) {
+          if (item.types.some(t => t.startsWith('image/'))) return;
+        }
+      } catch {
+        // Clipboard API not available or denied — proceed with text paste
+      }
+
+      e.preventDefault();
+      pasteTextElement(screen.id, copiedTextElementRef.current);
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [pasteTextElement, primarySelectedIndex, screens]);
 
   // Helper to convert canvas element to PNG blob
   // Download currently visible/selected screens individually
@@ -579,6 +644,7 @@ export function AppFrames() {
             sharedBackground={currentSharedBackground}
             onSharedBackgroundChange={(sharedBg) => setSharedBackground(currentCanvasSize, sharedBg)}
             onToggleScreenInSharedBg={toggleScreenInSharedBackground}
+            onApplyEffectsToAll={applyBackgroundEffectsToAll}
           />
         </AppShell.Navbar>
       )}
@@ -811,7 +877,7 @@ export function AppFrames() {
           onClose={() => {
             setFrameSelectionVisible(false);
             setCanvasSelected(false);
-            if (hasTextSelected && primaryScreen) {
+            if (hasTextSelected) {
               selectTextElement(null);
             }
           }}
@@ -827,6 +893,7 @@ export function AppFrames() {
                 setCanvasBackgroundMedia(activeFrameScreenIndex, undefined);
               }
             },
+            onApplyEffectsToAll: applyBackgroundEffectsToAll,
           }}
           imageSettings={{
             screenScale: currentScreen?.settings?.screenScale ?? 0,
@@ -901,8 +968,8 @@ export function AppFrames() {
           hasTextSelected={hasTextSelected}
           selectedTextStyle={selectedTextElement?.style}
           onTextStyleChange={(updates) => {
-            if (!primaryScreen || !selectedTextElement) return;
-            updateTextElement(primaryScreen.id, selectedTextElement.id, { style: { ...selectedTextElement.style, ...updates } });
+            if (!textSelectionInfo) return;
+            updateTextElement(textSelectionInfo.screen.id, textSelectionInfo.textElement.id, { style: { ...textSelectionInfo.textElement.style, ...updates } });
           }}
         />
       </AppShell.Main>

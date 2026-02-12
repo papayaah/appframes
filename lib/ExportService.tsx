@@ -4,6 +4,7 @@ import { getCanvasDimensions } from '@/components/AppFrames/FramesContext';
 import { CompositionRenderer } from '@/components/AppFrames/CompositionRenderer';
 import { TextElement as CanvasTextElement } from '@/components/AppFrames/TextElement';
 import { SharedCanvasBackground } from '@/components/AppFrames/SharedCanvasBackground';
+import { BackgroundEffectsOverlay } from '@/components/AppFrames/BackgroundEffectsOverlay';
 import { useMediaImage } from '@/hooks/useMediaImage';
 import { MantineProvider } from '@mantine/core';
 import { theme } from '@/theme';
@@ -129,18 +130,21 @@ const orderedCanvasSizes = (selected: string[]) => {
   ];
 };
 
-function CanvasBackground({ mediaId }: { mediaId?: number }) {
+function CanvasBackground({ mediaId, blur }: { mediaId?: number; blur?: number }) {
   const { imageUrl } = useMediaImage(mediaId);
   if (!imageUrl) return null;
+  const hasBlur = blur != null && blur > 0;
   return (
     <div
       style={{
         position: 'absolute',
-        inset: 0,
+        inset: hasBlur ? `-${blur}px` : 0,
+        clipPath: hasBlur ? `inset(${blur}px)` : undefined,
         backgroundImage: `url(${imageUrl})`,
         backgroundSize: 'cover',
         backgroundPosition: 'center',
         backgroundRepeat: 'no-repeat',
+        filter: hasBlur ? `blur(${blur}px)` : undefined,
         pointerEvents: 'none',
         zIndex: 0,
       }}
@@ -172,18 +176,32 @@ function ExportSurface({
   };
 
   // Check if this screen is part of a shared background
-  const isInSharedBg = sharedBackground?.enabled && sharedBackground.screenIds.includes(screen.id);
+  const isInSharedBg = sharedBackground?.screenIds.includes(screen.id) ?? false;
+
+  const blurAmount = screenSettings.backgroundEffects?.blur ?? 0;
+  const hasBlur = blurAmount > 0;
 
   return (
     <div
       style={{
         width,
         height,
-        ...getBackgroundStyle(screenSettings.backgroundColor),
         position: 'relative',
         overflow: 'hidden',
       }}
     >
+      {/* Background color/gradient layer (separate div for blur support) */}
+      <div
+        style={{
+          position: 'absolute',
+          inset: hasBlur ? `-${blurAmount}px` : 0,
+          clipPath: hasBlur ? `inset(${blurAmount}px)` : undefined,
+          ...getBackgroundStyle(screenSettings.backgroundColor),
+          filter: hasBlur ? `blur(${blurAmount}px)` : undefined,
+          pointerEvents: 'none',
+          zIndex: 0,
+        }}
+      />
       {/* Render shared background if this screen is part of a shared background group */}
       {isInSharedBg && allScreens && sharedBackground ? (
         <SharedCanvasBackground
@@ -192,10 +210,12 @@ function ExportSurface({
           sharedBackground={sharedBackground}
           screenWidth={width}
           screenHeight={height}
+          blur={blurAmount}
         />
       ) : (
-        <CanvasBackground mediaId={screenSettings.canvasBackgroundMediaId} />
+        <CanvasBackground mediaId={screenSettings.canvasBackgroundMediaId} blur={blurAmount} />
       )}
+      <BackgroundEffectsOverlay effects={screenSettings.backgroundEffects} screenId={screen.id} />
       <div style={{ position: 'relative', zIndex: 1, width: '100%', height: '100%' }}>
         <CompositionRenderer
           // CompositionRenderer expects the CanvasSettings shape; screenSettings matches it.

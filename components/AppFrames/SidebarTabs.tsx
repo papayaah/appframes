@@ -10,6 +10,7 @@ import { TextTab } from './TextTab';
 import { LayersTab } from './LayersTab';
 import { MediaLibrary } from './MediaLibrary';
 import { CanvasSettings, SharedBackground, Screen } from './AppFrames';
+import type { BackgroundEffects } from './types';
 
 interface SidebarTabsProps {
   settings: CanvasSettings;
@@ -26,6 +27,8 @@ interface SidebarTabsProps {
   sharedBackground?: SharedBackground;
   onSharedBackgroundChange?: (sharedBg: SharedBackground | undefined) => void;
   onToggleScreenInSharedBg?: (screenId: string) => void;
+  // Background effects
+  onApplyEffectsToAll?: (effects: BackgroundEffects) => void;
 }
 
 type TabId = 'layout' | 'device' | 'text' | 'layers' | 'media' | 'settings';
@@ -74,6 +77,7 @@ export function SidebarTabs({
   sharedBackground,
   onSharedBackgroundChange,
   onToggleScreenInSharedBg,
+  onApplyEffectsToAll,
 }: SidebarTabsProps) {
   const [activeTab, setActiveTab] = useState<TabId | null>(null);
   const [isPinned, setIsPinned] = useState(false);
@@ -317,7 +321,8 @@ export function SidebarTabs({
     switch (tabId) {
       case 'layout':
         return <Sidebar settings={settings} setSettings={setSettings} screens={screens}
-          sharedBackground={sharedBackground} onSharedBackgroundChange={onSharedBackgroundChange} onToggleScreenInSharedBg={onToggleScreenInSharedBg} />;
+          sharedBackground={sharedBackground} onSharedBackgroundChange={onSharedBackgroundChange} onToggleScreenInSharedBg={onToggleScreenInSharedBg}
+          onApplyEffectsToAll={onApplyEffectsToAll} />;
       case 'device':
         return <DeviceTab />;
       case 'text':

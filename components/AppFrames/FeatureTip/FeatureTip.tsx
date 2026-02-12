@@ -8,10 +8,12 @@ import Lottie, { type LottieRefCurrentProps } from 'lottie-react';
 function LottieSegment({
   animationData,
   segment,
+  speed,
   onComplete,
 }: {
   animationData: object;
   segment?: [number, number];
+  speed?: number;
   onComplete: () => void;
 }) {
   const ref = useRef<LottieRefCurrentProps | null>(null);
@@ -19,10 +21,11 @@ function LottieSegment({
   useEffect(() => {
     const instance = ref.current;
     if (!instance) return;
+    if (speed) instance.setSpeed(speed);
     if (segment) {
       instance.playSegments(segment, true);
     }
-  }, [segment]);
+  }, [segment, speed]);
 
   return (
     <Lottie
@@ -31,7 +34,7 @@ function LottieSegment({
       loop={false}
       autoplay={!segment}
       onComplete={onComplete}
-      style={{ width: 64, height: 64 }}
+      style={{ width: 120, height: 120 }}
     />
   );
 }
@@ -202,13 +205,16 @@ export function FeatureTip({
   const revealSegment = cachedAnim?.revealSegment;
   const loopSegment = cachedAnim?.loopSegment;
 
-  // Use ref so the onComplete callback always sees latest loopSegment
-  const loopSegmentRef = useRef(loopSegment);
-  loopSegmentRef.current = loopSegment;
+  // Fall back to reveal segment when no explicit loop marker exists
+  const effectiveLoopSegment = loopSegment ?? revealSegment;
+
+  // Use ref so the onComplete callback always sees latest segment
+  const loopSegmentRef = useRef(effectiveLoopSegment);
+  loopSegmentRef.current = effectiveLoopSegment;
 
   const handleComplete = useCallback(() => {
-    const hasLoop = !!loopSegmentRef.current;
-    if (!hasLoop) return; // No loop marker — just stop after reveal
+    const seg = loopSegmentRef.current;
+    if (!seg) return;
 
     // Pause, then play/replay the loop animation
     setPhase('pause');
@@ -228,7 +234,7 @@ export function FeatureTip({
 
   if (!visible || !currentTip) return null;
 
-  const currentSegment = phase === 'loop' ? loopSegment : revealSegment;
+  const currentSegment = phase === 'loop' ? effectiveLoopSegment : revealSegment;
   const containerStyle: React.CSSProperties = anchorRef?.current
     ? posStyle
     : {};
@@ -244,7 +250,7 @@ export function FeatureTip({
               ...containerStyle,
               ...transitionStyles,
               position: containerStyle.position ?? 'relative',
-              width: 240,
+              width: 280,
               backgroundColor: 'white',
               borderRadius: 12,
               boxShadow: '0 4px 20px rgba(0,0,0,0.12)',
@@ -270,10 +276,11 @@ export function FeatureTip({
                 key={`${currentTip.animationBase}-${phase}-${playCount}`}
                 animationData={animData}
                 segment={currentSegment}
+                speed={1.5}
                 onComplete={handleComplete}
               />
             ) : (
-              <Box style={{ width: 64, height: 64 }} />
+              <Box style={{ width: 120, height: 120 }} />
             )}
 
             <Text fw={600} size="sm" ta="center">

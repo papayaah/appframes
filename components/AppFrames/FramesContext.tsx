@@ -1,7 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useRef, ReactNode, useCallback, useEffect, useMemo } from 'react';
-import { Screen, ScreenImage, CanvasSettings, DEFAULT_TEXT_STYLE, TextElement, TextStyle, clampFrameTransform, SharedBackground } from './types';
+import { Screen, ScreenImage, CanvasSettings, DEFAULT_TEXT_STYLE, TextElement, TextStyle, clampFrameTransform, SharedBackground, BackgroundEffects } from './types';
 import { reorderScreenIds, insertScreenIdInOrder, createDefaultSharedBackground } from './sharedBackgroundUtils';
 import type { DIYOptions } from './diy-frames/types';
 import { getDefaultDIYOptions } from './diy-frames/types';
@@ -266,7 +266,9 @@ interface FramesContextType {
   selectTextElement: (textId: string | null) => void;
   selectTextElementOnScreen: (screenIndex: number, textId: string | null) => void;
   duplicateTextElement: (screenId: string, textId: string) => void;
+  pasteTextElement: (targetScreenId: string, source: TextElement) => void;
   // Frame/background convenience (for meaningful history labels)
+  applyBackgroundEffectsToAll: (effects: BackgroundEffects) => void;
   setCanvasBackgroundMedia: (screenIndex: number, mediaId: number | undefined) => void;
   clearFrameSlot: (screenIndex: number, frameIndex: number) => void;
   setFrameDIYOptions: (screenIndex: number, frameIndex: number, options: DIYOptions, templateId?: string) => void;
@@ -494,18 +496,19 @@ export function FramesProvider({ children }: { children: ReactNode }) {
   };
 
   const addScreen = (imageOrMediaId?: string | number) => {
-    // Inherit settings from the last screen if one exists, otherwise use defaults
+    // Use default settings, inheriting only composition and orientation from the last screen
     const lastScreen = screens.length > 0 ? screens[screens.length - 1] : null;
-    const defaultSettings = lastScreen
-      ? { ...lastScreen.settings, selectedTextId: undefined }
-      : (() => {
-          // Auto-detect orientation from canvas size dimensions for first screen
-          const defaults = getDefaultScreenSettings();
-          const size = currentCanvasSizeRef.current;
-          const dims = getCanvasDimensions(size, 'portrait');
-          if (dims.width > dims.height) defaults.orientation = 'landscape';
-          return defaults;
-        })();
+    const defaultSettings = (() => {
+      const defaults = getDefaultScreenSettings();
+      const size = currentCanvasSizeRef.current;
+      const dims = getCanvasDimensions(size, 'portrait');
+      if (dims.width > dims.height) defaults.orientation = 'landscape';
+      if (lastScreen) {
+        defaults.composition = lastScreen.settings.composition;
+        defaults.orientation = lastScreen.settings.orientation;
+      }
+      return defaults;
+    })();
     const frameCount = getCompositionFrameCount(defaultSettings.composition);
 
     // Determine which DIY options to use for the new screen's frames:
@@ -552,13 +555,12 @@ export function FramesProvider({ children }: { children: ReactNode }) {
     }
 
     screenIdCounter.current += 1;
-    const textElements: TextElement[] = [createDefaultTextElement([])];
     const newScreen: Screen = {
       id: `screen-${screenIdCounter.current}`,
       images,
       name: `Screen ${screens.length + 1}`,
-      settings: defaultSettings, // Each screen gets its own default settings
-      textElements,
+      settings: defaultSettings,
+      textElements: [],
     };
     commitCurrentScreens('Add screen', (list) => {
       list.push(newScreen);
@@ -728,10 +730,6 @@ export function FramesProvider({ children }: { children: ReactNode }) {
       const sharedBg = draft.sharedBackgrounds?.[size];
       if (sharedBg) {
         sharedBg.screenIds = sharedBg.screenIds.filter(sid => sid !== id);
-        // If less than 2 screens remain, disable shared background
-        if (sharedBg.screenIds.length < 2) {
-          delete draft.sharedBackgrounds![size];
-        }
       }
     });
 
@@ -854,7 +852,20 @@ export function FramesProvider({ children }: { children: ReactNode }) {
   }, [commitCurrentScreens]);
 
   const selectTextElement = useCallback((textId: string | null) => {
-    updateSelectedScreenSettings({ selectedTextId: textId ?? undefined });
+    if (textId === null) {
+      // Clear selectedTextId on ALL screens (not just primary) for multi-select scenarios
+      mutateDoc((draft) => {
+        const size = currentCanvasSizeRef.current;
+        const list = draft.screensByCanvasSize[size] || [];
+        list.forEach((screen) => {
+          if (screen.settings.selectedTextId) {
+            screen.settings = { ...screen.settings, selectedTextId: undefined };
+          }
+        });
+      });
+    } else {
+      updateSelectedScreenSettings({ selectedTextId: textId });
+    }
   }, [updateSelectedScreenSettings]);
 
   const selectTextElementOnScreen = useCallback((screenIndex: number, textId: string | null) => {
@@ -898,6 +909,34 @@ export function FramesProvider({ children }: { children: ReactNode }) {
       existing.splice(idx + 1, 0, copy);
       screen.textElements = existing.map((t, i) => ({ ...t, zIndex: i + 1 }));
       screen.settings = { ...screen.settings, selectedTextId: copy.id };
+    });
+  }, [commitCurrentScreens]);
+
+  const pasteTextElement = useCallback((targetScreenId: string, source: TextElement) => {
+    commitCurrentScreens('Paste text', (list) => {
+      const screen = list.find((s) => s.id === targetScreenId);
+      if (!screen) return;
+      const existing = [...(screen.textElements ?? [])].sort((a, b) => (a.zIndex ?? 0) - (b.zIndex ?? 0));
+      const copy: TextElement = {
+        ...source,
+        style: { ...source.style },
+        id: createId('text'),
+        name: `${source.name} Copy`,
+        x: clamp01(source.x + 2),
+        y: clamp01(source.y + 2),
+        zIndex: getMaxZIndex(existing) + 1,
+      };
+      existing.push(copy);
+      screen.textElements = existing.map((t, i) => ({ ...t, zIndex: i + 1 }));
+      screen.settings = { ...screen.settings, selectedTextId: copy.id };
+    });
+  }, [commitCurrentScreens]);
+
+  const applyBackgroundEffectsToAll = useCallback((effects: BackgroundEffects) => {
+    commitCurrentScreens('Apply effects to all screens', (list) => {
+      list.forEach(screen => {
+        screen.settings = { ...screen.settings, backgroundEffects: { ...effects } };
+      });
     });
   }, [commitCurrentScreens]);
 
@@ -1072,22 +1111,13 @@ export function FramesProvider({ children }: { children: ReactNode }) {
     const isInGroup = existing.screenIds.includes(screenId);
 
     if (isInGroup) {
-      // Remove from group
+      // Remove from group (keep shared bg object to preserve settings)
       const newIds = existing.screenIds.filter(id => id !== screenId);
-      if (newIds.length < 2) {
-        // Less than 2 screens - disable shared background
-        commitDoc('Disable shared background', (draft) => {
-          if (draft.sharedBackgrounds) {
-            delete draft.sharedBackgrounds[size];
-          }
-        });
-      } else {
-        commitDoc('Remove screen from shared background', (draft) => {
-          if (draft.sharedBackgrounds?.[size]) {
-            draft.sharedBackgrounds[size].screenIds = newIds;
-          }
-        });
-      }
+      commitDoc('Remove screen from shared background', (draft) => {
+        if (draft.sharedBackgrounds?.[size]) {
+          draft.sharedBackgrounds[size].screenIds = newIds;
+        }
+      });
     } else {
       // Add to group in correct order
       const newIds = insertScreenIdInOrder(existing.screenIds, screenId, allScreens);
@@ -1676,6 +1706,8 @@ export function FramesProvider({ children }: { children: ReactNode }) {
         selectTextElement,
         selectTextElementOnScreen,
         duplicateTextElement,
+        pasteTextElement,
+        applyBackgroundEffectsToAll,
         setCanvasBackgroundMedia,
         clearFrameSlot,
         setFrameDIYOptions,

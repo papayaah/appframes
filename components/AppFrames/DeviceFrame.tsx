@@ -19,12 +19,12 @@ import { useAppStore } from '../../stores/useAppStore';
 
 const FRAME_TIPS: TipItem[] = [
   {
-    animationBase: 'doodle-outline-690-computer-mouse-left-click',
+    animationBase: 'keyboardmouse',
     title: 'Move your frame',
     description: 'Click and drag anywhere on the frame to reposition it',
   },
   {
-    animationBase: 'doodle-outline-690-computer-mouse-left-click',
+    animationBase: 'keyboardmouse',
     title: 'Rotate your frame',
     description: 'Use the rotation dial in the settings panel to rotate',
   },
@@ -32,7 +32,7 @@ const FRAME_TIPS: TipItem[] = [
 
 const IMAGE_TIPS: TipItem[] = [
   {
-    animationBase: 'doodle-outline-690-computer-mouse-left-click',
+    animationBase: 'keyboardmouse',
     title: 'Reposition your image',
     description: 'Hold Space + drag to pan the image inside the frame',
   },

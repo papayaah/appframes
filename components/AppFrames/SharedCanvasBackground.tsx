@@ -15,21 +15,26 @@ interface SharedGradientBackgroundProps {
   gradient: NonNullable<SharedBackground['gradient']>;
   sliceIndex: number;
   totalSlices: number;
+  blur?: number;
 }
 
 function SharedGradientBackground({
   gradient,
   sliceIndex,
   totalSlices,
+  blur,
 }: SharedGradientBackgroundProps) {
   const gradientCSS = getScreenGradientCSS(gradient, sliceIndex, totalSlices);
+  const hasBlur = blur != null && blur > 0;
 
   return (
     <Box
       style={{
         position: 'absolute',
-        inset: 0,
+        inset: hasBlur ? `-${blur}px` : 0,
+        clipPath: hasBlur ? `inset(${blur}px)` : undefined,
         background: gradientCSS,
+        filter: hasBlur ? `blur(${blur}px)` : undefined,
         pointerEvents: 'none',
         zIndex: 0,
       }}
@@ -46,6 +51,7 @@ interface SharedImageBackgroundProps {
   horizontalAlign: 'left' | 'center' | 'right';
   screenWidth: number;
   screenHeight: number;
+  blur?: number;
 }
 
 function SharedImageBackground({
@@ -57,6 +63,7 @@ function SharedImageBackground({
   horizontalAlign,
   screenWidth,
   screenHeight,
+  blur,
 }: SharedImageBackgroundProps) {
   const { imageUrl } = useMediaImage(mediaId);
   const [imageDimensions, setImageDimensions] = useState<{ width: number; height: number } | null>(null);
@@ -117,12 +124,16 @@ function SharedImageBackground({
     screenHeight
   );
 
+  const hasBlur = blur != null && blur > 0;
+
   return (
     <Box
       style={{
         position: 'absolute',
-        inset: 0,
+        inset: hasBlur ? `-${blur}px` : 0,
+        clipPath: hasBlur ? `inset(${blur}px)` : undefined,
         ...bgStyle,
+        filter: hasBlur ? `blur(${blur}px)` : undefined,
         pointerEvents: 'none',
         zIndex: 0,
       }}
@@ -136,6 +147,7 @@ export interface SharedCanvasBackgroundProps {
   sharedBackground: SharedBackground;
   screenWidth: number;
   screenHeight: number;
+  blur?: number;
 }
 
 export function SharedCanvasBackground({
@@ -144,8 +156,9 @@ export function SharedCanvasBackground({
   sharedBackground,
   screenWidth,
   screenHeight,
+  blur,
 }: SharedCanvasBackgroundProps) {
-  if (!sharedBackground.enabled) return null;
+  if (!sharedBackground.screenIds.length) return null;
 
   const sliceInfo = getSliceInfo(screenId, allScreens, sharedBackground);
   if (!sliceInfo) return null;
@@ -158,6 +171,7 @@ export function SharedCanvasBackground({
         gradient={sharedBackground.gradient}
         sliceIndex={sliceIndex}
         totalSlices={totalSlices}
+        blur={blur}
       />
     );
   }
@@ -173,6 +187,7 @@ export function SharedCanvasBackground({
         horizontalAlign={sharedBackground.imageHorizontalAlign ?? 'center'}
         screenWidth={screenWidth}
         screenHeight={screenHeight}
+        blur={blur}
       />
     );
   }

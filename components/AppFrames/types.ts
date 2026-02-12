@@ -90,6 +90,22 @@ export interface TextElement {
   zIndex: number; // higher renders above
 }
 
+export interface BackgroundEffects {
+  blur: number;              // 0-50 px
+  overlayColor: string;      // hex color
+  overlayOpacity: number;    // 0-100%
+  vignetteIntensity: number; // 0-100%
+  noiseIntensity: number;    // 0-100%
+}
+
+export const DEFAULT_BACKGROUND_EFFECTS: BackgroundEffects = {
+  blur: 0,
+  overlayColor: '#000000',
+  overlayOpacity: 0,
+  vignetteIntensity: 0,
+  noiseIntensity: 0,
+};
+
 export interface CanvasSettings {
   canvasSize: string; // Export dimensions (App Store requirements)
   composition: 'single' | 'dual' | 'stack' | 'triple' | 'fan';
@@ -101,6 +117,7 @@ export interface CanvasSettings {
   orientation: 'portrait' | 'landscape';
   backgroundColor: string;
   canvasBackgroundMediaId?: number; // Full-canvas background image (optional)
+  backgroundEffects?: BackgroundEffects;
 }
 
 export interface Screen {
@@ -119,7 +136,7 @@ export interface AppFramesActions {
 
 // Shared Background - spans across multiple screens for panoramic effect
 export interface SharedBackground {
-  enabled: boolean;
+  enabled?: boolean;  // Deprecated — kept for backward compat with saved data
   screenIds: string[];  // Participating screens in visual order
   type: 'gradient' | 'image';
   // For gradient type

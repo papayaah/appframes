@@ -17,12 +17,15 @@ import { CanvasSettings } from './AppFrames';
 import { GradientEditor } from './GradientEditor';
 import { isGradient, getBackgroundStyle, BACKGROUND_PRESETS } from './Sidebar';
 import { isFixedOrientationCanvas } from './FramesContext';
+import { BackgroundEffectsPanel } from './BackgroundEffectsPanel';
+import { DEFAULT_BACKGROUND_EFFECTS } from './types';
 
 export interface CanvasSettingsPanelProps {
   settings: CanvasSettings;
   setSettings: (settings: CanvasSettings) => void;
   hasBackgroundMedia?: boolean;
   onClearBackgroundMedia?: () => void;
+  onApplyEffectsToAll?: (effects: import('./types').BackgroundEffects) => void;
 }
 
 export function CanvasSettingsPanel({
@@ -30,6 +33,7 @@ export function CanvasSettingsPanel({
   setSettings,
   hasBackgroundMedia,
   onClearBackgroundMedia,
+  onApplyEffectsToAll,
 }: CanvasSettingsPanelProps) {
   const [customColorOpen, setCustomColorOpen] = useState(false);
   const [customColor, setCustomColor] = useState('#ffffff');
@@ -171,6 +175,18 @@ export function CanvasSettingsPanel({
           </Button>
         </Box>
       )}
+
+      {/* Background Effects */}
+      <Box>
+        <Text size="sm" fw={700} mb="xs">
+          Background Effects
+        </Text>
+        <BackgroundEffectsPanel
+          effects={settings.backgroundEffects ?? DEFAULT_BACKGROUND_EFFECTS}
+          onChange={(effects) => setSettings({ ...settings, backgroundEffects: effects })}
+          onApplyToAll={onApplyEffectsToAll ? () => onApplyEffectsToAll(settings.backgroundEffects ?? DEFAULT_BACKGROUND_EFFECTS) : undefined}
+        />
+      </Box>
     </Stack>
   );
 }
