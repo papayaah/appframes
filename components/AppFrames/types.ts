@@ -32,6 +32,8 @@ export interface ScreenImage {
   // Per-frame appearance
   /** Custom frame color (overrides device default). If undefined, uses device default. */
   frameColor?: string;
+  /** Per-frame visual effects (shadow, glow, opacity) */
+  frameEffects?: FrameEffects;
 }
 
 export interface TextStyle {
@@ -104,6 +106,34 @@ export const DEFAULT_BACKGROUND_EFFECTS: BackgroundEffects = {
   overlayOpacity: 0,
   vignetteIntensity: 0,
   noiseIntensity: 0,
+};
+
+export interface FrameEffects {
+  shadowEnabled: boolean;
+  shadowBlur: number;       // 0-50 px
+  shadowOffsetX: number;    // -50 to 50 px
+  shadowOffsetY: number;    // -50 to 50 px
+  shadowColor: string;      // hex color
+  shadowOpacity: number;    // 0-100%
+  glowEnabled: boolean;
+  glowColor: string;        // hex color
+  glowBlur: number;         // 0-60 px
+  glowIntensity: number;    // 0-100%
+  opacity: number;          // 0-100%, default 100
+}
+
+export const DEFAULT_FRAME_EFFECTS: FrameEffects = {
+  shadowEnabled: false,
+  shadowBlur: 20,
+  shadowOffsetX: 0,
+  shadowOffsetY: 10,
+  shadowColor: '#000000',
+  shadowOpacity: 25,
+  glowEnabled: false,
+  glowColor: '#667eea',
+  glowBlur: 30,
+  glowIntensity: 50,
+  opacity: 100,
 };
 
 export interface CanvasSettings {

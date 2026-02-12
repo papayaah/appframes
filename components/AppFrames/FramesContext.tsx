@@ -1,7 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useRef, ReactNode, useCallback, useEffect, useMemo } from 'react';
-import { Screen, ScreenImage, CanvasSettings, DEFAULT_TEXT_STYLE, TextElement, TextStyle, clampFrameTransform, SharedBackground, BackgroundEffects } from './types';
+import { Screen, ScreenImage, CanvasSettings, DEFAULT_TEXT_STYLE, TextElement, TextStyle, clampFrameTransform, SharedBackground, BackgroundEffects, FrameEffects } from './types';
 import { reorderScreenIds, insertScreenIdInOrder, createDefaultSharedBackground } from './sharedBackgroundUtils';
 import type { DIYOptions } from './diy-frames/types';
 import { getDefaultDIYOptions } from './diy-frames/types';
@@ -279,6 +279,7 @@ interface FramesContextType {
   setFrameRotate: (screenIndex: number, frameIndex: number, rotateZ: number) => void;
   setFrameTilt: (screenIndex: number, frameIndex: number, tiltX: number, tiltY: number) => void;
   setFrameColor: (screenIndex: number, frameIndex: number, frameColor: string | undefined) => void;
+  setFrameEffects: (screenIndex: number, frameIndex: number, frameEffects: FrameEffects) => void;
   setImageRotation: (screenIndex: number, frameIndex: number, imageRotation: number) => void;
   // Shared backgrounds
   sharedBackgrounds: Record<string, SharedBackground>;
@@ -1070,6 +1071,16 @@ export function FramesProvider({ children }: { children: ReactNode }) {
     });
   }, [commitCurrentScreens]);
 
+  const setFrameEffects = useCallback((screenIndex: number, frameIndex: number, frameEffects: FrameEffects) => {
+    commitCurrentScreens('Change frame effects', (list) => {
+      const screen = list[screenIndex];
+      if (!screen) return;
+      if (!screen.images) screen.images = [];
+      while (screen.images.length <= frameIndex) screen.images.push({});
+      screen.images[frameIndex] = { ...(screen.images[frameIndex] || {}), frameEffects };
+    });
+  }, [commitCurrentScreens]);
+
   const setImageRotation = useCallback((screenIndex: number, frameIndex: number, imageRotation: number) => {
     commitCurrentScreens('Rotate image', (list) => {
       const screen = list[screenIndex];
@@ -1719,6 +1730,7 @@ export function FramesProvider({ children }: { children: ReactNode }) {
         setFrameRotate,
         setFrameTilt,
         setFrameColor,
+        setFrameEffects,
         setImageRotation,
         sharedBackgrounds,
         currentSharedBackground,

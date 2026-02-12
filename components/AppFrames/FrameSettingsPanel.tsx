@@ -4,7 +4,10 @@ import { useState } from 'react';
 import { Box, Text, SimpleGrid, Button, Popover, ColorPicker, Stack, Divider } from '@mantine/core';
 import { IconPlus } from '@tabler/icons-react';
 import type { DIYOptions } from './diy-frames/types';
+import type { FrameEffects } from './types';
+import { DEFAULT_FRAME_EFFECTS } from './types';
 import { DIYSettingsPanel } from './diy-frames/DIYSettingsPanel';
+import { FrameEffectsPanel } from './FrameEffectsPanel';
 import { TransformControls } from './TransformControls';
 
 // Frame color presets
@@ -63,6 +66,10 @@ export interface FrameSettingsPanelProps {
   diyOptions?: DIYOptions;
   /** Callback when DIY options change */
   onDIYOptionsChange?: (options: DIYOptions) => void;
+  /** Current frame effects */
+  frameEffects?: FrameEffects;
+  /** Callback when frame effects change */
+  onFrameEffectsChange?: (effects: FrameEffects) => void;
 }
 
 export function FrameSettingsPanel({
@@ -82,6 +89,8 @@ export function FrameSettingsPanel({
   onResetTransforms,
   diyOptions,
   onDIYOptionsChange,
+  frameEffects,
+  onFrameEffectsChange,
 }: FrameSettingsPanelProps) {
   const [customColorOpen, setCustomColorOpen] = useState(false);
   const [customColor, setCustomColor] = useState(frameColor || defaultFrameColor);
@@ -204,6 +213,20 @@ export function FrameSettingsPanel({
             onReset={onResetTransforms}
           />
         </Box>
+      )}
+
+      {/* Frame Effects */}
+      {onFrameEffectsChange && (
+        <>
+          <Divider my="lg" />
+          <Text size="xs" c="dimmed" mb="xs" tt="uppercase">
+            Effects
+          </Text>
+          <FrameEffectsPanel
+            effects={frameEffects ?? DEFAULT_FRAME_EFFECTS}
+            onChange={onFrameEffectsChange}
+          />
+        </>
       )}
 
       {/* DIY Options */}

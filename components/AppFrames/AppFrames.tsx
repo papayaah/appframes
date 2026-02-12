@@ -83,6 +83,7 @@ export function AppFrames() {
     setFrameRotate,
     setFrameTilt,
     setFrameColor,
+    setFrameEffects,
     setImageRotation,
     downloadFormat,
     downloadJpegQuality,
@@ -963,6 +964,11 @@ export function AppFrames() {
             onDIYOptionsChange: (options: DIYOptions) => {
               if (selectedFrameIndex === null || selectedFrameIndex === undefined) return;
               setFrameDIYOptions(activeFrameScreenIndex, selectedFrameIndex, options);
+            },
+            frameEffects: currentFrameData?.frameEffects,
+            onFrameEffectsChange: (effects) => {
+              if (selectedFrameIndex === null || selectedFrameIndex === undefined) return;
+              setFrameEffects(activeFrameScreenIndex, selectedFrameIndex, effects);
             },
           }}
           hasTextSelected={hasTextSelected}

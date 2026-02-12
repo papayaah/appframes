@@ -5,7 +5,8 @@ import { Box, Center } from '@mantine/core';
 import { CanvasSettings, Screen } from './AppFrames';
 import { DeviceFrame } from './DeviceFrame';
 // ResizeHandles removed — scale via mouse wheel, rotate via right-click drag
-import { clampFrameTransform } from './types';
+import { clampFrameTransform, DEFAULT_FRAME_EFFECTS } from './types';
+import type { FrameEffects } from './types';
 import { getDefaultDIYOptions } from './diy-frames/types';
 import { useInteractionLock } from './InteractionLockContext';
 
@@ -75,6 +76,7 @@ const DraggableFrame = ({
   onResizeScale,
   onRotate,
   gestureOwnerKey,
+  frameEffects,
 }: {
   children: React.ReactNode;
   baseStyle?: React.CSSProperties;
@@ -90,6 +92,7 @@ const DraggableFrame = ({
   onResizeScale?: (scale: number) => void;
   onRotate?: (rotateZ: number) => void;
   gestureOwnerKey: string;
+  frameEffects?: FrameEffects;
 }) => {
   const { isLocked, isOwnerActive } = useInteractionLock();
   const [isHovered, setIsHovered] = useState(false);
@@ -264,6 +267,20 @@ const DraggableFrame = ({
     }
   }, [gestureOwnerKey, isLocked, isOwnerActive]);
 
+  // Build frame effects CSS using drop-shadow filter (follows frame shape, not wrapper box)
+  const fx = frameEffects ?? DEFAULT_FRAME_EFFECTS;
+  const filterParts: string[] = [];
+  if (fx.shadowEnabled) {
+    const a = Math.round(fx.shadowOpacity * 2.55); // 0-100 → 0-255
+    filterParts.push(`drop-shadow(${fx.shadowOffsetX}px ${fx.shadowOffsetY}px ${fx.shadowBlur}px ${fx.shadowColor}${a.toString(16).padStart(2, '0')})`);
+  }
+  if (fx.glowEnabled) {
+    const a = Math.round(fx.glowIntensity * 2.55);
+    filterParts.push(`drop-shadow(0 0 ${fx.glowBlur}px ${fx.glowColor}${a.toString(16).padStart(2, '0')})`);
+  }
+  const effectFilter = filterParts.length > 0 ? filterParts.join(' ') : undefined;
+  const effectOpacity = fx.opacity < 100 ? fx.opacity / 100 : undefined;
+
   return (
     <Box
       ref={frameRef}
@@ -289,6 +306,8 @@ const DraggableFrame = ({
         transformStyle: 'preserve-3d',
         transformOrigin: 'center center',
         position: baseStyleNoTransform.position ?? 'relative',
+        filter: effectFilter,
+        opacity: effectOpacity,
         // For side-by-side layouts, use fixed width to prevent shifting
         ...(fixedWidth ? {
           display: 'flex',
@@ -308,9 +327,10 @@ const DraggableFrame = ({
           className={isSelected ? 'frame-selection-glow' : undefined}
           style={{
             position: 'absolute',
-            inset: isSelected ? -3 : -2,
-            borderRadius: 8,
-            border: isSelected ? undefined : '1px solid rgba(102, 126, 234, 0.4)',
+            inset: -6,
+            borderRadius: 10,
+            border: '5px dashed #667eea',
+            opacity: isSelected ? 1 : 0.5,
             pointerEvents: 'none',
             transition: 'border 0.15s ease, box-shadow 0.15s ease, inset 0.15s ease',
             transform: childDragOffset ? `translate3d(${childDragOffset.x}px, ${childDragOffset.y}px, 0)` : undefined,
@@ -360,6 +380,9 @@ export function CompositionRenderer({
     tiltY: images[index]?.tiltY ?? 0,
     rotateZ: images[index]?.rotateZ ?? 0,
   });
+
+  // Helper to get per-frame effects
+  const getFrameEffects = (index: number) => images[index]?.frameEffects;
 
   // Determine which frames should be highlighted based on drag
   const getHighlightedFrames = (): number[] => {
@@ -445,6 +468,7 @@ export function CompositionRenderer({
               onResizeScale={isCleared0 ? undefined : (next) => onFrameScaleChange?.(0, next)}
               onRotate={isCleared0 ? undefined : (next) => onFrameRotateChange?.(0, next)}
               gestureOwnerKey={`frame:${screen.id}:0`}
+              frameEffects={getFrameEffects(0)}
             >
               {isCleared0 ? null : (
                 <DeviceFrame
@@ -480,6 +504,7 @@ export function CompositionRenderer({
               onResizeScale={isClearedDual0 ? undefined : (next) => onFrameScaleChange?.(0, next)}
               onRotate={isClearedDual0 ? undefined : (next) => onFrameRotateChange?.(0, next)}
               gestureOwnerKey={`frame:${screen.id}:0`}
+              frameEffects={getFrameEffects(0)}
             >
               {isClearedDual0 ? null : <DeviceFrame {...getFrameProps(0, 0.9)} />}
             </DraggableFrame>
@@ -496,6 +521,7 @@ export function CompositionRenderer({
               onResizeScale={isClearedDual1 ? undefined : (next) => onFrameScaleChange?.(1, next)}
               onRotate={isClearedDual1 ? undefined : (next) => onFrameRotateChange?.(1, next)}
               gestureOwnerKey={`frame:${screen.id}:1`}
+              frameEffects={getFrameEffects(1)}
             >
               {isClearedDual1 ? null : <DeviceFrame {...getFrameProps(1, 0.9)} />}
             </DraggableFrame>
@@ -532,6 +558,7 @@ export function CompositionRenderer({
                 onResizeScale={isClearedStack0 ? undefined : (next) => onFrameScaleChange?.(0, next)}
                 onRotate={isClearedStack0 ? undefined : (next) => onFrameRotateChange?.(0, next)}
                 gestureOwnerKey={`frame:${screen.id}:0`}
+                frameEffects={getFrameEffects(0)}
               >
                 {isClearedStack0 ? null : <DeviceFrame {...getFrameProps(0, 0.85)} />}
               </DraggableFrame>
@@ -551,6 +578,7 @@ export function CompositionRenderer({
                 onResizeScale={isClearedStack1 ? undefined : (next) => onFrameScaleChange?.(1, next)}
                 onRotate={isClearedStack1 ? undefined : (next) => onFrameRotateChange?.(1, next)}
                 gestureOwnerKey={`frame:${screen.id}:1`}
+                frameEffects={getFrameEffects(1)}
               >
                 {isClearedStack1 ? null : <DeviceFrame {...getFrameProps(1, 0.85)} />}
               </DraggableFrame>
@@ -585,6 +613,7 @@ export function CompositionRenderer({
               onResizeScale={isClearedTriple0 ? undefined : (next) => onFrameScaleChange?.(0, next)}
               onRotate={isClearedTriple0 ? undefined : (next) => onFrameRotateChange?.(0, next)}
               gestureOwnerKey={`frame:${screen.id}:0`}
+              frameEffects={getFrameEffects(0)}
             >
               {isClearedTriple0 ? null : <DeviceFrame {...getFrameProps(0, 0.68)} />}
             </DraggableFrame>
@@ -601,6 +630,7 @@ export function CompositionRenderer({
               onResizeScale={isClearedTriple1 ? undefined : (next) => onFrameScaleChange?.(1, next)}
               onRotate={isClearedTriple1 ? undefined : (next) => onFrameRotateChange?.(1, next)}
               gestureOwnerKey={`frame:${screen.id}:1`}
+              frameEffects={getFrameEffects(1)}
             >
               {isClearedTriple1 ? null : <DeviceFrame {...getFrameProps(1, 0.68)} />}
             </DraggableFrame>
@@ -617,6 +647,7 @@ export function CompositionRenderer({
               onResizeScale={isClearedTriple2 ? undefined : (next) => onFrameScaleChange?.(2, next)}
               onRotate={isClearedTriple2 ? undefined : (next) => onFrameRotateChange?.(2, next)}
               gestureOwnerKey={`frame:${screen.id}:2`}
+              frameEffects={getFrameEffects(2)}
             >
               {isClearedTriple2 ? null : <DeviceFrame {...getFrameProps(2, 0.68)} />}
             </DraggableFrame>
@@ -657,6 +688,7 @@ export function CompositionRenderer({
               onResizeScale={isClearedFan0 ? undefined : (next) => onFrameScaleChange?.(0, next)}
               onRotate={isClearedFan0 ? undefined : (next) => onFrameRotateChange?.(0, next)}
               gestureOwnerKey={`frame:${screen.id}:0`}
+              frameEffects={getFrameEffects(0)}
             >
               {isClearedFan0 ? null : <DeviceFrame {...getFrameProps(0, 0.7, -8)} />}
             </DraggableFrame>
@@ -679,6 +711,7 @@ export function CompositionRenderer({
               onResizeScale={isClearedFan1 ? undefined : (next) => onFrameScaleChange?.(1, next)}
               onRotate={isClearedFan1 ? undefined : (next) => onFrameRotateChange?.(1, next)}
               gestureOwnerKey={`frame:${screen.id}:1`}
+              frameEffects={getFrameEffects(1)}
             >
               {isClearedFan1 ? null : <DeviceFrame {...getFrameProps(1, 0.7, 0)} />}
             </DraggableFrame>
@@ -701,6 +734,7 @@ export function CompositionRenderer({
               onResizeScale={isClearedFan2 ? undefined : (next) => onFrameScaleChange?.(2, next)}
               onRotate={isClearedFan2 ? undefined : (next) => onFrameRotateChange?.(2, next)}
               gestureOwnerKey={`frame:${screen.id}:2`}
+              frameEffects={getFrameEffects(2)}
             >
               {isClearedFan2 ? null : <DeviceFrame {...getFrameProps(2, 0.7, 8)} />}
             </DraggableFrame>

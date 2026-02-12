@@ -1163,16 +1163,57 @@ export function Sidebar({ settings, setSettings, screens, sharedBackground, onSh
                         </Popover>
                       )}
 
-                      <Select size="xs" label="Fit Mode"
-                        value={sharedBackground.imageFit ?? 'fill'} onChange={handleImageFitChange}
-                        data={[{ value: 'fill', label: 'Fill (Cover)' }, { value: 'fit', label: 'Fit (Contain)' }]}
-                      />
-                      <AlignmentControl
-                        vertical={sharedBackground.imageVerticalAlign ?? 'center'}
-                        horizontal={sharedBackground.imageHorizontalAlign ?? 'center'}
-                        onVerticalChange={(v) => handleVerticalAlignChange(v)}
-                        onHorizontalChange={(h) => handleHorizontalAlignChange(h)}
-                      />
+                      <Group gap="md" align="flex-start" wrap="nowrap">
+                        {/* Fit Mode toggle */}
+                        <Box style={{ flex: 1 }}>
+                          <Text size="xs" c="dimmed" mb={4} tt="uppercase" ta="center">Fit Mode</Text>
+                          <SimpleGrid cols={2} spacing={4}>
+                            {([['fill', 'Fill'], ['fit', 'Fit']] as const).map(([value, label]) => {
+                              const isFill = value === 'fill';
+                              const selected = (sharedBackground.imageFit ?? 'fill') === value;
+                              return (
+                                <Box
+                                  key={value}
+                                  onClick={() => handleImageFitChange(value)}
+                                  style={{
+                                    border: '2px solid',
+                                    borderColor: selected ? '#228be6' : '#dee2e6',
+                                    borderRadius: 6,
+                                    padding: '6px 2px 4px',
+                                    cursor: 'pointer',
+                                    textAlign: 'center',
+                                    backgroundColor: selected ? '#e7f5ff' : 'white',
+                                    transition: 'all 0.2s',
+                                  }}
+                                >
+                                  <Box style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 24, marginBottom: 2 }}>
+                                    <Box style={{
+                                      position: 'relative', width: 28, height: 22,
+                                      border: '2px solid #495057', borderRadius: 2,
+                                      overflow: isFill ? 'hidden' : undefined,
+                                      display: isFill ? undefined : 'flex', alignItems: 'center', justifyContent: 'center',
+                                    }}>
+                                      {isFill ? (
+                                        <Box style={{ position: 'absolute', inset: -3, background: 'linear-gradient(135deg, #a8d8ea 0%, #aa96da 50%, #fcbad3 100%)' }} />
+                                      ) : (
+                                        <Box style={{ width: 14, height: 16, borderRadius: 1, background: 'linear-gradient(135deg, #a8d8ea 0%, #aa96da 50%, #fcbad3 100%)' }} />
+                                      )}
+                                    </Box>
+                                  </Box>
+                                  <Text size="xs" fw={500}>{label}</Text>
+                                </Box>
+                              );
+                            })}
+                          </SimpleGrid>
+                        </Box>
+                        {/* Alignment pad */}
+                        <AlignmentControl
+                          vertical={sharedBackground.imageVerticalAlign ?? 'center'}
+                          horizontal={sharedBackground.imageHorizontalAlign ?? 'center'}
+                          onVerticalChange={(v) => handleVerticalAlignChange(v)}
+                          onHorizontalChange={(h) => handleHorizontalAlignChange(h)}
+                        />
+                      </Group>
                       {recommendedDimensions && (
                         <Box style={{ backgroundColor: '#f1f3f5', borderRadius: 8, padding: '8px 12px' }}>
                           <Text size="xs" c="dimmed">Recommended size: {recommendedDimensions.width} x {recommendedDimensions.height}px</Text>
