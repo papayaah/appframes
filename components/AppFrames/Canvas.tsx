@@ -27,6 +27,7 @@ interface CanvasProps {
   onFrameScaleChange?: (screenIndex: number, frameIndex: number, frameScale: number) => void;
   onFrameRotateChange?: (screenIndex: number, frameIndex: number, rotateZ: number) => void;
   onMediaSelect?: (screenIndex: number, frameIndex: number, mediaId: number) => void;
+  onCanvasBackgroundMediaSelect?: (screenIndex: number, mediaId: number) => void;
   onPexelsSelect?: (screenIndex: number, frameIndex: number, url: string) => void;
   onSelectTextElement?: (screenIndex: number, textId: string | null) => void;
   onUpdateTextElement?: (screenIndex: number, textId: string, updates: any) => void;
@@ -71,6 +72,7 @@ export function Canvas({
   onFrameScaleChange,
   onFrameRotateChange,
   onMediaSelect,
+  onCanvasBackgroundMediaSelect,
   onPexelsSelect,
   onSelectTextElement,
   onUpdateTextElement,
@@ -413,14 +415,13 @@ export function Canvas({
                 })();
                 const mediaId = Number(mediaIdRaw);
                 if (Number.isFinite(mediaId) && mediaId > 0) {
-                  const targetFrameIndex =
-                    dropFrameIndex ??
-                    hoveredFrameIndex ??
-                    // Fall back to currently selected frame (primary screen), or 0.
-                    (screenIndex === selectedScreenIndices[selectedScreenIndices.length - 1]
-                      ? (selectedFrameIndex ?? 0)
-                      : 0);
-                  onMediaSelect?.(screenIndex, targetFrameIndex, mediaId);
+                  // If dropped directly on a frame, put it in that frame
+                  if (dropFrameIndex != null) {
+                    onMediaSelect?.(screenIndex, dropFrameIndex, mediaId);
+                  } else {
+                    // Dropped on canvas background area (not on a frame) → set as canvas background
+                    onCanvasBackgroundMediaSelect?.(screenIndex, mediaId);
+                  }
                   setHoveredFrameIndex(null);
                   setHoveredScreenIndex(null);
                   setDragFileCount(0);

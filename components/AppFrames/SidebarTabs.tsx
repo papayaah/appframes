@@ -9,7 +9,7 @@ import { DeviceTab } from './DeviceTab';
 import { TextTab } from './TextTab';
 import { LayersTab } from './LayersTab';
 import { MediaLibrary } from './MediaLibrary';
-import { CanvasSettings, Screen } from './AppFrames';
+import { CanvasSettings, SharedBackground, Screen } from './AppFrames';
 
 interface SidebarTabsProps {
   settings: CanvasSettings;
@@ -22,6 +22,10 @@ interface SidebarTabsProps {
   onDownloadFormatChange: (format: 'png' | 'jpg') => void;
   downloadJpegQuality: number;
   onDownloadJpegQualityChange: (quality: number) => void;
+  // Shared background
+  sharedBackground?: SharedBackground;
+  onSharedBackgroundChange?: (sharedBg: SharedBackground | undefined) => void;
+  onToggleScreenInSharedBg?: (screenId: string) => void;
 }
 
 type TabId = 'layout' | 'device' | 'text' | 'layers' | 'media' | 'settings';
@@ -67,6 +71,9 @@ export function SidebarTabs({
   onDownloadFormatChange,
   downloadJpegQuality,
   onDownloadJpegQualityChange,
+  sharedBackground,
+  onSharedBackgroundChange,
+  onToggleScreenInSharedBg,
 }: SidebarTabsProps) {
   const [activeTab, setActiveTab] = useState<TabId | null>(null);
   const [isPinned, setIsPinned] = useState(false);
@@ -309,7 +316,8 @@ export function SidebarTabs({
   const renderPanelContent = (tabId: TabId) => {
     switch (tabId) {
       case 'layout':
-        return <Sidebar settings={settings} setSettings={setSettings} screens={screens} />;
+        return <Sidebar settings={settings} setSettings={setSettings} screens={screens}
+          sharedBackground={sharedBackground} onSharedBackgroundChange={onSharedBackgroundChange} onToggleScreenInSharedBg={onToggleScreenInSharedBg} />;
       case 'device':
         return <DeviceTab />;
       case 'text':

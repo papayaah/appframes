@@ -1,6 +1,6 @@
 'use client';
 
-import { memo, useEffect, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { Box, Group, Text, ActionIcon } from '@mantine/core';
 import { IconPlus, IconX, IconCheck, IconCopy } from '@tabler/icons-react';
 import { Screen, CanvasSettings, SharedBackground } from './AppFrames';
@@ -35,7 +35,8 @@ interface ScreensPanelProps {
   removeScreen: (id: string) => void;
   duplicateScreen?: (screenIndex: number) => void;
   selectedIndices: number[];
-  onSelectScreen: (index: number, multi: boolean) => void;
+  onSelectScreen: (index: number, toggle: boolean, shift?: boolean) => void;
+  onSetScreenSelection?: (indices: number[]) => void;
   onReorderScreens?: (fromIndex: number, toIndex: number) => void;
   onMediaUpload?: (file: File) => Promise<number | null>;
   sharedBackground?: SharedBackground;
@@ -174,6 +175,7 @@ export function ScreensPanel({
   duplicateScreen,
   selectedIndices,
   onSelectScreen,
+  onSetScreenSelection,
   onReorderScreens,
   onMediaUpload,
   sharedBackground,
@@ -183,6 +185,73 @@ export function ScreensPanel({
   const lastScrollTimeRef = useRef(0);
   const dragFromIndexRef = useRef<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+
+  // Drag-to-select: click on panel background and drag across thumbnails
+  const isDragSelectingRef = useRef(false);
+  const dragSelectStartXRef = useRef<number | null>(null);
+  const dragSelectAdditive = useRef(false); // Cmd/Ctrl held = add to existing selection
+  const dragSelectBaseIndices = useRef<number[]>([]); // Pre-existing selection when additive
+
+  const handlePanelMouseDown = useCallback((e: React.MouseEvent) => {
+    // Only start drag-select from the panel background, not from a screen thumbnail
+    const target = e.target as HTMLElement;
+    if (target.closest('[data-screen-index]')) return;
+    if (!onSetScreenSelection) return;
+
+    isDragSelectingRef.current = true;
+    dragSelectStartXRef.current = e.clientX;
+    dragSelectAdditive.current = e.metaKey || e.ctrlKey;
+    dragSelectBaseIndices.current = dragSelectAdditive.current ? [...selectedIndices] : [];
+  }, [onSetScreenSelection, selectedIndices]);
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isDragSelectingRef.current || dragSelectStartXRef.current == null) return;
+      if (!onSetScreenSelection) return;
+
+      const panel = panelRef.current;
+      if (!panel) return;
+
+      const startX = dragSelectStartXRef.current;
+      const currentX = e.clientX;
+      const minX = Math.min(startX, currentX);
+      const maxX = Math.max(startX, currentX);
+
+      const screenEls = panel.querySelectorAll('[data-screen-index]');
+      const swept: number[] = [];
+
+      screenEls.forEach((el) => {
+        const rect = el.getBoundingClientRect();
+        // Select if the thumbnail overlaps with the drag range
+        if (rect.right >= minX && rect.left <= maxX) {
+          const idx = parseInt(el.getAttribute('data-screen-index')!, 10);
+          swept.push(idx);
+        }
+      });
+
+      // Merge with base selection when additive (Cmd/Ctrl held)
+      const base = dragSelectBaseIndices.current;
+      const merged = dragSelectAdditive.current
+        ? Array.from(new Set([...base, ...swept]))
+        : swept;
+
+      if (merged.length > 0) {
+        onSetScreenSelection(merged);
+      }
+    };
+
+    const handleMouseUp = () => {
+      isDragSelectingRef.current = false;
+      dragSelectStartXRef.current = null;
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [onSetScreenSelection]);
 
   // Mouse wheel should only switch screens when hovering this panel.
   // Keep horizontal scrolling for the thumbnail strip (trackpads / shift+wheel).
@@ -255,6 +324,7 @@ export function ScreensPanel({
   return (
     <Box
       ref={panelRef}
+      onMouseDown={handlePanelMouseDown}
       style={{
         borderTop: '1px solid #E5E7EB',
         padding: '12px 20px',
@@ -262,6 +332,7 @@ export function ScreensPanel({
         height: 104,
         boxShadow: '0 -2px 8px rgba(0,0,0,0.05)',
         overflowX: 'auto', // Allow horizontal scrolling if many screens
+        userSelect: isDragSelectingRef.current ? 'none' : undefined,
       }}
     >
       <Group gap="md" align="flex-start" wrap="nowrap">
@@ -278,6 +349,7 @@ export function ScreensPanel({
               }}
             >
               <Box
+                data-screen-index={index}
                 style={{
                   position: 'relative',
                   width: 60,
@@ -296,7 +368,7 @@ export function ScreensPanel({
                       : 'none',
                   outlineOffset: 2,
                 }}
-                onClick={(e) => onSelectScreen(index, e.metaKey || e.ctrlKey || e.shiftKey)}
+                onClick={(e) => onSelectScreen(index, e.metaKey || e.ctrlKey, e.shiftKey)}
                 draggable={true}
                 onDragStart={(e) => {
                   dragFromIndexRef.current = index;

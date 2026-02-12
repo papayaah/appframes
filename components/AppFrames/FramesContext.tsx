@@ -79,6 +79,13 @@ export const getCanvasDimensions = (canvasSize: string, orientation: string) => 
   return dim;
 };
 
+// Returns true if the canvas size has a fixed aspect ratio (orientation toggle has no effect)
+export const isFixedOrientationCanvas = (canvasSize: string): boolean => {
+  const portrait = getCanvasDimensions(canvasSize, 'portrait');
+  const landscape = getCanvasDimensions(canvasSize, 'landscape');
+  return portrait.width === landscape.width && portrait.height === landscape.height;
+};
+
 // Helper function to convert canvas size ID to readable label
 export const getCanvasSizeLabel = (canvasSize: string): string => {
   const labels: Record<string, string> = {
@@ -200,7 +207,7 @@ interface FramesContextType {
   setFrameSelectionVisible: (visible: boolean) => void;
   primarySelectedIndex: number;
   settings: CanvasSettings;
-  handleScreenSelect: (index: number, multi: boolean) => void;
+  handleScreenSelect: (index: number, toggle: boolean, shift?: boolean) => void;
   addScreen: (imageOrMediaId?: string | number) => void;
   addFrameSlot: () => void;
   updateSelectedScreenSettings: (updates: Partial<Omit<CanvasSettings, 'selectedScreenIndex'>>) => void;
@@ -458,8 +465,18 @@ export function FramesProvider({ children }: { children: ReactNode }) {
     });
   }, [commitDoc]);
 
-  const handleScreenSelect = (index: number, multi: boolean) => {
-    if (multi) {
+  const handleScreenSelect = (index: number, toggle: boolean, shift?: boolean) => {
+    if (shift) {
+      // Shift+click: range selection from last selected to clicked index
+      setSelectedScreenIndices(prev => {
+        const anchor = prev.length > 0 ? prev[prev.length - 1] : 0;
+        const start = Math.min(anchor, index);
+        const end = Math.max(anchor, index);
+        const range: number[] = [];
+        for (let i = start; i <= end; i++) range.push(i);
+        return range;
+      });
+    } else if (toggle) {
       setSelectedScreenIndices(prev => {
         if (prev.includes(index)) {
           // Deselect if already selected, unless it's the only one

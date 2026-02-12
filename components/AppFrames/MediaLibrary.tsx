@@ -54,7 +54,7 @@ interface MediaLibraryProps {
 }
 
 const mantinePreset: ComponentPreset = {
-  Card: ({ children, onClick, selected, className, style }) => (
+  Card: ({ children, onClick, selected, className, style, ...rest }) => (
     <Card
       shadow="sm"
       padding="md"
@@ -69,6 +69,7 @@ const mantinePreset: ComponentPreset = {
         transition: 'all 0.15s',
         ...style,
       }}
+      {...rest}
     >
       {children}
     </Card>

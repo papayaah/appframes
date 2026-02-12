@@ -1,10 +1,15 @@
 'use client';
 
-import { useState } from 'react';
-import { Stack, Text, SimpleGrid, Box, Group } from '@mantine/core';
+import { useState, useMemo } from 'react';
+import { Stack, Text, SimpleGrid, Box, Group, Button, SegmentedControl, Select, Popover, Card, Image, Badge, Loader, Center, Skeleton } from '@mantine/core';
 import { IconChevronDown, IconBrandApple, IconBrandGooglePlay } from '@tabler/icons-react';
-import { CanvasSettings, Screen } from './AppFrames';
+import { CanvasSettings, SharedBackground, Screen } from './AppFrames';
 import { getCanvasDimensions } from './FramesContext';
+import { GradientEditor } from './GradientEditor';
+import { getRecommendedImageDimensions } from './sharedBackgroundUtils';
+import { useMediaImage } from '../../hooks/useMediaImage';
+import { QuickMediaPicker, MediaLibraryProvider } from '@reactkits.dev/react-media-library';
+import type { ComponentPreset } from '@reactkits.dev/react-media-library';
 
 // Helper to detect if a background value is a gradient
 export const isGradient = (color: string): boolean => {
@@ -458,10 +463,60 @@ function DeviceIcon({ deviceId, size = 40 }: { deviceId: string; size?: number }
   );
 }
 
+// Minimal Mantine preset for QuickMediaPicker (shared background image selection)
+const quickPickerPreset: ComponentPreset = {
+  Card: ({ children, onClick, selected, style }) => (
+    <Card shadow="none" padding={0} radius="sm" withBorder onClick={onClick}
+      style={{ cursor: onClick ? 'pointer' : 'default', borderColor: selected ? 'var(--mantine-color-violet-6)' : undefined, borderWidth: selected ? 2 : 1, ...style }}>
+      {children}
+    </Card>
+  ),
+  Button: ({ children, onClick, variant = 'primary', disabled, loading, size = 'md', fullWidth, leftIcon, ...rest }) => (
+    <Button onClick={onClick} variant={variant === 'primary' ? 'filled' : variant === 'danger' ? 'filled' : 'light'}
+      color={variant === 'danger' ? 'red' : 'violet'} disabled={disabled} loading={loading} size={size} fullWidth={fullWidth} leftSection={leftIcon} {...rest}>
+      {children}
+    </Button>
+  ),
+  TextInput: () => null, Select: () => null, Checkbox: () => null,
+  Badge: ({ children }) => <Badge size="xs">{children}</Badge>,
+  Image: ({ src, alt, style, onLoad }) => <Image src={src} alt={alt} style={style} fit="cover" w="100%" h="100%" onLoad={onLoad} />,
+  Modal: () => null,
+  Loader: ({ size = 'md' }) => <Loader size={size} />,
+  EmptyState: ({ icon, message }) => (<Center p="md"><Stack align="center" gap="xs">{icon}<Text size="xs" c="dimmed">{message}</Text></Stack></Center>),
+  FileButton: () => null,
+  Grid: ({ children, columns = 3, gap = '6px' }) => (<div style={{ display: 'grid', gridTemplateColumns: `repeat(${columns}, 1fr)`, gap }}>{children}</div>),
+  Skeleton: () => <Skeleton height={60} />,
+  UploadCard: () => null, Viewer: () => null, ViewerThumbnail: () => null,
+};
+
+// Shared background gradient preview
+function SharedGradientPreview({ gradient }: { gradient: NonNullable<SharedBackground['gradient']> }) {
+  const directionMap: Record<string, string> = {
+    'horizontal': 'to right', 'vertical': 'to bottom', 'diagonal-down': '135deg', 'diagonal-up': '45deg',
+  };
+  const direction = directionMap[gradient.direction] || 'to right';
+  const stops = gradient.stops.map(s => `${s.color} ${s.position}%`).join(', ');
+  return (
+    <Box style={{ width: '100%', height: 40, borderRadius: 8, background: `linear-gradient(${direction}, ${stops})`, border: '1px solid #dee2e6' }} />
+  );
+}
+
+// Shared background image preview
+function SharedImagePreview({ mediaId }: { mediaId: number }) {
+  const { imageUrl } = useMediaImage(mediaId);
+  if (!imageUrl) return null;
+  return (
+    <Box style={{ width: '100%', height: 60, borderRadius: 8, backgroundImage: `url(${imageUrl})`, backgroundSize: 'cover', backgroundPosition: 'center', border: '1px solid #dee2e6' }} />
+  );
+}
+
 interface SidebarProps {
   settings: CanvasSettings;
   setSettings: (settings: CanvasSettings) => void;
   screens: Screen[];
+  sharedBackground?: SharedBackground;
+  onSharedBackgroundChange?: (sharedBg: SharedBackground | undefined) => void;
+  onToggleScreenInSharedBg?: (screenId: string) => void;
 }
 
 const CompositionButton = ({
@@ -575,7 +630,7 @@ const CompositionButton = ({
   </Box>
 );
 
-export function Sidebar({ settings, setSettings, screens }: SidebarProps) {
+export function Sidebar({ settings, setSettings, screens, sharedBackground, onSharedBackgroundChange, onToggleScreenInSharedBg }: SidebarProps) {
   const currentScreen = screens[settings.selectedScreenIndex];
   const hasAnyFrames = (currentScreen?.images ?? []).some((img) => !(img?.cleared === true) && img?.diyOptions);
   const effectiveComposition = hasAnyFrames ? settings.composition : undefined;
@@ -606,6 +661,82 @@ export function Sidebar({ settings, setSettings, screens }: SidebarProps) {
   // Check if a device is currently selected
   const isDeviceSelected = (device: DeviceConfig) => {
     return device.sizes.some((s) => s.value === settings.canvasSize);
+  };
+
+  // Shared background state & handlers
+  const [sharedGradientOpen, setSharedGradientOpen] = useState(false);
+  const [imagePickerOpen, setImagePickerOpen] = useState(false);
+
+  const isSharedMode = sharedBackground?.enabled && sharedBackground.screenIds.length >= 2;
+  const hasSharedBackgroundSupport = !!onSharedBackgroundChange && screens.length >= 2;
+
+  const recommendedDimensions = useMemo(() => {
+    if (!sharedBackground || sharedBackground.screenIds.length < 2) return null;
+    return getRecommendedImageDimensions(sharedBackground.screenIds.length, settings.canvasSize, settings.orientation);
+  }, [sharedBackground?.screenIds.length, settings.canvasSize, settings.orientation]);
+
+  const handleBackgroundModeChange = (mode: string) => {
+    if (mode === 'shared' && !sharedBackground?.enabled) {
+      const allScreenIds = screens.map(s => s.id);
+      onSharedBackgroundChange?.({
+        enabled: true, screenIds: allScreenIds, type: 'gradient',
+        gradient: { stops: [{ color: '#667eea', position: 0 }, { color: '#764ba2', position: 100 }], direction: 'horizontal' },
+      });
+    } else if (mode === 'per-screen' && sharedBackground?.enabled) {
+      onSharedBackgroundChange?.(undefined);
+    }
+  };
+
+  const handleSharedTypeChange = (type: 'gradient' | 'image') => {
+    if (!sharedBackground) return;
+    onSharedBackgroundChange?.({ ...sharedBackground, type });
+  };
+
+  const handleSelectMedia = (mediaId: number) => {
+    if (!sharedBackground) return;
+    onSharedBackgroundChange?.({ ...sharedBackground, mediaId });
+    setImagePickerOpen(false);
+  };
+
+  const handleGradientApply = (gradientString: string) => {
+    if (!sharedBackground) return;
+    const dirMatch = gradientString.match(/linear-gradient\(([^,]+)/);
+    const colorStops = gradientString.match(/#[a-fA-F0-9]{6}\s+[\d.]+%/g) || [];
+    let direction: NonNullable<SharedBackground['gradient']>['direction'] = 'horizontal';
+    if (dirMatch) {
+      const dir = dirMatch[1].trim();
+      if (dir === 'to bottom' || dir === '180deg') direction = 'vertical';
+      else if (dir === '135deg') direction = 'diagonal-down';
+      else if (dir === '45deg') direction = 'diagonal-up';
+    }
+    const stops = colorStops.map(s => {
+      const parts = s.trim().split(/\s+/);
+      return { color: parts[0], position: parseFloat(parts[1]) };
+    });
+    if (stops.length >= 2) {
+      onSharedBackgroundChange?.({ ...sharedBackground, gradient: { stops, direction } });
+    }
+    setSharedGradientOpen(false);
+  };
+
+  const handleDirectionChange = (direction: string | null) => {
+    if (!sharedBackground?.gradient || !direction) return;
+    onSharedBackgroundChange?.({ ...sharedBackground, gradient: { ...sharedBackground.gradient, direction: direction as NonNullable<SharedBackground['gradient']>['direction'] } });
+  };
+
+  const handleImageFitChange = (fit: string | null) => {
+    if (!sharedBackground || !fit) return;
+    onSharedBackgroundChange?.({ ...sharedBackground, imageFit: fit as 'fill' | 'fit' });
+  };
+
+  const handleVerticalAlignChange = (align: string | null) => {
+    if (!sharedBackground || !align) return;
+    onSharedBackgroundChange?.({ ...sharedBackground, imageVerticalAlign: align as 'top' | 'center' | 'bottom' });
+  };
+
+  const handleHorizontalAlignChange = (align: string | null) => {
+    if (!sharedBackground || !align) return;
+    onSharedBackgroundChange?.({ ...sharedBackground, imageHorizontalAlign: align as 'left' | 'center' | 'right' });
   };
 
   return (
@@ -795,6 +926,158 @@ export function Sidebar({ settings, setSettings, screens }: SidebarProps) {
           />
         </Box>
       </Box>
+
+      {/* Shared Background */}
+      {hasSharedBackgroundSupport && (
+        <Box>
+          <Text size="xs" c="dimmed" mb="xs" tt="uppercase">
+            Background
+          </Text>
+
+          <SegmentedControl
+            fullWidth
+            size="xs"
+            mb="sm"
+            value={isSharedMode ? 'shared' : 'per-screen'}
+            onChange={handleBackgroundModeChange}
+            data={[
+              { label: 'Per Screen', value: 'per-screen' },
+              { label: 'Shared', value: 'shared' },
+            ]}
+          />
+
+          {isSharedMode && sharedBackground && (
+            <Stack gap="sm">
+              {/* Screen Selector */}
+              <Box>
+                <Text size="sm" fw={600} mb="xs">Screens in Group</Text>
+                <Group gap={4}>
+                  {screens.map((screen, idx) => {
+                    const isInGroup = sharedBackground.screenIds.includes(screen.id);
+                    return (
+                      <Button key={screen.id} size="xs" variant={isInGroup ? 'filled' : 'light'}
+                        onClick={() => onToggleScreenInSharedBg?.(screen.id)}
+                        style={{ minWidth: 32, padding: '0 8px' }}>
+                        {idx + 1}
+                      </Button>
+                    );
+                  })}
+                </Group>
+                {sharedBackground.screenIds.length < 2 && (
+                  <Text size="xs" c="red" mt={4}>Select at least 2 screens</Text>
+                )}
+              </Box>
+
+              {/* Type Selector */}
+              <Box>
+                <Text size="sm" fw={600} mb="xs">Background Type</Text>
+                <SegmentedControl fullWidth size="xs"
+                  value={sharedBackground.type}
+                  onChange={(v) => handleSharedTypeChange(v as 'gradient' | 'image')}
+                  data={[
+                    { label: 'Gradient', value: 'gradient' },
+                    { label: 'Image', value: 'image' },
+                  ]}
+                />
+              </Box>
+
+              {/* Gradient Controls */}
+              {sharedBackground.type === 'gradient' && sharedBackground.gradient && (
+                <Stack gap="xs">
+                  <SharedGradientPreview gradient={sharedBackground.gradient} />
+                  <Select size="xs" label="Direction"
+                    value={sharedBackground.gradient.direction}
+                    onChange={handleDirectionChange}
+                    data={[
+                      { value: 'horizontal', label: 'Horizontal (Left to Right)' },
+                      { value: 'vertical', label: 'Vertical (Top to Bottom)' },
+                      { value: 'diagonal-down', label: 'Diagonal (Top-Left to Bottom-Right)' },
+                      { value: 'diagonal-up', label: 'Diagonal (Bottom-Left to Top-Right)' },
+                    ]}
+                  />
+                  <Popover opened={sharedGradientOpen} onChange={setSharedGradientOpen} position="bottom" withArrow>
+                    <Popover.Target>
+                      <Button size="xs" variant="light" fullWidth onClick={() => setSharedGradientOpen(true)}>Edit Colors</Button>
+                    </Popover.Target>
+                    <Popover.Dropdown>
+                      <GradientEditor
+                        initialGradient={
+                          sharedBackground.gradient
+                            ? `linear-gradient(to right, ${sharedBackground.gradient.stops.map(s => `${s.color} ${s.position}%`).join(', ')})`
+                            : undefined
+                        }
+                        onApply={handleGradientApply}
+                        onCancel={() => setSharedGradientOpen(false)}
+                      />
+                    </Popover.Dropdown>
+                  </Popover>
+                </Stack>
+              )}
+
+              {/* Image Controls */}
+              {sharedBackground.type === 'image' && (
+                <Stack gap="xs">
+                  {sharedBackground.mediaId ? (
+                    <>
+                      <SharedImagePreview mediaId={sharedBackground.mediaId} />
+                      <Group grow>
+                        <Popover opened={imagePickerOpen} onChange={setImagePickerOpen} position="bottom" withArrow width={280}>
+                          <Popover.Target>
+                            <Button size="xs" variant="light" onClick={() => setImagePickerOpen(true)}>Change Image</Button>
+                          </Popover.Target>
+                          <Popover.Dropdown p={0}>
+                            <MediaLibraryProvider enableDragDrop={false}>
+                              <QuickMediaPicker onSelectMedia={handleSelectMedia} onClose={() => setImagePickerOpen(false)}
+                                preset={quickPickerPreset} width={280} scrollHeight={200} maxItems={9} columns={3} gap="4px" />
+                            </MediaLibraryProvider>
+                          </Popover.Dropdown>
+                        </Popover>
+                        <Button size="xs" variant="light" color="red"
+                          onClick={() => onSharedBackgroundChange?.({ ...sharedBackground, mediaId: undefined })}>
+                          Remove
+                        </Button>
+                      </Group>
+                    </>
+                  ) : (
+                    <Popover opened={imagePickerOpen} onChange={setImagePickerOpen} position="bottom" withArrow width={280}>
+                      <Popover.Target>
+                        <Button size="xs" variant="light" fullWidth onClick={() => setImagePickerOpen(true)}>Select Image</Button>
+                      </Popover.Target>
+                      <Popover.Dropdown p={0}>
+                        <MediaLibraryProvider enableDragDrop={false}>
+                          <QuickMediaPicker onSelectMedia={handleSelectMedia} onClose={() => setImagePickerOpen(false)}
+                            preset={quickPickerPreset} width={280} scrollHeight={200} maxItems={9} columns={3} gap="4px" />
+                        </MediaLibraryProvider>
+                      </Popover.Dropdown>
+                    </Popover>
+                  )}
+
+                  <Select size="xs" label="Fit Mode"
+                    value={sharedBackground.imageFit ?? 'fill'} onChange={handleImageFitChange}
+                    data={[{ value: 'fill', label: 'Fill (Cover)' }, { value: 'fit', label: 'Fit (Contain)' }]}
+                  />
+                  <Group grow>
+                    <Select size="xs" label="Vertical"
+                      value={sharedBackground.imageVerticalAlign ?? 'center'} onChange={handleVerticalAlignChange}
+                      data={[{ value: 'top', label: 'Top' }, { value: 'center', label: 'Center' }, { value: 'bottom', label: 'Bottom' }]}
+                    />
+                    <Select size="xs" label="Horizontal"
+                      value={sharedBackground.imageHorizontalAlign ?? 'center'} onChange={handleHorizontalAlignChange}
+                      data={[{ value: 'left', label: 'Left' }, { value: 'center', label: 'Center' }, { value: 'right', label: 'Right' }]}
+                    />
+                  </Group>
+                  {recommendedDimensions && (
+                    <Box style={{ backgroundColor: '#f1f3f5', borderRadius: 8, padding: '8px 12px' }}>
+                      <Text size="xs" c="dimmed">Recommended size: {recommendedDimensions.width} x {recommendedDimensions.height}px</Text>
+                      <Text size="xs" c="dimmed">Aspect ratio: {recommendedDimensions.aspectRatio}</Text>
+                    </Box>
+                  )}
+                </Stack>
+              )}
+            </Stack>
+          )}
+        </Box>
+      )}
     </Stack>
   );
 }

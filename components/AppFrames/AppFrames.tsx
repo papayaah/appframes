@@ -576,6 +576,9 @@ export function AppFrames() {
                 replaceScreen(primarySelectedIndex, mediaId, selectedFrameIndex);
               }
             }}
+            sharedBackground={currentSharedBackground}
+            onSharedBackgroundChange={(sharedBg) => setSharedBackground(currentCanvasSize, sharedBg)}
+            onToggleScreenInSharedBg={toggleScreenInSharedBackground}
           />
         </AppShell.Navbar>
       )}
@@ -768,6 +771,9 @@ export function AppFrames() {
             onMediaSelect={(screenIndex, frameIndex, mediaId) => {
               replaceScreen(screenIndex, mediaId, frameIndex);
             }}
+            onCanvasBackgroundMediaSelect={(screenIndex, mediaId) => {
+              setCanvasBackgroundMedia(screenIndex, mediaId);
+            }}
             onPexelsSelect={async (screenIndex, frameIndex, url) => {
               try {
                 // Fetch the pexels image and upload to media library
@@ -791,6 +797,7 @@ export function AppFrames() {
             duplicateScreen={duplicateScreen}
             selectedIndices={selectedScreenIndices}
             onSelectScreen={handleScreenSelect}
+            onSetScreenSelection={setSelectedScreenIndices}
             onReorderScreens={reorderScreens}
             onMediaUpload={handleMediaUpload}
             sharedBackground={currentSharedBackground}
@@ -820,10 +827,6 @@ export function AppFrames() {
                 setCanvasBackgroundMedia(activeFrameScreenIndex, undefined);
               }
             },
-            screens,
-            sharedBackground: currentSharedBackground,
-            onSharedBackgroundChange: (sharedBg) => setSharedBackground(currentCanvasSize, sharedBg),
-            onToggleScreenInSharedBg: toggleScreenInSharedBackground,
           }}
           imageSettings={{
             screenScale: currentScreen?.settings?.screenScale ?? 0,
