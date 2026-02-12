@@ -1,5 +1,5 @@
 import { openDB, DBSchema, IDBPDatabase } from 'idb';
-import type { Screen, TextElement } from '@/components/AppFrames/types';
+import type { Screen, TextElement, BackgroundEffects, SharedBackground } from '@/components/AppFrames/types';
 
 // Project interface - represents a complete project with all its screens
 export interface Project {
@@ -11,6 +11,7 @@ export interface Project {
   primarySelectedIndex: number; // Primary selection (for current canvas size)
   selectedFrameIndex: number | null; // Selected frame within screen
   zoom: number; // Canvas zoom level (10-400)
+  sharedBackgrounds?: Record<string, SharedBackground>; // Shared backgrounds per canvas size
   pristine: boolean; // True if project hasn't been meaningfully edited (auto-delete on sign-in)
   createdAt: Date; // Project creation time
   updatedAt: Date; // Last modification time
@@ -589,6 +590,11 @@ export function validateProject(project: any): Project {
     // zoom: must be a number between 10 and 400
     zoom: clampZoom(project.zoom),
 
+    // sharedBackgrounds: optional object keyed by canvas size
+    sharedBackgrounds: project.sharedBackgrounds && typeof project.sharedBackgrounds === 'object'
+      ? project.sharedBackgrounds as Record<string, SharedBackground>
+      : undefined,
+
     // pristine: boolean (default to false for existing projects without the flag)
     pristine: typeof project.pristine === 'boolean' ? project.pristine : false,
 
@@ -878,6 +884,22 @@ function validateCanvasSettings(settings: any): Omit<Screen['settings'], never> 
     selectedTextId: typeof settings.selectedTextId === 'string' && settings.selectedTextId.length > 0
       ? settings.selectedTextId
       : defaults.selectedTextId,
+
+    backgroundEffects: validateBackgroundEffects(settings.backgroundEffects),
+  };
+}
+
+/**
+ * Validate BackgroundEffects object — returns undefined if no effects are set
+ */
+function validateBackgroundEffects(effects: any): BackgroundEffects | undefined {
+  if (!effects || typeof effects !== 'object') return undefined;
+  return {
+    blur: typeof effects.blur === 'number' ? Math.max(0, Math.min(50, effects.blur)) : 0,
+    overlayColor: typeof effects.overlayColor === 'string' ? effects.overlayColor : '#000000',
+    overlayOpacity: typeof effects.overlayOpacity === 'number' ? Math.max(0, Math.min(100, effects.overlayOpacity)) : 0,
+    vignetteIntensity: typeof effects.vignetteIntensity === 'number' ? Math.max(0, Math.min(100, effects.vignetteIntensity)) : 0,
+    noiseIntensity: typeof effects.noiseIntensity === 'number' ? Math.max(0, Math.min(100, effects.noiseIntensity)) : 0,
   };
 }
 

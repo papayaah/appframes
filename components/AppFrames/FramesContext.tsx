@@ -1218,7 +1218,7 @@ export function FramesProvider({ children }: { children: ReactNode }) {
         })),
       ])
     );
-    resetDocWithHistory({ name: project.name, screensByCanvasSize: screensWithNoSelection });
+    resetDocWithHistory({ name: project.name, screensByCanvasSize: screensWithNoSelection, sharedBackgrounds: project.sharedBackgrounds });
     setCurrentCanvasSize(project.currentCanvasSize);
     setSelectedScreenIndices(project.selectedScreenIndices);
     setSelectedFrameIndex(project.selectedFrameIndex ?? 0);
@@ -1393,6 +1393,7 @@ export function FramesProvider({ children }: { children: ReactNode }) {
         id: currentProjectId,
         name: doc.name,
         screensByCanvasSize: doc.screensByCanvasSize,
+        sharedBackgrounds: doc.sharedBackgrounds,
         currentCanvasSize,
         selectedScreenIndices,
         primarySelectedIndex,
@@ -1436,7 +1437,7 @@ export function FramesProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     saveProjectState(true); // Content changed - mark non-pristine
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [doc.screensByCanvasSize, doc.name]);
+  }, [doc.screensByCanvasSize, doc.name, doc.sharedBackgrounds]);
 
   // Save project state when currentCanvasSize changes
   useEffect(() => {

@@ -34,7 +34,7 @@ function LottieSegment({
       loop={false}
       autoplay={!segment}
       onComplete={onComplete}
-      style={{ width: 120, height: 120 }}
+      style={{ width: 280 }}
     />
   );
 }
@@ -254,11 +254,11 @@ export function FeatureTip({
               backgroundColor: 'white',
               borderRadius: 12,
               boxShadow: '0 4px 20px rgba(0,0,0,0.12)',
-              padding: 16,
+              padding: '8px 16px 12px',
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'center',
-              gap: 8,
+              gap: 0,
               zIndex: containerStyle.zIndex ?? 1000,
             }}
           >
@@ -270,18 +270,20 @@ export function FeatureTip({
               aria-label="Dismiss tip"
             />
 
-            {/* Lottie animation */}
-            {animData && phase !== 'pause' ? (
-              <LottieSegment
-                key={`${currentTip.animationBase}-${phase}-${playCount}`}
-                animationData={animData}
-                segment={currentSegment}
-                speed={1.5}
-                onComplete={handleComplete}
-              />
-            ) : (
-              <Box style={{ width: 120, height: 120 }} />
-            )}
+            {/* Lottie animation — stays mounted during pause so last frame is visible */}
+            <Box style={{ height: 160, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              {animData ? (
+                <LottieSegment
+                  key={`${currentTip.animationBase}-${phase === 'pause' ? 'loop' : phase}-${playCount}`}
+                  animationData={animData}
+                  segment={phase === 'pause' ? undefined : currentSegment}
+                  speed={1.5}
+                  onComplete={handleComplete}
+                />
+              ) : (
+                <Box />
+              )}
+            </Box>
 
             <Text fw={600} size="sm" ta="center">
               {currentTip.title}

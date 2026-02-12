@@ -7,8 +7,7 @@ import { CanvasSettings, SharedBackground, Screen } from './AppFrames';
 import { getCanvasDimensions } from './FramesContext';
 import { GradientEditor } from './GradientEditor';
 import { getRecommendedImageDimensions } from './sharedBackgroundUtils';
-import { BackgroundEffectsPanel } from './BackgroundEffectsPanel';
-import { DEFAULT_BACKGROUND_EFFECTS, type BackgroundEffects } from './types';
+import type { BackgroundEffects } from './types';
 import { useMediaImage } from '../../hooks/useMediaImage';
 import { QuickMediaPicker, MediaLibraryProvider } from '@reactkits.dev/react-media-library';
 import type { ComponentPreset } from '@reactkits.dev/react-media-library';
@@ -1185,16 +1184,6 @@ export function Sidebar({ settings, setSettings, screens, sharedBackground, onSh
                 </>
               )}
 
-              {/* Background Effects — per-screen, applied on top of background */}
-              <Box>
-                <Text size="xs" c="dimmed" mb={4}>Background Effects</Text>
-                <Text size="xs" c="dimmed" mb="xs" style={{ opacity: 0.7 }}>Applied per-screen on top of the background</Text>
-                <BackgroundEffectsPanel
-                  effects={settings.backgroundEffects ?? DEFAULT_BACKGROUND_EFFECTS}
-                  onChange={(effects) => setSettings({ ...settings, backgroundEffects: effects })}
-                  onApplyToAll={onApplyEffectsToAll ? () => onApplyEffectsToAll(settings.backgroundEffects ?? DEFAULT_BACKGROUND_EFFECTS) : undefined}
-                />
-              </Box>
             </Stack>
         </Box>
       )}

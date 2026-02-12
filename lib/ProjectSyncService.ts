@@ -351,6 +351,7 @@ export class ProjectSyncService {
       primarySelectedIndex: project.primarySelectedIndex,
       selectedFrameIndex: project.selectedFrameIndex,
       zoom: project.zoom,
+      sharedBackgrounds: project.sharedBackgrounds,
     };
 
     try {
@@ -420,6 +421,7 @@ export class ProjectSyncService {
       primarySelectedIndex: localProject.primarySelectedIndex,
       selectedFrameIndex: localProject.selectedFrameIndex,
       zoom: localProject.zoom,
+      sharedBackgrounds: localProject.sharedBackgrounds,
     };
 
     try {
@@ -538,6 +540,7 @@ export class ProjectSyncService {
         primarySelectedIndex?: number;
         selectedFrameIndex?: number | null;
         zoom?: number;
+        sharedBackgrounds?: Record<string, unknown>;
       };
 
       const localProject: Project = {
@@ -549,6 +552,7 @@ export class ProjectSyncService {
         primarySelectedIndex: data.primarySelectedIndex ?? 0,
         selectedFrameIndex: data.selectedFrameIndex ?? null,
         zoom: data.zoom ?? 100,
+        sharedBackgrounds: data.sharedBackgrounds as Project['sharedBackgrounds'],
         pristine: false, // Pulled from server, not pristine
         createdAt: new Date(),
         updatedAt: new Date(serverProject.updatedAt),
