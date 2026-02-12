@@ -120,6 +120,10 @@ export interface FrameEffects {
   glowBlur: number;         // 0-60 px
   glowIntensity: number;    // 0-100%
   opacity: number;          // 0-100%, default 100
+  outlineEnabled: boolean;
+  outlineWidth: number;     // 1-10 px
+  outlineColor: string;     // hex color
+  outlineOffset: number;    // 0-20 px
 }
 
 export const DEFAULT_FRAME_EFFECTS: FrameEffects = {
@@ -134,6 +138,10 @@ export const DEFAULT_FRAME_EFFECTS: FrameEffects = {
   glowBlur: 30,
   glowIntensity: 50,
   opacity: 100,
+  outlineEnabled: false,
+  outlineWidth: 2,
+  outlineColor: '#ffffff',
+  outlineOffset: 4,
 };
 
 export interface CanvasSettings {

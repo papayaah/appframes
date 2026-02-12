@@ -321,6 +321,17 @@ const DraggableFrame = ({
       }}
     >
       {children}
+      {fx.outlineEnabled && (
+        <Box
+          style={{
+            position: 'absolute',
+            inset: -fx.outlineOffset - fx.outlineWidth,
+            borderRadius: 10 + fx.outlineOffset,
+            border: `${fx.outlineWidth}px solid ${fx.outlineColor}`,
+            pointerEvents: 'none',
+          }}
+        />
+      )}
       {(isHovered || isSelected) && (
         <Box
           data-export-hide="true"

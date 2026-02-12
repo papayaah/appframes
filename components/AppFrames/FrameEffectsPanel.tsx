@@ -15,6 +15,7 @@ export function FrameEffectsPanel({ effects, onChange }: FrameEffectsPanelProps)
   const hasAnyEffect =
     effects.shadowEnabled ||
     effects.glowEnabled ||
+    effects.outlineEnabled ||
     effects.opacity < 100;
 
   return (
@@ -145,6 +146,59 @@ export function FrameEffectsPanel({ effects, onChange }: FrameEffectsPanelProps)
                 onChange={(v) => update('glowIntensity', v)}
                 min={0}
                 max={100}
+                step={1}
+                size="sm"
+              />
+            </Box>
+          </Stack>
+        )}
+      </Box>
+
+      {/* Outline/Stroke */}
+      <Box>
+        <Group justify="space-between" mb={4}>
+          <Text size="xs" c="dimmed">Outline</Text>
+          <Switch
+            size="xs"
+            checked={effects.outlineEnabled}
+            onChange={(e) => update('outlineEnabled', e.currentTarget.checked)}
+          />
+        </Group>
+        {effects.outlineEnabled && (
+          <Stack gap="xs" mt={4}>
+            <Box>
+              <Text size="xs" c="dimmed" mb={4}>Color</Text>
+              <ColorInput
+                value={effects.outlineColor}
+                onChange={(v) => update('outlineColor', v)}
+                size="xs"
+                withEyeDropper={false}
+              />
+            </Box>
+            <Box>
+              <Group justify="space-between" mb={4}>
+                <Text size="xs" c="dimmed">Width</Text>
+                <Text size="xs" c="dimmed">{effects.outlineWidth}px</Text>
+              </Group>
+              <Slider
+                value={effects.outlineWidth}
+                onChange={(v) => update('outlineWidth', v)}
+                min={1}
+                max={10}
+                step={1}
+                size="sm"
+              />
+            </Box>
+            <Box>
+              <Group justify="space-between" mb={4}>
+                <Text size="xs" c="dimmed">Offset</Text>
+                <Text size="xs" c="dimmed">{effects.outlineOffset}px</Text>
+              </Group>
+              <Slider
+                value={effects.outlineOffset}
+                onChange={(v) => update('outlineOffset', v)}
+                min={0}
+                max={20}
                 step={1}
                 size="sm"
               />
