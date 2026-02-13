@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { AppShell, Box, Center, Loader } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { useMediaQuery } from '@mantine/hooks';
+import { IconFileImport } from '@tabler/icons-react';
 import { Header } from './Header';
 import { SidebarTabs } from './SidebarTabs';
 import { MobileBottomNav, MOBILE_NAV_HEIGHT } from './MobileBottomNav';
@@ -110,6 +111,82 @@ export function AppFrames() {
   const [historyPanelOpen, setHistoryPanelOpen] = useState(false);
   const [canvasSelected, setCanvasSelected] = useState(false);
   const copiedTextElementRef = useRef<TextElement | null>(null);
+
+  // Global drop zone for .appframes import
+  const [importDragOver, setImportDragOver] = useState(false);
+  const importDragCounter = useRef(0);
+
+  useEffect(() => {
+    const isAppframesDrag = (e: DragEvent) => {
+      if (!e.dataTransfer) return false;
+      // Check if any dragged item looks like an .appframes or .zip file
+      for (let i = 0; i < e.dataTransfer.items.length; i++) {
+        const item = e.dataTransfer.items[i];
+        if (item.kind === 'file') return true;
+      }
+      return false;
+    };
+
+    const handleDragEnter = (e: DragEvent) => {
+      if (!isAppframesDrag(e)) return;
+      e.preventDefault();
+      importDragCounter.current++;
+      if (importDragCounter.current === 1) {
+        setImportDragOver(true);
+      }
+    };
+
+    const handleDragLeave = (e: DragEvent) => {
+      e.preventDefault();
+      importDragCounter.current--;
+      if (importDragCounter.current <= 0) {
+        importDragCounter.current = 0;
+        setImportDragOver(false);
+      }
+    };
+
+    const handleDragOver = (e: DragEvent) => {
+      if (importDragOver) {
+        e.preventDefault();
+        if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
+      }
+    };
+
+    const handleDrop = async (e: DragEvent) => {
+      importDragCounter.current = 0;
+      setImportDragOver(false);
+
+      if (!e.dataTransfer?.files.length) return;
+
+      const file = e.dataTransfer.files[0];
+      const name = file.name.toLowerCase();
+      if (!name.endsWith('.appframes') && !name.endsWith('.zip')) return;
+
+      // This is an .appframes import — prevent other handlers
+      e.preventDefault();
+      e.stopPropagation();
+
+      notifications.show({ id: 'import', title: 'Importing project', message: 'Processing archive...', loading: true, autoClose: false });
+      try {
+        await importProject(file);
+        notifications.update({ id: 'import', title: 'Import complete', message: 'Project imported successfully.', loading: false, autoClose: 3000 });
+      } catch (err) {
+        notifications.update({ id: 'import', title: 'Import failed', message: err instanceof Error ? err.message : 'Unknown error', color: 'red', loading: false, autoClose: 5000 });
+      }
+    };
+
+    window.addEventListener('dragenter', handleDragEnter);
+    window.addEventListener('dragleave', handleDragLeave);
+    window.addEventListener('dragover', handleDragOver);
+    window.addEventListener('drop', handleDrop);
+
+    return () => {
+      window.removeEventListener('dragenter', handleDragEnter);
+      window.removeEventListener('dragleave', handleDragLeave);
+      window.removeEventListener('dragover', handleDragOver);
+      window.removeEventListener('drop', handleDrop);
+    };
+  }, [importDragOver, importProject]);
 
   // Track which screen the currently selected frame belongs to (for settings sidebar)
   // This is separate from primarySelectedIndex to avoid reordering canvases when clicking frames
@@ -563,6 +640,42 @@ export function AppFrames() {
   return (
     <CrossCanvasDragProvider>
     <InteractionLockProvider>
+
+      {/* Global drop zone overlay for .appframes import */}
+      {importDragOver && (
+        <Box
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 9999,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            backdropFilter: 'blur(4px)',
+            pointerEvents: 'none',
+          }}
+        >
+          <Box
+            style={{
+              padding: '48px 64px',
+              borderRadius: 16,
+              border: '3px dashed rgba(255, 255, 255, 0.6)',
+              backgroundColor: 'rgba(255, 255, 255, 0.1)',
+              textAlign: 'center',
+            }}
+          >
+            <IconFileImport size={48} color="white" style={{ marginBottom: 12 }} />
+            <div style={{ color: 'white', fontSize: 20, fontWeight: 600 }}>
+              Drop to import project
+            </div>
+            <div style={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: 14, marginTop: 4 }}>
+              .appframes file
+            </div>
+          </Box>
+        </Box>
+      )}
+
       <AppShell
       header={{ height: 45 }}
       navbar={isMobile ? undefined : { width: navWidth, breakpoint: 'sm' }}

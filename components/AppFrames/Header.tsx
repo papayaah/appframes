@@ -303,7 +303,8 @@ export function Header({
                 leftSection={<IconFileImport size={16} />}
                 onClick={() => importInputRef.current?.click()}
               >
-                Import Project
+                <Text size="sm">Import Project</Text>
+                <Text size="xs" c="dimmed">or drag & drop .appframes file</Text>
               </Menu.Item>
             </Menu.Dropdown>
           </Menu>
