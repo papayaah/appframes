@@ -11,7 +11,7 @@
 
 import { persistenceDB, type Project } from './PersistenceDB';
 import { initDB, getFileFromOpfs } from '@reactkits.dev/react-media-library';
-import type { Screen, ScreenImage } from '@/components/AppFrames/types';
+import type { Screen, ScreenImage, SharedBackground } from '@/components/AppFrames/types';
 
 export interface ServerProject {
   id: string;
@@ -156,6 +156,37 @@ async function resolveProjectMedia(
     resolved[canvasSize] = await Promise.all(
       screens.map(screen => resolveScreenMedia(screen, apiBaseUrl))
     );
+  }
+
+  return resolved;
+}
+
+/**
+ * Resolve all media references in shared backgrounds for sync
+ * Uploads local OPFS files to server and stores server paths
+ */
+async function resolveSharedBackgroundMedia(
+  sharedBackgrounds: Record<string, SharedBackground>,
+  apiBaseUrl: string
+): Promise<Record<string, SharedBackground>> {
+  const resolved: Record<string, SharedBackground> = {};
+
+  for (const [canvasSize, bg] of Object.entries(sharedBackgrounds)) {
+    if (bg.type === 'image' && bg.mediaId && !bg.serverMediaPath) {
+      const serverPath = await uploadMediaToServer(bg.mediaId, apiBaseUrl);
+      if (serverPath) {
+        const { mediaId: _, ...rest } = bg;
+        resolved[canvasSize] = { ...rest, serverMediaPath: serverPath };
+      } else {
+        resolved[canvasSize] = bg;
+      }
+    } else if (bg.serverMediaPath) {
+      // Already has server path, strip mediaId
+      const { mediaId: _, ...rest } = bg;
+      resolved[canvasSize] = rest;
+    } else {
+      resolved[canvasSize] = bg;
+    }
   }
 
   return resolved;
@@ -343,6 +374,14 @@ export class ProjectSyncService {
       this.config.apiBaseUrl
     );
 
+    // Resolve shared background media (upload images to server)
+    const resolvedSharedBackgrounds = project.sharedBackgrounds
+      ? await resolveSharedBackgroundMedia(
+          project.sharedBackgrounds as Record<string, SharedBackground>,
+          this.config.apiBaseUrl
+        )
+      : undefined;
+
     // Prepare project data for server (with server media paths)
     const projectData = {
       screensByCanvasSize: resolvedScreens,
@@ -351,7 +390,7 @@ export class ProjectSyncService {
       primarySelectedIndex: project.primarySelectedIndex,
       selectedFrameIndex: project.selectedFrameIndex,
       zoom: project.zoom,
-      sharedBackgrounds: project.sharedBackgrounds,
+      sharedBackgrounds: resolvedSharedBackgrounds ?? project.sharedBackgrounds,
     };
 
     try {
@@ -414,6 +453,14 @@ export class ProjectSyncService {
       this.config.apiBaseUrl
     );
 
+    // Resolve shared background media
+    const resolvedSharedBackgrounds = localProject.sharedBackgrounds
+      ? await resolveSharedBackgroundMedia(
+          localProject.sharedBackgrounds as Record<string, SharedBackground>,
+          this.config.apiBaseUrl
+        )
+      : undefined;
+
     const projectData = {
       screensByCanvasSize: resolvedScreens,
       currentCanvasSize: localProject.currentCanvasSize,
@@ -421,7 +468,7 @@ export class ProjectSyncService {
       primarySelectedIndex: localProject.primarySelectedIndex,
       selectedFrameIndex: localProject.selectedFrameIndex,
       zoom: localProject.zoom,
-      sharedBackgrounds: localProject.sharedBackgrounds,
+      sharedBackgrounds: resolvedSharedBackgrounds ?? localProject.sharedBackgrounds,
     };
 
     try {

@@ -155,6 +155,7 @@ export interface CanvasSettings {
   orientation: 'portrait' | 'landscape';
   backgroundColor: string;
   canvasBackgroundMediaId?: number; // Full-canvas background image (optional)
+  canvasBackgroundServerPath?: string; // Server-side path for canvas background (set during sync)
   backgroundEffects?: BackgroundEffects;
 }
 
@@ -184,6 +185,7 @@ export interface SharedBackground {
   };
   // For image type
   mediaId?: number;  // References media library
+  serverMediaPath?: string; // Server-side media path (for cross-device sync & export)
   imageFit?: 'fill' | 'fit';  // Default: 'fill'
   imageVerticalAlign?: 'top' | 'center' | 'bottom';  // Default: 'center'
   imageHorizontalAlign?: 'left' | 'center' | 'right';  // Default: 'center'

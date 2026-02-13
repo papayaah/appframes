@@ -10,6 +10,7 @@ import { usePersistence } from '@/hooks/usePersistence';
 import { usePatchHistory, type PatchHistoryEntry } from '@/hooks/usePatchHistory';
 import { useProjectSync, type UseProjectSyncResult } from '@/hooks/useProjectSync';
 import { WelcomeModal } from '@/components/WelcomeModal/WelcomeModal';
+import type { ArchiveManifest } from '@/lib/projectArchive';
 
 // Canvas dimensions helper (App Store requirements)
 export const getCanvasDimensions = (canvasSize: string, orientation: string) => {
@@ -252,6 +253,9 @@ interface FramesContextType {
   deleteProject: (projectId: string) => Promise<void>;
   renameProject: (newName: string) => Promise<void>;
   getAllProjects: () => Promise<Project[]>;
+  // Export/Import
+  exportProject: () => Promise<void>;
+  importProject: (file: File) => Promise<void>;
   // Sync status (for signed-in users)
   syncStatus: UseProjectSyncResult['syncStatus'];
   isSignedIn: boolean;
@@ -1652,6 +1656,177 @@ export function FramesProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  /**
+   * Export the current project as a .appframes file (client-side, no server required)
+   */
+  const exportProject = useCallback(async () => {
+    if (!currentProjectId) return;
+
+    const JSZip = (await import('jszip')).default;
+    const { initDB, getFileFromOpfs } = await import('@reactkits.dev/react-media-library');
+    const {
+      ARCHIVE_FORMAT_VERSION,
+      collectClientMediaIds,
+      stripProjectForClientExport,
+      sanitizeFilename,
+    } = await import('@/lib/projectArchive');
+
+
+    const db = await initDB();
+
+    // Build the full project data from current state
+    const projectData: Record<string, unknown> = {
+      screensByCanvasSize: doc.screensByCanvasSize,
+      currentCanvasSize,
+      sharedBackgrounds: doc.sharedBackgrounds,
+      name: doc.name,
+    };
+
+    // Collect all mediaIds referenced in the project
+    const mediaIds = collectClientMediaIds(projectData);
+
+    // Look up each mediaId in IndexedDB to get the OPFS handleName, then read from OPFS
+    const mediaIdToRef = new Map<number, string>();
+    const mediaFiles = new Map<string, Blob>(); // mediaRef -> blob
+    const manifestEntries: Array<{ mediaRef: string; originalPath: string }> = [];
+    let counter = 0;
+
+    const mediaIdArray = Array.from(mediaIds);
+    for (const mediaId of mediaIdArray) {
+      const asset = await db.get('assets', mediaId);
+      if (!asset) continue;
+
+      const file = await getFileFromOpfs(asset.handleName);
+      if (!file) continue;
+
+      counter++;
+      const safeName = sanitizeFilename(asset.fileName || asset.handleName);
+      const mediaRef = `${counter}-${safeName}`;
+
+      mediaIdToRef.set(mediaId, mediaRef);
+      mediaFiles.set(mediaRef, file);
+      manifestEntries.push({ mediaRef, originalPath: `local:${mediaId}:${asset.handleName}` });
+    }
+
+    // Strip project data and rewrite mediaId -> mediaRef
+    const archiveProject = stripProjectForClientExport(projectData, mediaIdToRef);
+    archiveProject.name = doc.name;
+
+    // Build manifest
+    const manifest: ArchiveManifest = {
+      formatVersion: ARCHIVE_FORMAT_VERSION,
+      appVersion: '1.0.0',
+      exportedAt: new Date().toISOString(),
+      projectName: doc.name || 'Untitled',
+      mediaFiles: manifestEntries,
+    };
+
+    // Build ZIP
+    const zip = new JSZip();
+    zip.file('manifest.json', JSON.stringify(manifest, null, 2));
+    zip.file('project.json', JSON.stringify(archiveProject, null, 2));
+
+    mediaFiles.forEach((blob, mediaRef) => {
+      zip.file(`media/${mediaRef}`, blob);
+    });
+
+    const archiveBlob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 6 } });
+
+    // Download
+    const url = URL.createObjectURL(archiveBlob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${(doc.name || 'project').replace(/[^a-zA-Z0-9\-_ ]/g, '').trim()}.appframes`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, [currentProjectId, doc.screensByCanvasSize, currentCanvasSize, doc.sharedBackgrounds, doc.name]);
+
+  /**
+   * Import a .appframes file — client-side extraction, saves media to OPFS, creates local project
+   */
+  const importProject = useCallback(async (file: File) => {
+    const JSZip = (await import('jszip')).default;
+    const { importFileToLibrary } = await import('@reactkits.dev/react-media-library');
+    const {
+      ARCHIVE_FORMAT_VERSION,
+      rewriteMediaRefsToIds,
+    } = await import('@/lib/projectArchive');
+
+
+    // Read and parse ZIP
+    const zip = await JSZip.loadAsync(file);
+
+    const manifestFile = zip.file('manifest.json');
+    if (!manifestFile) throw new Error('Invalid archive: missing manifest.json');
+    const manifest: ArchiveManifest = JSON.parse(await manifestFile.async('string'));
+
+    const projectFile = zip.file('project.json');
+    if (!projectFile) throw new Error('Invalid archive: missing project.json');
+    const projectData: Record<string, unknown> = JSON.parse(await projectFile.async('string'));
+
+    if (manifest.formatVersion > ARCHIVE_FORMAT_VERSION) {
+      throw new Error(`Unsupported format version ${manifest.formatVersion}. Please update AppFrames.`);
+    }
+
+    if (!projectData.screensByCanvasSize || typeof projectData.screensByCanvasSize !== 'object') {
+      throw new Error('Invalid archive: project data missing screensByCanvasSize');
+    }
+
+    // Import media files to local OPFS + IndexedDB
+    const mediaRefToId = new Map<string, number>();
+
+    for (const entry of manifest.mediaFiles) {
+      const mediaZipFile = zip.file(`media/${entry.mediaRef}`);
+      if (!mediaZipFile) continue;
+
+      try {
+        const blob = await mediaZipFile.async('blob');
+        // Guess mime type from filename extension
+        const ext = entry.mediaRef.split('.').pop()?.toLowerCase() || '';
+        const mimeMap: Record<string, string> = {
+          png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg',
+          gif: 'image/gif', webp: 'image/webp', svg: 'image/svg+xml',
+          mp4: 'video/mp4', webm: 'video/webm',
+        };
+        const mimeType = mimeMap[ext] || 'application/octet-stream';
+        const mediaFile = new File([blob], entry.mediaRef, { type: mimeType });
+
+        const mediaId = await importFileToLibrary(mediaFile);
+        mediaRefToId.set(entry.mediaRef, mediaId);
+      } catch (error) {
+        console.error(`Failed to import media ${entry.mediaRef}:`, error);
+      }
+    }
+
+    // Rewrite project data: mediaRef -> local mediaId
+    const rewrittenData = rewriteMediaRefsToIds(projectData, mediaRefToId);
+
+    // Create a new local project in IndexedDB
+    const projectName = (projectData.name as string) || manifest.projectName || 'Imported Project';
+    const newProject: Project = {
+      id: crypto.randomUUID(),
+      name: projectName,
+      screensByCanvasSize: (rewrittenData.screensByCanvasSize as Record<string, Screen[]>) || {},
+      currentCanvasSize: (rewrittenData.currentCanvasSize as string) || 'iphone-6.5',
+      sharedBackgrounds: rewrittenData.sharedBackgrounds as Record<string, SharedBackground> | undefined,
+      selectedScreenIndices: [],
+      primarySelectedIndex: 0,
+      selectedFrameIndex: null,
+      zoom: 100,
+      pristine: false,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      lastAccessedAt: new Date(),
+    };
+
+    await persistenceDB.saveProject(newProject);
+
+    // Switch to the imported project
+    await switchProject(newProject.id);
+  }, [switchProject]);
+
   return (
     <FramesContext.Provider
       value={{
@@ -1707,6 +1882,8 @@ export function FramesProvider({ children }: { children: ReactNode }) {
         deleteProject,
         renameProject,
         getAllProjects,
+        exportProject,
+        importProject,
         syncStatus,
         isSignedIn,
         syncAll,

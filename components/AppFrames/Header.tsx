@@ -3,7 +3,8 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { Group, Text, ActionIcon, Box, Slider, Tooltip, Menu, Button, Modal, TextInput, Stack, Badge } from '@mantine/core';
-import { IconDownload, IconChevronDown, IconPlus, IconEdit, IconTrash, IconFolder, IconAlertCircle, IconUser, IconHistory, IconCloud, IconRefresh } from '@tabler/icons-react';
+import { IconDownload, IconChevronDown, IconPlus, IconEdit, IconTrash, IconFolder, IconAlertCircle, IconUser, IconHistory, IconCloud, IconRefresh, IconFileExport, IconFileImport } from '@tabler/icons-react';
+import { notifications } from '@mantine/notifications';
 import { useState, useEffect, useRef } from 'react';
 import type { SyncStatus } from '@/lib/ProjectSyncService';
 import type { Project } from '@/lib/PersistenceDB';
@@ -33,6 +34,10 @@ interface HeaderProps {
   onRenameProject?: (newName: string) => Promise<void>;
   onDeleteProject?: (projectId: string) => Promise<void>;
   onGetAllProjects?: () => Promise<Project[]>;
+  // Export/Import
+  onExportProject?: () => Promise<void>;
+  onImportProject?: (file: File) => Promise<void>;
+  isSignedIn?: boolean;
   // Save & sync status
   saveStatus?: 'idle' | 'saving' | 'saved' | 'error';
   syncStatus?: SyncStatus;
@@ -124,6 +129,9 @@ export function Header({
   onRenameProject,
   onDeleteProject,
   onGetAllProjects,
+  onExportProject,
+  onImportProject,
+  isSignedIn = false,
   saveStatus = 'idle',
   syncStatus = 'idle',
   historyOpen = false,
@@ -136,6 +144,7 @@ export function Header({
   const [newProjectName, setNewProjectName] = useState('');
   const [renameValue, setRenameValue] = useState('');
   const [projectToDelete, setProjectToDelete] = useState<string | null>(null);
+  const importInputRef = useRef<HTMLInputElement>(null);
 
   // Load projects when menu opens
   const loadProjects = async () => {
@@ -270,6 +279,31 @@ export function Header({
                 }}
               >
                 Delete Current Project
+              </Menu.Item>
+
+              <Menu.Divider />
+
+              <Menu.Item
+                leftSection={<IconFileExport size={16} />}
+                onClick={async () => {
+                  if (!onExportProject) return;
+                  notifications.show({ id: 'export', title: 'Exporting project', message: 'Syncing and building archive...', loading: true, autoClose: false });
+                  try {
+                    await onExportProject();
+                    notifications.update({ id: 'export', title: 'Export complete', message: 'Your project file has been downloaded.', loading: false, autoClose: 3000 });
+                  } catch (err) {
+                    notifications.update({ id: 'export', title: 'Export failed', message: err instanceof Error ? err.message : 'Unknown error', color: 'red', loading: false, autoClose: 5000 });
+                  }
+                }}
+              >
+                Export Project
+              </Menu.Item>
+
+              <Menu.Item
+                leftSection={<IconFileImport size={16} />}
+                onClick={() => importInputRef.current?.click()}
+              >
+                Import Project
               </Menu.Item>
             </Menu.Dropdown>
           </Menu>
@@ -463,6 +497,26 @@ export function Header({
           </Group>
         </Stack>
       </Modal>
+
+      {/* Hidden file input for import */}
+      <input
+        ref={importInputRef}
+        type="file"
+        accept=".appframes,.zip"
+        style={{ display: 'none' }}
+        onChange={async (e) => {
+          const file = e.target.files?.[0];
+          if (!file || !onImportProject) return;
+          e.target.value = ''; // Reset for re-import
+          notifications.show({ id: 'import', title: 'Importing project', message: 'Uploading and processing...', loading: true, autoClose: false });
+          try {
+            await onImportProject(file);
+            notifications.update({ id: 'import', title: 'Import complete', message: 'Project imported successfully.', loading: false, autoClose: 3000 });
+          } catch (err) {
+            notifications.update({ id: 'import', title: 'Import failed', message: err instanceof Error ? err.message : 'Unknown error', color: 'red', loading: false, autoClose: 5000 });
+          }
+        }}
+      />
 
       {/* Delete Project Modal */}
       <Modal

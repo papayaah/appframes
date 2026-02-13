@@ -57,6 +57,9 @@ export function AppFrames() {
     deleteProject,
     renameProject,
     getAllProjects,
+    exportProject,
+    importProject,
+    isSignedIn,
     saveStatus,
     syncStatus,
     updateTextElement,
@@ -611,6 +614,9 @@ export function AppFrames() {
           onRenameProject={renameProject}
           onDeleteProject={deleteProject}
           onGetAllProjects={getAllProjects}
+          onExportProject={exportProject}
+          onImportProject={importProject}
+          isSignedIn={isSignedIn}
           saveStatus={saveStatus}
           syncStatus={syncStatus}
           historyOpen={historyPanelOpen}
