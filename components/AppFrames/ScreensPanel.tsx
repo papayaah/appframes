@@ -395,6 +395,12 @@ export function ScreensPanel({
                   setDragOverIndex((prev) => (prev === index ? null : prev));
                 }}
                 onDrop={(e) => {
+                  // Let .appframes/.zip files bubble up to the global import handler
+                  const droppedFile = e.dataTransfer?.files[0];
+                  if (droppedFile) {
+                    const name = droppedFile.name.toLowerCase();
+                    if (name.endsWith('.appframes') || name.endsWith('.zip')) return;
+                  }
                   if (!onReorderScreens) return;
                   e.preventDefault();
                   e.stopPropagation();

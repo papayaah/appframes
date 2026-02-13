@@ -3,7 +3,7 @@
 import React, { createContext, useContext, useState, useRef, ReactNode, useCallback, useEffect, useMemo } from 'react';
 import { Screen, ScreenImage, CanvasSettings, DEFAULT_TEXT_STYLE, TextElement, TextStyle, clampFrameTransform, SharedBackground, BackgroundEffects, FrameEffects } from './types';
 import { reorderScreenIds, insertScreenIdInOrder, createDefaultSharedBackground } from './sharedBackgroundUtils';
-import type { DIYOptions } from './diy-frames/types';
+import type { DIYOptions, DIYDeviceType } from './diy-frames/types';
 import { getDefaultDIYOptions } from './diy-frames/types';
 import { persistenceDB, Project } from '@/lib/PersistenceDB';
 import { usePersistence } from '@/hooks/usePersistence';
@@ -143,6 +143,16 @@ export const getCompositionFrameCount = (composition: string): number => {
   }
 };
 
+// Infer the device type (phone, tablet, laptop, etc.) from a canvas size string
+const inferDeviceTypeFromCanvasSize = (size: string): DIYDeviceType | null => {
+  if (size === 'google-feature-graphic') return null; // frameless
+  if (size.startsWith('ipad-')) return 'tablet';
+  if (size.startsWith('watch-')) return 'phone';
+  if (size.startsWith('google-tablet')) return 'tablet';
+  if (size.startsWith('google-chromebook')) return 'laptop';
+  return 'phone'; // iphone-*, google-phone, google-xr
+};
+
 const createId = (prefix: string) =>
   `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 
@@ -245,6 +255,7 @@ interface FramesContextType {
   setDownloadJpegQuality: (quality: number) => void;
   // Canvas size switching
   switchCanvasSize: (newSize: string) => void;
+  copyScreensToCanvasSize: (targetCanvasSize: string) => void;
   getCurrentScreens: () => Screen[];
   reorderScreens: (fromIndex: number, toIndex: number) => void;
   // Project management
@@ -519,13 +530,10 @@ export function FramesProvider({ children }: { children: ReactNode }) {
     // Determine which DIY options to use for the new screen's frames:
     // 1. If screens exist, reuse the frame from the last screen's first non-cleared slot
     // 2. Otherwise, infer device type from the current canvas size
-    // Canvas sizes that should not have a device frame
-    const isFramelessCanvas = (size: string) =>
-      size === 'google-feature-graphic';
-
     const getFrameOptions = (): DIYOptions | null => {
       const size = currentCanvasSizeRef.current;
-      if (isFramelessCanvas(size)) return null;
+      const deviceType = inferDeviceTypeFromCanvasSize(size);
+      if (!deviceType) return null; // frameless canvas
 
       if (screens.length > 0) {
         const lastScreen = screens[screens.length - 1];
@@ -534,12 +542,7 @@ export function FramesProvider({ children }: { children: ReactNode }) {
         );
         if (lastFrame?.diyOptions) return { ...lastFrame.diyOptions };
       }
-      // Infer device type from canvas size
-      if (size.startsWith('ipad-')) return getDefaultDIYOptions('tablet');
-      if (size.startsWith('watch-')) return getDefaultDIYOptions('phone');
-      if (size.startsWith('google-tablet')) return getDefaultDIYOptions('tablet');
-      if (size.startsWith('google-chromebook')) return getDefaultDIYOptions('laptop');
-      return getDefaultDIYOptions('phone');
+      return getDefaultDIYOptions(deviceType);
     };
 
     const frameOpts = getFrameOptions();
@@ -1220,6 +1223,91 @@ export function FramesProvider({ children }: { children: ReactNode }) {
     });
   }, [commitDoc, doc.screensByCanvasSize]);
 
+  const copyScreensToCanvasSize = useCallback((targetCanvasSize: string) => {
+    const sourceCanvasSize = currentCanvasSizeRef.current;
+    const sourceScreens = doc.screensByCanvasSize[sourceCanvasSize];
+
+    if (!sourceScreens || sourceScreens.length === 0) return;
+    if (targetCanvasSize === sourceCanvasSize) return;
+
+    // Determine device types for frame adaptation
+    const sourceDeviceType = inferDeviceTypeFromCanvasSize(sourceCanvasSize);
+    const targetDeviceType = inferDeviceTypeFromCanvasSize(targetCanvasSize);
+    const deviceTypeChanged = sourceDeviceType !== targetDeviceType;
+
+    const adaptedScreens: Screen[] = sourceScreens.map((src) => {
+      screenIdCounter.current += 1;
+
+      const adaptedImages: ScreenImage[] = (src.images || []).map((img) => {
+        if (!img) return {};
+
+        const adapted: ScreenImage = {
+          ...img,
+          diyOptions: img.diyOptions ? { ...img.diyOptions } : undefined,
+          frameEffects: img.frameEffects ? { ...img.frameEffects } : undefined,
+          // Reset frame positions — the composition renderer handles default
+          // layout for each type, and pixel offsets from the source canvas
+          // don't translate well to different aspect ratios
+          frameX: 0,
+          frameY: 0,
+          // Reset scale to default so frames are properly sized for the new canvas
+          frameScale: 100,
+          // Keep angles as-is
+          tiltX: img.tiltX,
+          tiltY: img.tiltY,
+          rotateZ: img.rotateZ,
+        };
+
+        // Swap device frame when device type changes (e.g. phone → tablet)
+        if (deviceTypeChanged) {
+          if (!targetDeviceType) {
+            adapted.diyOptions = undefined;
+            adapted.cleared = true;
+          } else {
+            adapted.diyOptions = getDefaultDIYOptions(targetDeviceType);
+            adapted.cleared = false;
+          }
+        }
+
+        return adapted;
+      });
+
+      const adaptedTextElements: TextElement[] = (src.textElements || []).map((el) => ({
+        ...el,
+        id: createId('text'),
+        style: { ...el.style },
+      }));
+
+      return {
+        id: `screen-${screenIdCounter.current}`,
+        images: adaptedImages,
+        name: src.name,
+        settings: {
+          ...src.settings,
+          canvasSize: targetCanvasSize,
+          selectedTextId: undefined,
+          // Reset screen-level pan to defaults
+          screenScale: 0,
+          screenPanX: 50,
+          screenPanY: 50,
+        },
+        textElements: adaptedTextElements,
+      };
+    });
+
+    commitDoc('Copy screens to canvas size', (draft) => {
+      if (!draft.screensByCanvasSize[targetCanvasSize]) {
+        draft.screensByCanvasSize[targetCanvasSize] = [];
+      }
+      draft.screensByCanvasSize[targetCanvasSize].push(...adaptedScreens);
+    });
+
+    setCurrentCanvasSize(targetCanvasSize);
+    setSelectedScreenIndices([0]);
+    setSelectedFrameIndex(0);
+    setFrameSelectionVisible(false);
+  }, [commitDoc, doc.screensByCanvasSize]);
+
   // Load project data into React state
   const loadProjectIntoState = useCallback((project: Project) => {
     setCurrentProjectId(project.id);
@@ -1875,6 +1963,7 @@ export function FramesProvider({ children }: { children: ReactNode }) {
         downloadJpegQuality,
         setDownloadJpegQuality,
         switchCanvasSize,
+        copyScreensToCanvasSize,
         getCurrentScreens,
         reorderScreens,
         createNewProject,

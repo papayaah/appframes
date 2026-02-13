@@ -400,14 +400,21 @@ export function Canvas({
                 alignItems: 'center',
                 justifyContent: 'center',
                 height: '100%',
-                // We need to ensure the container has width so scaling works properly
-                width: aspectRatio > 1 ? '60vw' : '40vh', // Approximate sizing
+                // Scale container width with aspect ratio so wider canvases (e.g. iPad ~0.75)
+                // get enough horizontal space for their larger device frames.
+                width: aspectRatio > 1 ? '60vw' : `max(40vh, ${Math.round(80 * aspectRatio)}vh)`,
                 flexShrink: 0,
                 position: 'relative', // For positioning overflow layer
               }}
               onDrop={(e) => {
+                // Let .appframes/.zip files bubble up to the global import handler
+                const droppedFile = e.dataTransfer.files[0];
+                if (droppedFile) {
+                  const name = droppedFile.name.toLowerCase();
+                  if (name.endsWith('.appframes') || name.endsWith('.zip')) return;
+                }
                 e.preventDefault();
-                e.stopPropagation(); // Stop propagation to parent
+                e.stopPropagation();
                 const dropFrameIndex = getFrameIndexAtPoint(screenIndex, e.clientX, e.clientY);
                 // 1) Prefer mediaId payload (dragging from media library)
                 const mediaIdRaw = (() => {
@@ -451,7 +458,7 @@ export function Canvas({
                 ref={(el) => setCanvasRef(screenIndex, el)}
                 style={{
                   width: '100%',
-                  maxWidth: aspectRatio > 1 ? '90%' : 600,
+                  maxWidth: aspectRatio > 1 ? '90%' : '100%',
                   aspectRatio: `${aspectRatio}`,
                   position: 'relative',
                   boxShadow: '0 10px 40px rgba(0,0,0,0.15)',

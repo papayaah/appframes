@@ -2,12 +2,13 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
-import { Group, Text, ActionIcon, Box, Slider, Tooltip, Menu, Button, Modal, TextInput, Stack, Badge } from '@mantine/core';
-import { IconDownload, IconChevronDown, IconPlus, IconEdit, IconTrash, IconFolder, IconAlertCircle, IconUser, IconHistory, IconCloud, IconRefresh, IconFileExport, IconFileImport } from '@tabler/icons-react';
+import { Group, Text, ActionIcon, Box, Tooltip, Menu, Button, Modal, TextInput, Stack, Badge } from '@mantine/core';
+import { IconDownload, IconChevronDown, IconPlus, IconEdit, IconTrash, IconFolder, IconAlertCircle, IconUser, IconHistory, IconCloud, IconRefresh, IconFileExport, IconFileImport, IconCopy } from '@tabler/icons-react';
 import { notifications } from '@mantine/notifications';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, Fragment } from 'react';
 import type { SyncStatus } from '@/lib/ProjectSyncService';
 import type { Project } from '@/lib/PersistenceDB';
+import { CANVAS_SIZE_OPTIONS } from './Sidebar';
 
 interface CanvasSizeOption {
   id: string;
@@ -22,6 +23,7 @@ interface HeaderProps {
   canvasSizes?: CanvasSizeOption[];
   currentCanvasSize?: string;
   onCanvasSizeSwitch?: (size: string) => void;
+  onCopyToCanvasSize?: (targetCanvasSize: string) => void;
   zoom?: number;
   onZoomChange?: (zoom: number) => void;
   selectedCount?: number;
@@ -118,6 +120,7 @@ export function Header({
   canvasSizes = [],
   currentCanvasSize,
   onCanvasSizeSwitch,
+  onCopyToCanvasSize,
   zoom = 100,
   onZoomChange,
   selectedCount = 1,
@@ -346,24 +349,61 @@ export function Header({
               {outputDimensions}
             </Text>
           ) : null}
+
+          {onCopyToCanvasSize && totalCount > 0 && (
+            <Menu shadow="md" width={300} position="bottom-start">
+              <Menu.Target>
+                <Tooltip label="Copy all screens to another size" position="bottom" withArrow>
+                  <ActionIcon variant="subtle" size="sm" color="gray">
+                    <IconCopy size={14} />
+                  </ActionIcon>
+                </Tooltip>
+              </Menu.Target>
+              <Menu.Dropdown style={{ maxHeight: 400, overflowY: 'auto' }}>
+                <Menu.Label>Copy all screens to...</Menu.Label>
+                {CANVAS_SIZE_OPTIONS.map((group) => {
+                  const items = group.items.filter((item) => item.value !== currentCanvasSize);
+                  if (items.length === 0) return null;
+                  return (
+                    <Fragment key={group.group}>
+                      <Menu.Label c="dimmed" fz={10}>{group.group}</Menu.Label>
+                      {items.map((item) => (
+                        <Menu.Item
+                          key={item.value}
+                          onClick={() => onCopyToCanvasSize(item.value)}
+                        >
+                          <Text size="sm">{item.label}</Text>
+                        </Menu.Item>
+                      ))}
+                    </Fragment>
+                  );
+                })}
+              </Menu.Dropdown>
+            </Menu>
+          )}
         </Group>
 
-      <Group gap="md" style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)' }}>
-        <Text size="xs" c="dimmed" style={{ minWidth: 40 }}>
-          Zoom
-        </Text>
-        <Slider
-          value={zoom}
-          onChange={(value) => onZoomChange?.(value)}
-          min={25}
-          max={200}
-          label={(value) => `${value}%`}
-          style={{ width: 200 }}
-          size="sm"
-        />
-        <Text size="xs" c="dimmed" style={{ minWidth: 45 }}>
-          {zoom}%
-        </Text>
+      <Group gap={4} style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)' }}>
+        <ActionIcon variant="subtle" size="xs" color="gray" onClick={() => onZoomChange?.(Math.max(25, zoom - 25))}>
+          <Text size="xs" fw={600}>-</Text>
+        </ActionIcon>
+        <Menu shadow="sm" width={100} position="bottom">
+          <Menu.Target>
+            <Button variant="subtle" size="compact-xs" color="gray" styles={{ root: { fontWeight: 400, padding: '2px 6px' } }}>
+              {zoom}%
+            </Button>
+          </Menu.Target>
+          <Menu.Dropdown>
+            {[25, 50, 75, 100, 125, 150, 200].map((v) => (
+              <Menu.Item key={v} onClick={() => onZoomChange?.(v)} style={{ backgroundColor: v === zoom ? 'var(--mantine-color-blue-0)' : undefined }}>
+                <Text size="sm" ta="center">{v}%</Text>
+              </Menu.Item>
+            ))}
+          </Menu.Dropdown>
+        </Menu>
+        <ActionIcon variant="subtle" size="xs" color="gray" onClick={() => onZoomChange?.(Math.min(200, zoom + 25))}>
+          <Text size="xs" fw={600}>+</Text>
+        </ActionIcon>
       </Group>
 
         <Group gap="xs">

@@ -19,20 +19,20 @@ import { useAppStore } from '../../stores/useAppStore';
 
 const FRAME_TIPS: TipItem[] = [
   {
-    animationBase: 'keyboardmouse',
+    animation: 'mouse-left-drag.json',
     title: 'Move your frame',
     description: 'Click and drag anywhere on the frame to reposition it',
   },
   {
-    animationBase: 'keyboardmouse',
+    animation: 'mouse-right-drag.json',
     title: 'Rotate your frame',
-    description: 'Use the rotation dial in the settings panel to rotate',
+    description: 'Right-click and drag to rotate the frame',
   },
 ];
 
 const IMAGE_TIPS: TipItem[] = [
   {
-    animationBase: 'keyboardmouse',
+    animation: 'spacebar-mouse-drag.json',
     title: 'Reposition your image',
     description: 'Hold Space + drag to pan the image inside the frame',
   },

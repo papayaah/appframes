@@ -97,6 +97,7 @@ export function AppFrames() {
     screensByCanvasSize,
     currentCanvasSize,
     switchCanvasSize,
+    copyScreensToCanvasSize,
     currentSharedBackground,
     setSharedBackground,
     toggleScreenInSharedBackground,
@@ -115,6 +116,9 @@ export function AppFrames() {
   // Global drop zone for .appframes import
   const [importDragOver, setImportDragOver] = useState(false);
   const importDragCounter = useRef(0);
+
+  const importProjectRef = useRef(importProject);
+  importProjectRef.current = importProject;
 
   useEffect(() => {
     const isAppframesDrag = (e: DragEvent) => {
@@ -146,13 +150,18 @@ export function AppFrames() {
     };
 
     const handleDragOver = (e: DragEvent) => {
-      if (importDragOver) {
+      // Always preventDefault for file drags so the browser allows the drop event to fire
+      if (importDragCounter.current > 0 || isAppframesDrag(e)) {
         e.preventDefault();
         if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
       }
     };
 
     const handleDrop = async (e: DragEvent) => {
+      // Always prevent the browser's default drop behavior (navigating to the file)
+      e.preventDefault();
+      e.stopPropagation();
+
       importDragCounter.current = 0;
       setImportDragOver(false);
 
@@ -162,13 +171,9 @@ export function AppFrames() {
       const name = file.name.toLowerCase();
       if (!name.endsWith('.appframes') && !name.endsWith('.zip')) return;
 
-      // This is an .appframes import — prevent other handlers
-      e.preventDefault();
-      e.stopPropagation();
-
       notifications.show({ id: 'import', title: 'Importing project', message: 'Processing archive...', loading: true, autoClose: false });
       try {
-        await importProject(file);
+        await importProjectRef.current(file);
         notifications.update({ id: 'import', title: 'Import complete', message: 'Project imported successfully.', loading: false, autoClose: 3000 });
       } catch (err) {
         notifications.update({ id: 'import', title: 'Import failed', message: err instanceof Error ? err.message : 'Unknown error', color: 'red', loading: false, autoClose: 5000 });
@@ -186,7 +191,7 @@ export function AppFrames() {
       window.removeEventListener('dragover', handleDragOver);
       window.removeEventListener('drop', handleDrop);
     };
-  }, [importDragOver, importProject]);
+  }, []);
 
   // Track which screen the currently selected frame belongs to (for settings sidebar)
   // This is separate from primarySelectedIndex to avoid reordering canvases when clicking frames
@@ -716,6 +721,7 @@ export function AppFrames() {
             })}
           currentCanvasSize={currentCanvasSize}
           onCanvasSizeSwitch={switchCanvasSize}
+          onCopyToCanvasSize={copyScreensToCanvasSize}
           zoom={zoom}
           onZoomChange={setZoom}
           selectedCount={selectedScreenIndices.length}

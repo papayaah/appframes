@@ -42,8 +42,8 @@ function LottieSegment({
 type AnimPhase = 'reveal' | 'pause' | 'loop';
 
 export interface TipItem {
-  /** Base name for the Lottie animation pair (without suffix) */
-  animationBase: string;
+  /** Path to the Lottie animation file relative to /animations/ (e.g. 'spacebar-mouse-drag.json') */
+  animation: string;
   /** Title text (short, bold) */
   title: string;
   /** Description text (1-2 lines explaining the interaction) */
@@ -92,12 +92,12 @@ export function FeatureTip({
   // Load animation JSON and parse markers for reveal/loop segments
   useEffect(() => {
     if (!visible || !currentTip) return;
-    const base = currentTip.animationBase;
+    const key = currentTip.animation;
 
     // Skip if already cached
-    if (animCache[base]?.data) return;
+    if (animCache[key]?.data) return;
 
-    fetch(`/animations/${base}-in-reveal.json`)
+    fetch(`/animations/${key}`)
       .then((r) => r.json())
       .then((data) => {
         // Parse Lottie markers to find reveal and loop segments
@@ -124,11 +124,11 @@ export function FeatureTip({
 
         setAnimCache((prev) => ({
           ...prev,
-          [base]: { data: extendedData, revealSegment, loopSegment },
+          [key]: { data: extendedData, revealSegment, loopSegment },
         }));
       })
       .catch(() => {});
-  }, [visible, currentTip?.animationBase]);
+  }, [visible, currentTip?.animation]);
 
   // Reset when becoming visible
   useEffect(() => {
@@ -200,7 +200,7 @@ export function FeatureTip({
     };
   }, [visible, anchorRef, position]);
 
-  const cachedAnim = currentTip ? animCache[currentTip.animationBase] : undefined;
+  const cachedAnim = currentTip ? animCache[currentTip.animation] : undefined;
   const animData = cachedAnim?.data ?? null;
   const revealSegment = cachedAnim?.revealSegment;
   const loopSegment = cachedAnim?.loopSegment;
@@ -274,7 +274,7 @@ export function FeatureTip({
             <Box style={{ height: 160, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               {animData ? (
                 <LottieSegment
-                  key={`${currentTip.animationBase}-${phase === 'pause' ? 'loop' : phase}-${playCount}`}
+                  key={`${currentTip.animation}-${phase === 'pause' ? 'loop' : phase}-${playCount}`}
                   animationData={animData}
                   segment={phase === 'pause' ? undefined : currentSegment}
                   speed={1.5}
