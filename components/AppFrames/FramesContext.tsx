@@ -345,7 +345,7 @@ export function FramesProvider({ children }: { children: ReactNode }) {
     };
     return {
       name: 'My Project',
-      screensByCanvasSize: { 'iphone-6.5': [initialScreen] },
+      screensByCanvasSize: { 'iphone-6.9': [initialScreen] },
     };
   }, []);
 
@@ -368,8 +368,8 @@ export function FramesProvider({ children }: { children: ReactNode }) {
   const historyPosition = position;
   const goToHistory = useCallback((p: number) => goTo(p), [goTo]);
 
-  const [currentCanvasSize, setCurrentCanvasSize] = useState<string>('iphone-6.5');
-  const currentCanvasSizeRef = useRef<string>('iphone-6.5');
+  const [currentCanvasSize, setCurrentCanvasSize] = useState<string>('iphone-6.9');
+  const currentCanvasSizeRef = useRef<string>('iphone-6.9');
   const projectCreatedAt = useRef<Date>(new Date());
   // Tracks if project is pristine (untouched) - used to skip syncing on sign-in
   const projectPristine = useRef<boolean>(true);
@@ -606,7 +606,7 @@ export function FramesProvider({ children }: { children: ReactNode }) {
         )
         : [],
       name: `${sourceScreen.name} (copy)`,
-      settings: { ...sourceScreen.settings, selectedTextId: undefined },
+      settings: { ...sourceScreen.settings, canvasSize: currentCanvasSize, selectedTextId: undefined },
       textElements: sourceScreen.textElements
         ? sourceScreen.textElements.map((el) => ({
           ...el,
@@ -1191,12 +1191,16 @@ export function FramesProvider({ children }: { children: ReactNode }) {
     // and apply any settings overrides (e.g. orientation) to existing screens
     commitDoc('Switch canvas size', (draft) => {
       if (!draft.screensByCanvasSize[newSize]) draft.screensByCanvasSize[newSize] = [];
-      if (settingsOverrides) {
-        const screens = draft.screensByCanvasSize[newSize];
-        screens.forEach(screen => {
-          screen.settings = { ...screen.settings, ...settingsOverrides };
-        });
-      }
+
+      const screens = draft.screensByCanvasSize[newSize];
+      screens.forEach(screen => {
+        // Always sync the internal canvasSize setting with the bucket it belongs to
+        screen.settings = {
+          ...screen.settings,
+          canvasSize: newSize,
+          ...(settingsOverrides || {})
+        };
+      });
     });
 
     // Reset selection state for new canvas size
@@ -1371,7 +1375,7 @@ export function FramesProvider({ children }: { children: ReactNode }) {
         size,
         screens.map((s) => ({
           ...s,
-          settings: { ...s.settings, selectedTextId: undefined },
+          settings: { ...s.settings, canvasSize: size, selectedTextId: undefined },
         })),
       ])
     );

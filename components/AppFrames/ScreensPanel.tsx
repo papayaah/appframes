@@ -42,6 +42,7 @@ interface ScreensPanelProps {
   onReorderScreens?: (fromIndex: number, toIndex: number) => void;
   onMediaUpload?: (file: File) => Promise<number | null>;
   sharedBackground?: SharedBackground;
+  canvasSize?: string;
 }
 
 // Component to render mini composition preview for a specific screen
@@ -221,6 +222,7 @@ export function ScreensPanel({
   onReorderScreens,
   onMediaUpload,
   sharedBackground,
+  canvasSize,
 }: ScreensPanelProps) {
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const panelRef = useRef<HTMLDivElement | null>(null);
@@ -380,7 +382,8 @@ export function ScreensPanel({
       <Group gap="md" align="flex-start" wrap="nowrap">
         {screens.map((screen, index) => {
           const isSelected = selectedIndices.includes(index);
-          const canvasDims = getCanvasDimensions(screen.settings.canvasSize || 'iphone-6.5', screen.settings.orientation || 'portrait');
+          const effectiveCanvasSize = canvasSize || screen.settings.canvasSize || 'iphone-6.5';
+          const canvasDims = getCanvasDimensions(effectiveCanvasSize, screen.settings.orientation || 'portrait');
           const thumbAspectRatio = canvasDims.width / canvasDims.height;
           const thumbWidth = Math.max(32, Math.min(100, 80 * thumbAspectRatio));
 

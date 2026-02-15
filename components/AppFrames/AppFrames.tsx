@@ -995,6 +995,7 @@ export function AppFrames() {
                   onReorderScreens={reorderScreens}
                   onMediaUpload={handleMediaUpload}
                   sharedBackground={currentSharedBackground}
+                  canvasSize={currentCanvasSize}
                 />
               </Box>
             )}
