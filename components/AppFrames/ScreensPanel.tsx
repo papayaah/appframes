@@ -9,6 +9,8 @@ import { getCanvasSizeLabel, getCanvasDimensions } from './FramesContext';
 import { getBackgroundStyle } from './Sidebar';
 import { useMediaImage } from '../../hooks/useMediaImage';
 import { SharedCanvasBackground } from './SharedCanvasBackground';
+import { BackgroundEffectsOverlay } from './BackgroundEffectsOverlay';
+import { TextElement } from './TextElement';
 
 function ThumbnailCanvasBackground({ mediaId }: { mediaId?: number }) {
   const { imageUrl } = useMediaImage(mediaId);
@@ -74,7 +76,9 @@ const ScreenThumbnail = memo(function ScreenThumbnail({
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        ...getBackgroundStyle(screen.settings.backgroundColor),
+        ...(screen.settings.backgroundColor === 'transparent'
+          ? { backgroundColor: '#f1f3f5' } // Subtle gray for transparency in thumbs
+          : getBackgroundStyle(screen.settings.backgroundColor)),
         padding: 2,
         overflow: 'hidden',
         position: 'relative',
@@ -93,12 +97,15 @@ const ScreenThumbnail = memo(function ScreenThumbnail({
       ) : (
         <ThumbnailCanvasBackground mediaId={screen.settings.canvasBackgroundMediaId} />
       )}
+      <BackgroundEffectsOverlay effects={screen.settings.backgroundEffects} screenId={screen.id} />
       <Box
         style={{
-          transform: 'scale(0.12)',
+          width: canvasDims.width,
+          height: canvasDims.height,
+          flexShrink: 0,
           transformOrigin: 'center center',
-          width: '100%',
-          height: '100%',
+          transform: `scale(${Math.min(60 / canvasDims.width, 80 / canvasDims.height)})`,
+          position: 'relative',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -107,11 +114,28 @@ const ScreenThumbnail = memo(function ScreenThumbnail({
         {/* Use the same renderer as main canvas, showing this screen's composition */}
         {/* Each screen uses its own images array */}
         {/* Disable cross-canvas drag for thumbnails to prevent unnecessary re-renders */}
-        <CompositionRenderer
-          settings={settings}
-          screen={screen}
-          disableCrossCanvasDrag={true}
-        />
+        <Box style={{ position: 'absolute', inset: 0 }}>
+          <CompositionRenderer
+            settings={settings}
+            screen={screen}
+            disableCrossCanvasDrag={true}
+          />
+        </Box>
+
+        {/* Render text elements in thumbnail */}
+        {(screen.textElements || [])
+          .filter(t => t.visible)
+          .sort((a, b) => (a.zIndex ?? 0) - (b.zIndex ?? 0))
+          .map((t) => (
+            <TextElement
+              key={t.id}
+              element={t}
+              selected={false}
+              onSelect={() => { }}
+              onUpdate={() => { }}
+              onDelete={() => { }}
+            />
+          ))}
       </Box>
     </Box>
   );
@@ -126,9 +150,9 @@ const ScreenThumbnail = memo(function ScreenThumbnail({
   const imagesChanged = () => {
     const prevImages = prevProps.screen.images || [];
     const nextImages = nextProps.screen.images || [];
-    
+
     if (prevImages.length !== nextImages.length) return true;
-    
+
     return prevImages.some((prevImg, idx) => {
       const nextImg = nextImages[idx];
       return (
@@ -147,10 +171,27 @@ const ScreenThumbnail = memo(function ScreenThumbnail({
       );
     });
   };
-  
+
+  const textElementsChanged = () => {
+    const prevText = prevProps.screen.textElements || [];
+    const nextText = nextProps.screen.textElements || [];
+
+    if (prevText.length !== nextText.length) return true;
+
+    return prevText.some((prevEl, idx) => {
+      const nextEl = nextText[idx];
+      return (
+        prevEl?.content !== nextEl?.content ||
+        prevEl?.visible !== nextEl?.visible ||
+        JSON.stringify(prevEl?.style) !== JSON.stringify(nextEl?.style)
+      );
+    });
+  };
+
   const screenChanged =
     prevProps.screen.id !== nextProps.screen.id ||
-    imagesChanged();
+    imagesChanged() ||
+    textElementsChanged();
 
   // Check if this screen's settings changed
   const settingsChanged =
@@ -339,6 +380,10 @@ export function ScreensPanel({
       <Group gap="md" align="flex-start" wrap="nowrap">
         {screens.map((screen, index) => {
           const isSelected = selectedIndices.includes(index);
+          const canvasDims = getCanvasDimensions(screen.settings.canvasSize || 'iphone-6.5', screen.settings.orientation || 'portrait');
+          const thumbAspectRatio = canvasDims.width / canvasDims.height;
+          const thumbWidth = Math.max(32, Math.min(100, 80 * thumbAspectRatio));
+
           return (
             <Box
               key={screen.id}
@@ -353,7 +398,7 @@ export function ScreensPanel({
                 data-screen-index={index}
                 style={{
                   position: 'relative',
-                  width: 60,
+                  width: thumbWidth,
                   height: 80,
                   border: '2px solid',
                   borderColor: isSelected ? '#667eea' : '#dee2e6',
@@ -442,7 +487,7 @@ export function ScreensPanel({
                 }}
               >
                 <ScreenThumbnail screen={screen} allScreens={screens} screenIndex={index} sharedBackground={sharedBackground} />
-                
+
                 {deleteConfirmId === screen.id ? (
                   // Show confirmation buttons
                   <Box
@@ -526,7 +571,7 @@ export function ScreensPanel({
                     </ActionIcon>
                   </>
                 )}
-                
+
                 {/* Floating number on hover */}
                 <Box
                   className="screen-number"

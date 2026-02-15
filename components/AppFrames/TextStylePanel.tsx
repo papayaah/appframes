@@ -97,18 +97,18 @@ export function TextStylePanel({ style, onStyleChange }: TextStylePanelProps) {
         <Slider
           value={style.fontSize}
           onChange={(value) => onStyleChange({ fontSize: value })}
-          min={12}
-          max={120}
+          min={8}
+          max={500}
           style={{ flex: 1 }}
           size="sm"
         />
         <NumberInput
           value={style.fontSize}
           onChange={(value) => typeof value === 'number' && onStyleChange({ fontSize: value })}
-          min={12}
-          max={120}
+          min={8}
+          max={500}
           size="xs"
-          w={60}
+          w={65}
         />
       </Group>
 
@@ -207,7 +207,7 @@ export function TextStylePanel({ style, onStyleChange }: TextStylePanelProps) {
                 value={style.backgroundPadding}
                 onChange={(value) => onStyleChange({ backgroundPadding: value })}
                 min={0}
-                max={48}
+                max={200}
                 size="sm"
                 mb="sm"
               />
@@ -217,7 +217,7 @@ export function TextStylePanel({ style, onStyleChange }: TextStylePanelProps) {
                 value={style.backgroundRadius}
                 onChange={(value) => onStyleChange({ backgroundRadius: value })}
                 min={0}
-                max={32}
+                max={150}
                 size="sm"
                 mb="sm"
               />
@@ -273,8 +273,8 @@ export function TextStylePanel({ style, onStyleChange }: TextStylePanelProps) {
                   <Slider
                     value={style.textShadowOffsetX}
                     onChange={(value) => onStyleChange({ textShadowOffsetX: value })}
-                    min={-10}
-                    max={10}
+                    min={-50}
+                    max={50}
                     size="sm"
                   />
                 </Box>
@@ -283,8 +283,8 @@ export function TextStylePanel({ style, onStyleChange }: TextStylePanelProps) {
                   <Slider
                     value={style.textShadowOffsetY}
                     onChange={(value) => onStyleChange({ textShadowOffsetY: value })}
-                    min={-10}
-                    max={10}
+                    min={-50}
+                    max={50}
                     size="sm"
                   />
                 </Box>
@@ -310,8 +310,8 @@ export function TextStylePanel({ style, onStyleChange }: TextStylePanelProps) {
           <Slider
             value={style.letterSpacing}
             onChange={(value) => onStyleChange({ letterSpacing: value })}
-            min={-5}
-            max={20}
+            min={-20}
+            max={100}
             step={0.5}
             size="sm"
             mb="sm"

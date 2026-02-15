@@ -11,7 +11,11 @@ interface BackgroundEffectsOverlayProps {
 export function BackgroundEffectsOverlay({ effects, screenId }: BackgroundEffectsOverlayProps) {
   if (!effects) return null;
 
-  const { overlayColor, overlayOpacity, vignetteIntensity, noiseIntensity } = effects;
+  const overlayColor = effects.overlayColor ?? '#000000';
+  const overlayOpacity = effects.overlayOpacity ?? 0;
+  const vignetteIntensity = effects.vignetteIntensity ?? 0;
+  const noiseIntensity = effects.noiseIntensity ?? 0;
+
   const hasOverlay = overlayOpacity > 0;
   const hasVignette = vignetteIntensity > 0;
   const hasNoise = noiseIntensity > 0;
@@ -30,7 +34,7 @@ export function BackgroundEffectsOverlay({ effects, screenId }: BackgroundEffect
             backgroundColor: overlayColor,
             opacity: overlayOpacity / 100,
             pointerEvents: 'none',
-            zIndex: 0,
+            zIndex: 1, // Color overlay first
           }}
         />
       )}
@@ -42,14 +46,14 @@ export function BackgroundEffectsOverlay({ effects, screenId }: BackgroundEffect
             inset: 0,
             background: `radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,${vignetteIntensity / 100}) 100%)`,
             pointerEvents: 'none',
-            zIndex: 0,
+            zIndex: 2, // Vignette on top of color
           }}
         />
       )}
 
       {hasNoise && (
         <>
-          <svg style={{ position: 'absolute', width: 0, height: 0 }}>
+          <svg style={{ position: 'absolute', width: 0, height: 0, pointerEvents: 'none' }}>
             <filter id={filterId}>
               <feTurbulence
                 type="fractalNoise"
@@ -66,7 +70,7 @@ export function BackgroundEffectsOverlay({ effects, screenId }: BackgroundEffect
               filter: `url(#${filterId})`,
               opacity: noiseIntensity / 100,
               pointerEvents: 'none',
-              zIndex: 0,
+              zIndex: 3, // Noise on top
             }}
           />
         </>

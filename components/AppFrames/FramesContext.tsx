@@ -1,7 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useRef, ReactNode, useCallback, useEffect, useMemo } from 'react';
-import { Screen, ScreenImage, CanvasSettings, DEFAULT_TEXT_STYLE, TextElement, TextStyle, clampFrameTransform, SharedBackground, BackgroundEffects, FrameEffects } from './types';
+import { Screen, ScreenImage, CanvasSettings, DEFAULT_TEXT_STYLE, TextElement, TextStyle, clampFrameTransform, SharedBackground, BackgroundEffects, FrameEffects, DEFAULT_BACKGROUND_EFFECTS } from './types';
 import { reorderScreenIds, insertScreenIdInOrder, createDefaultSharedBackground } from './sharedBackgroundUtils';
 import type { DIYOptions, DIYDeviceType } from './diy-frames/types';
 import { getDefaultDIYOptions } from './diy-frames/types';
@@ -202,6 +202,7 @@ export const getDefaultScreenSettings = (): Omit<CanvasSettings, 'selectedScreen
     // Default to transparent so users can export/download with alpha without extra steps.
     backgroundColor: 'transparent',
     canvasBackgroundMediaId: undefined,
+    backgroundEffects: DEFAULT_BACKGROUND_EFFECTS,
   };
 };
 
@@ -551,15 +552,21 @@ export function FramesProvider({ children }: { children: ReactNode }) {
     // Initialize images array based on composition type
     // For frameless canvas sizes, create cleared slots (no device frame)
     const images: ScreenImage[] = Array(frameCount).fill(null).map(() =>
-      frameOpts ? { diyOptions: { ...frameOpts } } : { cleared: true }
+      frameOpts ? { diyOptions: { ...frameOpts }, frameScale: 100 } : { cleared: true }
     );
 
     // If an image was provided, add it to the first slot
     if (imageOrMediaId) {
       if (typeof imageOrMediaId === 'number') {
-        images[0] = { mediaId: imageOrMediaId, ...(frameOpts ? { diyOptions: { ...frameOpts } } : { cleared: true }) };
+        images[0] = {
+          mediaId: imageOrMediaId,
+          ...(frameOpts ? { diyOptions: { ...frameOpts }, frameScale: 100 } : { cleared: true })
+        };
       } else {
-        images[0] = { image: imageOrMediaId, ...(frameOpts ? { diyOptions: { ...frameOpts } } : { cleared: true }) };
+        images[0] = {
+          image: imageOrMediaId,
+          ...(frameOpts ? { diyOptions: { ...frameOpts }, frameScale: 100 } : { cleared: true })
+        };
       }
     }
 
@@ -705,23 +712,43 @@ export function FramesProvider({ children }: { children: ReactNode }) {
   }, [commitCurrentScreens, primarySelectedIndex, screens, setSelectedFrameIndex]);
 
   // Set settings (for backward compatibility, updates selected screen)
-  const setSettings = (newSettings: CanvasSettings | ((prev: CanvasSettings) => CanvasSettings)) => {
-    const settingsToApply = typeof newSettings === 'function'
-      ? newSettings(settings)
-      : newSettings;
+  const setSettings = useCallback((newSettings: CanvasSettings | ((prev: CanvasSettings) => CanvasSettings)) => {
+    commitCurrentScreens('Edit settings', (list) => {
+      const idx = primarySelectedIndex;
+      if (!list[idx]) return;
 
-    // Update selected screen index if it changed (via sidebar navigation or something?)
-    // This part is tricky with multi-selection. If the sidebar tries to change the index,
-    // we assume it means "select this screen exclusively".
-    if (settingsToApply.selectedScreenIndex !== primarySelectedIndex) {
-      setSelectedScreenIndices([settingsToApply.selectedScreenIndex]);
-      setSelectedFrameIndex(0);
-    }
+      const screen = list[idx];
+      // Compute updates
+      const currentFullSettings: CanvasSettings = { ...screen.settings, selectedScreenIndex: idx, canvasSize: currentCanvasSizeRef.current };
+      const settingsToApply = typeof newSettings === 'function' ? (newSettings as any)(currentFullSettings) : newSettings;
 
-    // Update the selected screen's settings (excluding selectedScreenIndex)
-    const { selectedScreenIndex: _, ...screenSettings } = settingsToApply;
-    updateSelectedScreenSettings(screenSettings);
-  };
+      // Update the selected screen exclusively if requested
+      if (settingsToApply.selectedScreenIndex !== idx) {
+        // This is tricky inside commitCurrentScreens as we need to update React state
+        // We'll handle this in a separate effect or just perform it but it might cause a re-render
+        // For now, let's just make sure we update the React state
+        setTimeout(() => {
+          setSelectedScreenIndices([settingsToApply.selectedScreenIndex]);
+          setSelectedFrameIndex(0);
+        }, 0);
+      }
+
+      // Update the selected screen's settings (excluding selectedScreenIndex/canvasSize)
+      const { selectedScreenIndex: _, canvasSize: __, ...updates } = settingsToApply;
+
+      const prevComposition = screen.settings.composition;
+      screen.settings = { ...screen.settings, ...updates };
+
+      // Handle composition changes (resetting images if needed)
+      if (updates.composition && updates.composition !== prevComposition) {
+        const frameCount = getCompositionFrameCount(updates.composition || 'single');
+        if (!screen.images) screen.images = [];
+        while (screen.images.length < frameCount) {
+          screen.images.push({ cleared: true });
+        }
+      }
+    });
+  }, [commitCurrentScreens, primarySelectedIndex]);
 
   const removeScreen = (id: string) => {
     // Find index of screen to remove

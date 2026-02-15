@@ -60,7 +60,7 @@ export interface TextStyle {
 
 export const DEFAULT_TEXT_STYLE: TextStyle = {
   fontFamily: 'Inter',
-  fontSize: 32,
+  fontSize: 120,
   fontWeight: 700,
   color: '#1a1a1a',
   backgroundColor: 'transparent',

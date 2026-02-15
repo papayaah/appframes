@@ -22,7 +22,7 @@ import { DEFAULT_BACKGROUND_EFFECTS } from './types';
 
 export interface CanvasSettingsPanelProps {
   settings: CanvasSettings;
-  setSettings: (settings: CanvasSettings) => void;
+  setSettings: (settings: CanvasSettings | ((prev: CanvasSettings) => CanvasSettings)) => void;
   hasBackgroundMedia?: boolean;
   onClearBackgroundMedia?: () => void;
   onApplyEffectsToAll?: (effects: import('./types').BackgroundEffects) => void;
@@ -74,18 +74,24 @@ export function CanvasSettingsPanel({
           {BACKGROUND_PRESETS.map((color) => (
             <Box
               key={color}
-              onClick={() => setSettings({ ...settings, backgroundColor: color })}
+              onClick={() => {
+                setSettings((prev: CanvasSettings) => ({
+                  ...prev,
+                  backgroundColor: color,
+                  canvasBackgroundMediaId: undefined,
+                }));
+              }}
               style={{
                 width: 32,
                 height: 32,
                 borderRadius: 8,
                 ...(color === 'transparent'
                   ? {
-                      backgroundImage:
-                        'linear-gradient(45deg, #e9ecef 25%, transparent 25%), linear-gradient(-45deg, #e9ecef 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #e9ecef 75%), linear-gradient(-45deg, transparent 75%, #e9ecef 75%)',
-                      backgroundSize: '10px 10px',
-                      backgroundPosition: '0 0, 0 5px, 5px -5px, -5px 0px',
-                    }
+                    backgroundImage:
+                      'linear-gradient(45deg, #e9ecef 25%, transparent 25%), linear-gradient(-45deg, #e9ecef 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #e9ecef 75%), linear-gradient(-45deg, transparent 75%, #e9ecef 75%)',
+                    backgroundSize: '10px 10px',
+                    backgroundPosition: '0 0, 0 5px, 5px -5px, -5px 0px',
+                  }
                   : getBackgroundStyle(color)),
                 cursor: 'pointer',
                 border:
@@ -134,7 +140,11 @@ export function CanvasSettingsPanel({
                     <Button
                       size="xs"
                       onClick={() => {
-                        setSettings({ ...settings, backgroundColor: customColor });
+                        setSettings((prev: CanvasSettings) => ({
+                          ...prev,
+                          backgroundColor: customColor,
+                          canvasBackgroundMediaId: undefined,
+                        }));
                         setCustomColorOpen(false);
                       }}
                     >
@@ -147,7 +157,11 @@ export function CanvasSettingsPanel({
                   <GradientEditor
                     initialGradient={isGradient(settings.backgroundColor) ? settings.backgroundColor : undefined}
                     onApply={(gradient) => {
-                      setSettings({ ...settings, backgroundColor: gradient });
+                      setSettings((prev: CanvasSettings) => ({
+                        ...prev,
+                        backgroundColor: gradient,
+                        canvasBackgroundMediaId: undefined,
+                      }));
                       setCustomColorOpen(false);
                     }}
                     onCancel={() => setCustomColorOpen(false)}

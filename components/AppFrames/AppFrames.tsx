@@ -865,7 +865,7 @@ export function AppFrames() {
                       // - multi file -> smart-fill device frames (empty-first), ignore excess
                       const effectiveTargetFrameIndex =
                         targetFrameIndex === undefined && files.length > 1 ? 0 : targetFrameIndex;
-                      if (targetFrameIndex === undefined && files.length <= 1) {
+                      if (targetFrameIndex == null && files.length <= 1) {
                         const backgroundMediaId = validMediaIds[0];
                         if (!backgroundMediaId) return;
                         setCanvasBackgroundMedia(screenIndex, backgroundMediaId);

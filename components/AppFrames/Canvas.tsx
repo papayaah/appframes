@@ -408,7 +408,7 @@ export function Canvas({
                 onDragOver={(e) => {
                   e.preventDefault();
                   setHoveredScreenIndex(screenIndex);
-                  if (e.dataTransfer?.types?.includes('Files')) setHoveredFrameIndex(getFrameIndexAtPoint(screenIndex, e.clientX, e.clientY));
+                  setHoveredFrameIndex(getFrameIndexAtPoint(screenIndex, e.clientX, e.clientY));
                 }}
               >
                 <Box
@@ -444,41 +444,60 @@ export function Canvas({
                     }}
                   >
                     <Box style={{ position: 'absolute', inset: 0, pointerEvents: 'auto' }}>
-                      {/* Background layer */}
-                      {(() => {
-                        const blur = screenSettings.backgroundEffects?.blur ?? 0;
-                        return (
-                          <Box
-                            style={{
-                              position: 'absolute',
-                              inset: blur > 0 ? `-${blur}px` : 0,
-                              clipPath: blur > 0 ? `inset(${blur}px)` : undefined,
-                              ...getBackgroundStyle(screenSettings.backgroundColor),
-                              filter: blur > 0 ? `blur(${blur}px)` : undefined,
-                              zIndex: 0,
-                            }}
-                          />
-                        );
-                      })()}
-
-                      {sharedBackground && sharedBackground.screenIds.includes(screen.id) ? (
-                        <SharedCanvasBackground
-                          screenId={screen.id}
-                          allScreens={screens}
-                          sharedBackground={sharedBackground}
-                          screenWidth={designRefWidth}
-                          screenHeight={designHeight}
-                          blur={screenSettings.backgroundEffects?.blur}
+                      {/* Background Stack (Layer 0) */}
+                      <Box style={{ position: 'absolute', inset: 0, zIndex: 0, overflow: 'hidden' }}>
+                        {/* Background Color */}
+                        <Box
+                          style={{
+                            position: 'absolute',
+                            inset: 0,
+                            ...getBackgroundStyle(screenSettings.backgroundColor),
+                            zIndex: 0,
+                          }}
                         />
-                      ) : (
-                        <CanvasBackground mediaId={screenSettings.canvasBackgroundMediaId} blur={screenSettings.backgroundEffects?.blur} />
-                      )}
 
-                      <BackgroundEffectsOverlay effects={screenSettings.backgroundEffects} screenId={screen.id} />
+                        {/* Background Image / Shared Background */}
+                        {sharedBackground && sharedBackground.screenIds.includes(screen.id) ? (
+                          <SharedCanvasBackground
+                            screenId={screen.id}
+                            allScreens={screens}
+                            sharedBackground={sharedBackground}
+                            screenWidth={designRefWidth}
+                            screenHeight={designHeight}
+                            blur={screenSettings.backgroundEffects?.blur}
+                          />
+                        ) : (
+                          <CanvasBackground mediaId={screenSettings.canvasBackgroundMediaId} blur={screenSettings.backgroundEffects?.blur} />
+                        )}
 
+                        {/* Background Effects Overlay */}
+                        <BackgroundEffectsOverlay effects={screenSettings.backgroundEffects} screenId={screen.id} />
+
+                        {/* Global Background Blur */}
+                        {(() => {
+                          const blur = screenSettings.backgroundEffects?.blur ?? 0;
+                          if (blur <= 0) return null;
+                          return (
+                            <Box
+                              style={{
+                                position: 'absolute',
+                                inset: `-${blur}px`,
+                                backdropFilter: `blur(${blur}px)`,
+                                pointerEvents: 'none',
+                                zIndex: 10, // Top of background stack
+                              }}
+                            />
+                          );
+                        })()}
+                      </Box>
+
+                      {/* Content Layer (Layer 1) */}
                       <Box style={{ position: 'relative', zIndex: 1, width: designRefWidth, height: designHeight }}>
                         <CompositionRenderer
-                          settings={screenSettings}
+                          settings={{
+                            ...screenSettings,
+                            composition: screenSettings.composition || 'single' // Fallback to prevent removal
+                          }}
                           screen={screen}
                           screenIndex={screenIndex}
                           // Important: normalize coordinates by BOTH zoom and design scale

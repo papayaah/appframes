@@ -177,24 +177,24 @@ export const getDefaultDIYOptions = (deviceType: DIYDeviceType): DIYOptions => {
 // Bezel width values in pixels (at scale 1)
 export const BEZEL_WIDTHS: Record<BezelStyle, number> = {
   none: 0,
-  thin: 8,
-  standard: 12,
-  thick: 16,
+  thin: 16,
+  standard: 24,
+  thick: 32,
 };
 
 // Corner radius values in pixels (at scale 1)
 export const CORNER_RADII: Record<CornerStyle, number> = {
-  sharp: 8,
-  rounded: 40,
-  'very-rounded': 52,
+  sharp: 16,
+  rounded: 80,
+  'very-rounded': 104,
 };
 
 // Base dimensions for each device type (at scale 1)
 export const BASE_DIMENSIONS: Record<DIYDeviceType, { width: number; height: number }> = {
-  phone: { width: 280, height: 575 },
-  flip: { width: 260, height: 640 },
-  foldable: { width: 380, height: 480 },
-  tablet: { width: 440, height: 580 },
-  laptop: { width: 600, height: 380 },
-  desktop: { width: 640, height: 360 },
+  phone: { width: 560, height: 1150 },
+  flip: { width: 520, height: 1280 },
+  foldable: { width: 760, height: 960 },
+  tablet: { width: 880, height: 1160 },
+  laptop: { width: 1200, height: 760 },
+  desktop: { width: 1280, height: 720 },
 };
