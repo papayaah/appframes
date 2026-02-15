@@ -453,6 +453,28 @@ class PersistenceDB {
   }
 
   /**
+   * Clear the synced revision entry for a deleted project
+   */
+  async clearSyncedRevision(projectId: string): Promise<void> {
+    try {
+      if (!this.db) await this.init();
+
+      const state = await this.getSyncState();
+      const revisions = state?.lastSyncedRevisionByProjectId ?? {};
+      delete revisions[projectId];
+
+      // Also clear any sync errors for this project
+      const errors = state?.syncErrorsByProjectId ?? {};
+      delete errors[projectId];
+
+      await this.saveSyncState({ lastSyncedRevisionByProjectId: revisions, syncErrorsByProjectId: errors });
+    } catch (error) {
+      console.error('Failed to clear synced revision:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Get the last synced revision for a project
    */
   async getSyncedRevision(projectId: string): Promise<number> {

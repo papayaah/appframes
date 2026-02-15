@@ -1485,10 +1485,10 @@ export function FramesProvider({ children }: { children: ReactNode }) {
     }
 
     debouncedSave(async () => {
-      // Check if project still exists (might have been deleted by claimLocalProjects)
+      // Check if project still exists (might have been deleted)
       const existingProject = await persistenceDB.loadProject(currentProjectId);
-      if (!existingProject && projectPristine.current) {
-        // Project was deleted and was pristine - don't re-create it
+      if (!existingProject) {
+        // Project was deleted - don't re-create it
         return;
       }
 
@@ -1674,40 +1674,72 @@ export function FramesProvider({ children }: { children: ReactNode }) {
    */
   const deleteProject = useCallback(async (projectId: string) => {
     try {
+      // Get the synced revision before deleting locally
+      const baseRevision = isSignedIn ? await persistenceDB.getSyncedRevision(projectId) : 0;
+
       // Delete the project from local database
       await persistenceDB.deleteProject(projectId);
       // Remove from sync queue if pending
       await persistenceDB.dequeueSyncProject(projectId);
+      // Clear the synced revision entry for this project
+      await persistenceDB.clearSyncedRevision(projectId);
 
-      // Try to delete on server (if signed in) - fire and forget
+      // Delete on server (if signed in) - await to prevent re-sync on refresh
       if (isSignedIn) {
-        const baseRevision = await persistenceDB.getSyncedRevision(projectId);
-        fetch(`/api/projects/${projectId}`, {
-          method: 'DELETE',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ baseRevision }),
-        }).catch(console.error);
+        try {
+          await fetch(`/api/projects/${projectId}`, {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ baseRevision }),
+          });
+        } catch (err) {
+          console.error('Failed to delete project on server:', err);
+        }
       }
 
-      // If deleting current project, switch to another or create new
+      // If deleting current project, load another project directly
+      // (don't use switchProject which would re-save the deleted project)
       if (projectId === currentProjectId) {
         const projects = await persistenceDB.getAllProjects();
         if (projects.length > 0) {
-          // Switch to the most recently accessed project
           const recent = projects.sort((a, b) =>
             b.lastAccessedAt.getTime() - a.lastAccessedAt.getTime()
           )[0];
-          await switchProject(recent.id);
+          loadProjectIntoState(recent);
+          await persistenceDB.saveAppState({
+            currentProjectId: recent.id,
+            sidebarTab,
+            sidebarPanelOpen,
+            navWidth,
+            downloadFormat,
+            downloadJpegQuality,
+          });
         } else {
-          // No projects left, create a new default project
-          await createNewProject('My Project');
+          // No projects left — create a fresh project directly
+          // (don't use createNewProject which would re-save the deleted project)
+          const newProject = await persistenceDB.createProject('My Project');
+          const seed = createInitialDoc();
+          newProject.screensByCanvasSize = seed.screensByCanvasSize;
+          const firstSize = Object.keys(seed.screensByCanvasSize)[0];
+          if (firstSize) newProject.currentCanvasSize = firstSize;
+          await persistenceDB.saveProject(newProject);
+          loadProjectIntoState(newProject);
+          await persistenceDB.saveAppState({
+            currentProjectId: newProject.id,
+            sidebarTab,
+            sidebarPanelOpen,
+            navWidth,
+            downloadFormat,
+            downloadJpegQuality,
+          });
         }
       }
     } catch (error) {
       console.error('Failed to delete project:', error);
       throw error;
     }
-  }, [currentProjectId, switchProject, createNewProject, isSignedIn]);
+  }, [currentProjectId, isSignedIn, loadProjectIntoState, createInitialDoc,
+      sidebarTab, sidebarPanelOpen, navWidth, downloadFormat, downloadJpegQuality]);
 
   /**
    * Rename the current project
