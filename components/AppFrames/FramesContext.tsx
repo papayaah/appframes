@@ -258,6 +258,7 @@ interface FramesContextType {
   copyScreensToCanvasSize: (targetCanvasSize: string) => void;
   getCurrentScreens: () => Screen[];
   reorderScreens: (fromIndex: number, toIndex: number) => void;
+  removeAllScreens: () => void;
   // Project management
   createNewProject: (name: string) => Promise<void>;
   switchProject: (projectId: string) => Promise<void>;
@@ -313,10 +314,10 @@ export const FramesContextInternal = FramesContext;
 export function FramesProvider({ children }: { children: ReactNode }) {
   // Use a counter for screen IDs to avoid hydration issues
   const screenIdCounter = useRef(0);
-  
+
   // Flag to prevent infinite loops between syncing effects
   const isSyncing = useRef(false);
-  
+
   // Flag to track if initial state has been loaded
   const hasLoadedInitialState = useRef(false);
   const hasStartedInitialLoad = useRef(false);
@@ -391,10 +392,10 @@ export function FramesProvider({ children }: { children: ReactNode }) {
   const [selectedFrameIndex, setSelectedFrameIndex] = useState<number>(0);
   // Hide frame selection handles until user explicitly selects a frame (or on load)
   const [frameSelectionVisible, setFrameSelectionVisible] = useState<boolean>(false);
-  
+
   // Media Cache to prevent flashing
   const [mediaCache, setMediaCache] = useState<Record<number, string>>({});
-  
+
   const setCachedMedia = useCallback((mediaId: number, url: string) => {
     setMediaCache(prev => ({ ...prev, [mediaId]: url }));
   }, []);
@@ -420,7 +421,7 @@ export function FramesProvider({ children }: { children: ReactNode }) {
     },
     onError: (error) => {
       console.error('Persistence error:', error);
-      
+
       // Handle quota exceeded errors
       if (error.message === 'QUOTA_EXCEEDED') {
         // Show notification with suggestion to clear workspace
@@ -588,23 +589,23 @@ export function FramesProvider({ children }: { children: ReactNode }) {
       id: `screen-${screenIdCounter.current}`,
       images: sourceScreen.images
         ? sourceScreen.images.map((img) =>
-            img
-              ? {
-                  ...img,
-                  // Deep copy diyOptions to avoid shared state
-                  diyOptions: img.diyOptions ? { ...img.diyOptions } : undefined,
-                }
-              : {}
-          )
+          img
+            ? {
+              ...img,
+              // Deep copy diyOptions to avoid shared state
+              diyOptions: img.diyOptions ? { ...img.diyOptions } : undefined,
+            }
+            : {}
+        )
         : [],
       name: `${sourceScreen.name} (copy)`,
       settings: { ...sourceScreen.settings, selectedTextId: undefined },
       textElements: sourceScreen.textElements
         ? sourceScreen.textElements.map((el) => ({
-            ...el,
-            id: `text-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
-            style: { ...el.style },
-          }))
+          ...el,
+          id: `text-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+          style: { ...el.style },
+        }))
         : [],
     };
 
@@ -644,10 +645,10 @@ export function FramesProvider({ children }: { children: ReactNode }) {
 
     const label =
       updates.canvasBackgroundMediaId !== undefined ? 'Change canvas background'
-      : updates.backgroundColor !== undefined ? 'Change background color'
-      : updates.composition !== undefined ? 'Change composition'
-      : updates.orientation !== undefined ? 'Change orientation'
-      : 'Edit screen settings';
+        : updates.backgroundColor !== undefined ? 'Change background color'
+          : updates.composition !== undefined ? 'Change composition'
+            : updates.orientation !== undefined ? 'Change orientation'
+              : 'Edit screen settings';
 
     commitCurrentScreens(label, (list) => {
       const screen = list[primarySelectedIndex];
@@ -679,8 +680,8 @@ export function FramesProvider({ children }: { children: ReactNode }) {
 
     const nextComposition =
       currentComposition === 'single' ? 'dual'
-      : currentComposition === 'dual' || currentComposition === 'stack' ? 'triple'
-      : 'triple';
+        : currentComposition === 'dual' || currentComposition === 'stack' ? 'triple'
+          : 'triple';
 
     const nextCount = getCompositionFrameCount(nextComposition);
 
@@ -882,7 +883,7 @@ export function FramesProvider({ children }: { children: ReactNode }) {
     mutateDoc((draft) => {
       const size = currentCanvasSizeRef.current;
       const list = draft.screensByCanvasSize[size] || [];
-      
+
       // If selecting text (not clearing), clear selection on all other screens first
       if (textId) {
         list.forEach((screen, idx) => {
@@ -891,7 +892,7 @@ export function FramesProvider({ children }: { children: ReactNode }) {
           }
         });
       }
-      
+
       // Update the target screen's selection
       const screen = list[screenIndex];
       if (!screen) return;
@@ -1223,6 +1224,19 @@ export function FramesProvider({ children }: { children: ReactNode }) {
     });
   }, [commitDoc, doc.screensByCanvasSize]);
 
+  const removeAllScreens = useCallback(() => {
+    commitDoc('Delete all screens', (draft) => {
+      const size = currentCanvasSizeRef.current;
+      draft.screensByCanvasSize[size] = [];
+      if (draft.sharedBackgrounds?.[size]) {
+        draft.sharedBackgrounds[size].screenIds = [];
+      }
+    });
+    setSelectedScreenIndices([0]);
+    setSelectedFrameIndex(0);
+    setFrameSelectionVisible(false);
+  }, [commitDoc]);
+
   const copyScreensToCanvasSize = useCallback((targetCanvasSize: string) => {
     const sourceCanvasSize = currentCanvasSizeRef.current;
     const sourceScreens = doc.screensByCanvasSize[sourceCanvasSize];
@@ -1235,6 +1249,12 @@ export function FramesProvider({ children }: { children: ReactNode }) {
     const targetDeviceType = inferDeviceTypeFromCanvasSize(targetCanvasSize);
     const deviceTypeChanged = sourceDeviceType !== targetDeviceType;
 
+    // Calculate height ratio for proportional scaling
+    // This ensures a frame taking 80% height on a large screen still takes 80% on a small one.
+    const sourceDims = getCanvasDimensions(sourceCanvasSize, 'portrait'); // Use portrait as baseline for ratio
+    const targetDims = getCanvasDimensions(targetCanvasSize, 'portrait');
+    const heightRatio = targetDims.height / sourceDims.height;
+
     const adaptedScreens: Screen[] = sourceScreens.map((src) => {
       screenIdCounter.current += 1;
 
@@ -1245,13 +1265,11 @@ export function FramesProvider({ children }: { children: ReactNode }) {
           ...img,
           diyOptions: img.diyOptions ? { ...img.diyOptions } : undefined,
           frameEffects: img.frameEffects ? { ...img.frameEffects } : undefined,
-          // Reset frame positions — the composition renderer handles default
-          // layout for each type, and pixel offsets from the source canvas
-          // don't translate well to different aspect ratios
-          frameX: 0,
-          frameY: 0,
-          // Reset scale to default so frames are properly sized for the new canvas
-          frameScale: 100,
+          // Proportional preservation:
+          // Scale the pixels so they occupy the same relative space on the new canvas height.
+          frameX: (img.frameX ?? 0) * heightRatio,
+          frameY: (img.frameY ?? 0) * heightRatio,
+          frameScale: (img.frameScale ?? 100) * heightRatio,
           // Keep angles as-is
           tiltX: img.tiltX,
           tiltY: img.tiltY,
@@ -1272,11 +1290,20 @@ export function FramesProvider({ children }: { children: ReactNode }) {
         return adapted;
       });
 
-      const adaptedTextElements: TextElement[] = (src.textElements || []).map((el) => ({
-        ...el,
-        id: createId('text'),
-        style: { ...el.style },
-      }));
+      const adaptedTextElements: TextElement[] = (src.textElements || []).map((el) => {
+        const style = { ...el.style };
+
+        // Scale text properties proportionally to maintain layout
+        if (style.fontSize) style.fontSize *= heightRatio;
+        if (typeof style.lineHeight === 'number') style.lineHeight *= heightRatio;
+        if (style.letterSpacing) style.letterSpacing *= heightRatio;
+
+        return {
+          ...el,
+          id: createId('text'),
+          style,
+        };
+      });
 
       return {
         id: `screen-${screenIdCounter.current}`,
@@ -1349,7 +1376,7 @@ export function FramesProvider({ children }: { children: ReactNode }) {
   const loadPersistedState = useCallback(async () => {
     try {
       const appState = await persistenceDB.loadAppState();
-      
+
       // Load current project if one exists
       if (appState?.currentProjectId) {
         const project = await persistenceDB.loadProject(appState.currentProjectId);
@@ -1406,7 +1433,7 @@ export function FramesProvider({ children }: { children: ReactNode }) {
           projectCreatedAt.current = newProject.createdAt;
         }
       }
-      
+
       // Load UI preferences
       if (appState) {
         setSidebarTab(appState.sidebarTab);
@@ -1597,10 +1624,10 @@ export function FramesProvider({ children }: { children: ReactNode }) {
 
       // Create new project
       const newProject = await persistenceDB.createProject(name);
-      
+
       // Load new project into state
       loadProjectIntoState(newProject);
-      
+
       // Update app state to track current project
       await persistenceDB.saveAppState({
         currentProjectId: newProject.id,
@@ -1614,9 +1641,9 @@ export function FramesProvider({ children }: { children: ReactNode }) {
       console.error('Failed to create new project:', error);
       throw error;
     }
-  }, [currentProjectId, doc.name, doc.screensByCanvasSize, currentCanvasSize, 
-      selectedScreenIndices, primarySelectedIndex, selectedFrameIndex, zoom, 
-      sidebarTab, sidebarPanelOpen, navWidth, loadProjectIntoState]);
+  }, [currentProjectId, doc.name, doc.screensByCanvasSize, currentCanvasSize,
+    selectedScreenIndices, primarySelectedIndex, selectedFrameIndex, zoom,
+    sidebarTab, sidebarPanelOpen, navWidth, loadProjectIntoState]);
 
   /**
    * Switch to a different project
@@ -1641,12 +1668,12 @@ export function FramesProvider({ children }: { children: ReactNode }) {
           lastAccessedAt: new Date(),
         });
       }
-      
+
       // Load new project
       const project = await persistenceDB.loadProject(projectId);
       if (project) {
         loadProjectIntoState(project);
-        
+
         // Update app state
         await persistenceDB.saveAppState({
           currentProjectId: projectId,
@@ -1664,8 +1691,8 @@ export function FramesProvider({ children }: { children: ReactNode }) {
       throw error;
     }
   }, [currentProjectId, doc.name, doc.screensByCanvasSize, currentCanvasSize,
-      selectedScreenIndices, primarySelectedIndex, selectedFrameIndex, zoom,
-      sidebarTab, sidebarPanelOpen, navWidth, loadProjectIntoState]);
+    selectedScreenIndices, primarySelectedIndex, selectedFrameIndex, zoom,
+    sidebarTab, sidebarPanelOpen, navWidth, loadProjectIntoState]);
 
   /**
    * Delete a project by ID
@@ -1739,7 +1766,7 @@ export function FramesProvider({ children }: { children: ReactNode }) {
       throw error;
     }
   }, [currentProjectId, isSignedIn, loadProjectIntoState, createInitialDoc,
-      sidebarTab, sidebarPanelOpen, navWidth, downloadFormat, downloadJpegQuality]);
+    sidebarTab, sidebarPanelOpen, navWidth, downloadFormat, downloadJpegQuality]);
 
   /**
    * Rename the current project
@@ -1750,12 +1777,12 @@ export function FramesProvider({ children }: { children: ReactNode }) {
         console.error('No current project to rename');
         return;
       }
-      
+
       // Update local state (undoable)
       commitDoc('Rename project', (draft) => {
         draft.name = newName;
       });
-      
+
       // Update in database
       await persistenceDB.renameProject(currentProjectId, newName);
     } catch (error) {
@@ -1998,6 +2025,7 @@ export function FramesProvider({ children }: { children: ReactNode }) {
         copyScreensToCanvasSize,
         getCurrentScreens,
         reorderScreens,
+        removeAllScreens,
         createNewProject,
         switchProject,
         deleteProject,

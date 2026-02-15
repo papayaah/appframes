@@ -191,7 +191,7 @@ export function TransformControls({
           <ScaleControl
             scale={scale}
             min={20}
-            max={200}
+            max={500}
             defaultValue={100}
             onScaleChange={onScaleChange}
           />

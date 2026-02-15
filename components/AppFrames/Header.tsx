@@ -45,6 +45,7 @@ interface HeaderProps {
   syncStatus?: SyncStatus;
   historyOpen?: boolean;
   onToggleHistory?: () => void;
+  onDeleteAllScreens?: () => void;
 }
 
 function SyncStatusIcon({ saveStatus, syncStatus }: { saveStatus: string; syncStatus: string }) {
@@ -81,12 +82,12 @@ function SyncStatusIcon({ saveStatus, syncStatus }: { saveStatus: string; syncSt
 
   const color = isError ? 'var(--mantine-color-red-6)' :
     isActive ? 'var(--mantine-color-blue-5)' :
-    'var(--mantine-color-green-6)';
+      'var(--mantine-color-green-6)';
 
   const tooltip = isError ? 'Sync error' :
     saveStatus === 'saving' ? 'Saving...' :
-    syncStatus === 'syncing' ? 'Syncing...' :
-    'Saved';
+      syncStatus === 'syncing' ? 'Syncing...' :
+        'Saved';
 
   return (
     <Tooltip label={tooltip} openDelay={300}>
@@ -139,11 +140,13 @@ export function Header({
   syncStatus = 'idle',
   historyOpen = false,
   onToggleHistory,
+  onDeleteAllScreens,
 }: HeaderProps) {
   const [projects, setProjects] = useState<Project[]>([]);
   const [showNewProjectModal, setShowNewProjectModal] = useState(false);
   const [showRenameModal, setShowRenameModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showDeleteAllModal, setShowDeleteAllModal] = useState(false);
   const [newProjectName, setNewProjectName] = useState('');
   const [renameValue, setRenameValue] = useState('');
   const [projectToDelete, setProjectToDelete] = useState<string | null>(null);
@@ -215,7 +218,7 @@ export function Header({
             style={{ objectFit: 'contain' }}
             priority
           />
-          
+
           {/* Project Selector */}
           <Menu shadow="md" width={280} onOpen={loadProjects}>
             <Menu.Target>
@@ -231,7 +234,7 @@ export function Header({
 
             <Menu.Dropdown>
               <Menu.Label>Projects</Menu.Label>
-              
+
               {projects.map((project) => {
                 const isCurrent = project.id === currentProjectId;
                 return (
@@ -383,33 +386,33 @@ export function Header({
           )}
         </Group>
 
-      <Group gap={4} style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)' }}>
-        <ActionIcon variant="subtle" size="xs" color="gray" onClick={() => onZoomChange?.(Math.max(25, zoom - 25))}>
-          <Text size="xs" fw={600}>-</Text>
-        </ActionIcon>
-        <Menu shadow="sm" width={100} position="bottom">
-          <Menu.Target>
-            <Button variant="subtle" size="compact-xs" color="gray" styles={{ root: { fontWeight: 400, padding: '2px 6px' } }}>
-              {zoom}%
-            </Button>
-          </Menu.Target>
-          <Menu.Dropdown>
-            {[25, 50, 75, 100, 125, 150, 200].map((v) => (
-              <Menu.Item key={v} onClick={() => onZoomChange?.(v)} style={{ backgroundColor: v === zoom ? 'var(--mantine-color-blue-0)' : undefined }}>
-                <Text size="sm" ta="center">{v}%</Text>
-              </Menu.Item>
-            ))}
-          </Menu.Dropdown>
-        </Menu>
-        <ActionIcon variant="subtle" size="xs" color="gray" onClick={() => onZoomChange?.(Math.min(200, zoom + 25))}>
-          <Text size="xs" fw={600}>+</Text>
-        </ActionIcon>
-      </Group>
+        <Group gap={4} style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)' }}>
+          <ActionIcon variant="subtle" size="xs" color="gray" onClick={() => onZoomChange?.(Math.max(25, zoom - 25))}>
+            <Text size="xs" fw={600}>-</Text>
+          </ActionIcon>
+          <Menu shadow="sm" width={100} position="bottom">
+            <Menu.Target>
+              <Button variant="subtle" size="compact-xs" color="gray" styles={{ root: { fontWeight: 400, padding: '2px 6px' } }}>
+                {zoom}%
+              </Button>
+            </Menu.Target>
+            <Menu.Dropdown>
+              {[25, 50, 75, 100, 125, 150, 200].map((v) => (
+                <Menu.Item key={v} onClick={() => onZoomChange?.(v)} style={{ backgroundColor: v === zoom ? 'var(--mantine-color-blue-0)' : undefined }}>
+                  <Text size="sm" ta="center">{v}%</Text>
+                </Menu.Item>
+              ))}
+            </Menu.Dropdown>
+          </Menu>
+          <ActionIcon variant="subtle" size="xs" color="gray" onClick={() => onZoomChange?.(Math.min(200, zoom + 25))}>
+            <Text size="xs" fw={600}>+</Text>
+          </ActionIcon>
+        </Group>
 
         <Group gap="xs">
           {/* Save & Sync Status Icon */}
           <SyncStatusIcon saveStatus={saveStatus} syncStatus={syncStatus} />
-          
+
           <Tooltip label={`Download${selectedCount > 1 ? ` (${selectedCount} screens)` : ''} • For full export, use Preview`}>
             <ActionIcon
               size="lg"
@@ -431,6 +434,19 @@ export function Header({
               <IconHistory size={18} />
             </ActionIcon>
           </Tooltip>
+          {onDeleteAllScreens && totalCount > 0 && (
+            <Tooltip label="Delete all screens (Clear workspace)">
+              <ActionIcon
+                size="lg"
+                variant="light"
+                color="red"
+                onClick={() => setShowDeleteAllModal(true)}
+                aria-label="Delete all screens"
+              >
+                <IconTrash size={18} />
+              </ActionIcon>
+            </Tooltip>
+          )}
           <Tooltip label="Account & integrations (optional)">
             <ActionIcon
               size="lg"
@@ -591,6 +607,40 @@ export function Header({
               onClick={handleDeleteProject}
             >
               Delete Project
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
+
+      {/* Delete All Screens Confirmation Modal */}
+      <Modal
+        opened={showDeleteAllModal}
+        onClose={() => setShowDeleteAllModal(false)}
+        title="Clear Workspace"
+        centered
+      >
+        <Stack gap="md">
+          <Text>
+            Are you sure you want to delete <strong>all {totalCount} screens</strong> for {outputDimensions}?
+          </Text>
+          <Text size="sm" c="dimmed">
+            This will permanently remove all screens from this canvas size. This action can be undone with Cmd+Z.
+          </Text>
+          <Group justify="flex-end" gap="xs">
+            <Button
+              variant="subtle"
+              onClick={() => setShowDeleteAllModal(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              color="red"
+              onClick={() => {
+                onDeleteAllScreens?.();
+                setShowDeleteAllModal(false);
+              }}
+            >
+              Delete All Screens
             </Button>
           </Group>
         </Stack>

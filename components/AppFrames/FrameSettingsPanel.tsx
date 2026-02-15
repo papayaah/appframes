@@ -44,7 +44,7 @@ export interface FrameSettingsPanelProps {
   frameRotation?: number;
   /** Callback when frame rotation changes */
   onFrameRotationChange?: (rotation: number) => void;
-  /** Current frame scale percentage (20 to 200) */
+  /** Current frame scale percentage (20 to 500) */
   frameScale?: number;
   /** Callback when frame scale changes */
   onFrameScaleChange?: (scale: number) => void;

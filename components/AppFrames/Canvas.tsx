@@ -91,11 +91,12 @@ export function Canvas({
   const [dragFileCount, setDragFileCount] = useState<number>(0);
   const [isPanning, setIsPanning] = useState(false);
 
+  // Track the actual rendered width of EACH canvas to enable proportional scaling
+  const [canvasWidths, setCanvasWidths] = useState<Record<string, number>>({});
+
   const containerRef = useRef<HTMLDivElement>(null);
   const innerRef = useRef<HTMLDivElement>(null);
-  const lastScrollTime = useRef<number>(0);
   const canvasRefs = useRef<Map<number, HTMLElement>>(new Map());
-  const canvasSizes = useRef<Map<number, { width: number; height: number }>>(new Map());
   const canvasResizeObservers = useRef<Map<number, ResizeObserver>>(new Map());
 
   // Pan + zoom hot path: keep in refs, apply transform in rAF (avoid React renders per mousemove)
@@ -103,7 +104,7 @@ export function Canvas({
   const zoomRef = useRef(zoom);
   const transformRafRef = useRef<number | null>(null);
   zoomRef.current = zoom;
-  
+
   // Get cross-canvas drag context
   const crossCanvasDrag = useCrossCanvasDrag();
 
@@ -251,40 +252,30 @@ export function Canvas({
     onReplaceScreen(files, targetFrameIndex, screenIndex);
   };
 
-  const setCanvasRef = useCallback((screenIndex: number, el: HTMLElement | null) => {
+  const setCanvasRef = useCallback((screenIndex: number, screenId: string, el: HTMLElement | null) => {
     // Clean up old observer/ref
     const prev = canvasRefs.current.get(screenIndex);
     if (prev && prev !== el) {
-      const ro = canvasResizeObservers.current.get(screenIndex);
-      ro?.disconnect();
+      canvasResizeObservers.current.get(screenIndex)?.disconnect();
       canvasResizeObservers.current.delete(screenIndex);
-      canvasSizes.current.delete(screenIndex);
       canvasRefs.current.delete(screenIndex);
       crossCanvasDrag.unregisterCanvas(screenIndex);
     }
 
-    if (!el) {
-      const ro = canvasResizeObservers.current.get(screenIndex);
-      ro?.disconnect();
-      canvasResizeObservers.current.delete(screenIndex);
-      canvasSizes.current.delete(screenIndex);
-      canvasRefs.current.delete(screenIndex);
-      crossCanvasDrag.unregisterCanvas(screenIndex);
-      return;
-    }
+    if (!el) return;
 
     canvasRefs.current.set(screenIndex, el);
-    // Register bounds for cross-canvas drag logic
+    // Register bounds for cross-canvas drag (initially)
     crossCanvasDrag.registerCanvas(screenIndex, el);
 
-    // Track size without forcing layout reads during render
+    // Track size to calculate the scaling ratio between official units and actual viewport pixels
     if (typeof ResizeObserver !== 'undefined') {
       const ro = new ResizeObserver((entries) => {
         const entry = entries[0];
         if (!entry) return;
-        const { width, height } = entry.contentRect;
-        canvasSizes.current.set(screenIndex, { width, height });
-        // Keep drag bounds current when layout changes
+        const width = entry.contentRect.width;
+        setCanvasWidths(prev => ({ ...prev, [screenId]: width }));
+        // Keep drag bounds current
         crossCanvasDrag.registerCanvas(screenIndex, el);
       });
       ro.observe(el);
@@ -316,6 +307,9 @@ export function Canvas({
     [onClickOutsideCanvas]
   );
 
+  // No longer using a hardcoded 1000px. We use the official target resolution width.
+  // This makes 1 unit = 1 pixel at 1x export, which is much more intuitive.
+
   return (
     <Box
       ref={containerRef}
@@ -324,24 +318,21 @@ export function Canvas({
         backgroundColor: '#F9FAFB',
         display: 'flex',
         alignItems: 'center',
-        justifyContent: 'flex-start', // Start from left to allow scrolling
+        justifyContent: 'flex-start',
         padding: 40,
-        overflowX: 'auto', // Enable horizontal scrolling
+        overflowX: 'auto',
         overflowY: 'hidden',
         position: 'relative',
       }}
       onMouseDown={handleContainerMouseDown}
       onDragOver={(e) => {
         e.preventDefault();
-        // Count files being dragged
         if (e.dataTransfer.types.includes('Files')) {
-          const fileCount = e.dataTransfer.items.length;
-          // Avoid state spam while dragging over
-          if (fileCount !== dragFileCount) setDragFileCount(fileCount);
+          const count = e.dataTransfer.items.length;
+          if (count !== dragFileCount) setDragFileCount(count);
         }
       }}
       onDragLeave={(e) => {
-        // Only clear if leaving the entire canvas area
         if (!e.currentTarget.contains(e.relatedTarget as Node)) {
           setHoveredFrameIndex(null);
           setHoveredScreenIndex(null);
@@ -353,267 +344,220 @@ export function Canvas({
         ref={innerRef}
         style={{
           display: 'flex',
-          gap: 60, // Fixed gap between canvases
+          gap: 60,
           height: '100%',
           alignItems: 'center',
-          margin: '0 auto', // Center if content is smaller than viewport
-          minWidth: 'min-content', // Ensure container grows with content
-          // Transform is applied imperatively (rAF-batched) for smooth panning
+          margin: '0 auto',
+          minWidth: 'min-content',
           willChange: 'transform',
-          // Change cursor when panning
           cursor: isPanning ? 'grabbing' : undefined,
         }}
       >
         {(() => {
-          // Sort indices to maintain the same order as ScreensPanel
           const sortedIndices = [...selectedScreenIndices].sort((a, b) => a - b);
-          // Primary screen is the last one selected (last in original array, not sorted)
           const primaryScreenIndex = selectedScreenIndices[selectedScreenIndices.length - 1];
-          
+
           return sortedIndices.map((screenIndex) => {
             const screen = screens[screenIndex];
-            if (!screen) {
-              return null;
-            }
+            if (!screen) return null;
 
-            const screenSettings = {
-              ...screen.settings,
-              selectedScreenIndex: screenIndex,
-            };
-
+            const screenSettings = { ...screen.settings, selectedScreenIndex: screenIndex };
             const canvasDimensions = getCanvasDimensions(screenSettings.canvasSize, screenSettings.orientation);
             const aspectRatio = canvasDimensions.width / canvasDimensions.height;
-
-            // Only show selection for the primary selected screen (last one selected)
             const isPrimaryScreen = screenIndex === primaryScreenIndex;
-          // Only show *one* set of handles at a time:
-          // - If a text element is selected, suppress frame selection/handles.
-          // - Hide frame handles until user explicitly selects a frame (frameSelectionVisible).
-          const effectiveSelectedFrameIndex =
-            isPrimaryScreen && !screenSettings.selectedTextId && frameSelectionVisible ? selectedFrameIndex : undefined;
+            const effSelectedFrameIndex = isPrimaryScreen && !screenSettings.selectedTextId && frameSelectionVisible ? selectedFrameIndex : undefined;
 
-          return (
-            <Box
-              key={screen.id}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                height: '100%',
-                // Scale container width with aspect ratio so wider canvases (e.g. iPad ~0.75)
-                // get enough horizontal space for their larger device frames.
-                width: aspectRatio > 1 ? '60vw' : `max(40vh, ${Math.round(80 * aspectRatio)}vh)`,
-                flexShrink: 0,
-                position: 'relative', // For positioning overflow layer
-              }}
-              onDrop={(e) => {
-                // Let .appframes/.zip files bubble up to the global import handler
-                const droppedFile = e.dataTransfer.files[0];
-                if (droppedFile) {
-                  const name = droppedFile.name.toLowerCase();
-                  if (name.endsWith('.appframes') || name.endsWith('.zip')) return;
-                }
-                e.preventDefault();
-                e.stopPropagation();
-                const dropFrameIndex = getFrameIndexAtPoint(screenIndex, e.clientX, e.clientY);
-                // 1) Prefer mediaId payload (dragging from media library)
-                const mediaIdRaw = (() => {
-                  try {
-                    return e.dataTransfer.getData('mediaId');
-                  } catch {
-                    return '';
-                  }
-                })();
-                const mediaId = Number(mediaIdRaw);
-                if (Number.isFinite(mediaId) && mediaId > 0) {
-                  // If dropped directly on a frame, put it in that frame
-                  if (dropFrameIndex != null) {
-                    onMediaSelect?.(screenIndex, dropFrameIndex, mediaId);
+            // Content Scaling Logic:
+            // We scale the target coordinate system (e.g. 1320px) down to the responsive actualWidth.
+            // This ensures editor units = target pixels.
+            const designRefWidth = canvasDimensions.width;
+            const actualWidth = canvasWidths[screen.id] || 0;
+            // Default to a 1:1 scale if the observer hasn't reported a width yet to avoid initial flicker
+            const contentScale = actualWidth ? actualWidth / designRefWidth : 1;
+            const designHeight = designRefWidth / aspectRatio;
+
+            return (
+              <Box
+                key={screen.id}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  height: '100%',
+                  width: aspectRatio > 1 ? '60vw' : `max(40vh, ${Math.round(80 * aspectRatio)}vh)`,
+                  flexShrink: 0,
+                  position: 'relative',
+                }}
+                onDrop={(e) => {
+                  const droppedFile = e.dataTransfer.files[0];
+                  if (droppedFile && (droppedFile.name.toLowerCase().endsWith('.appframes') || droppedFile.name.toLowerCase().endsWith('.zip'))) return;
+                  e.preventDefault();
+                  e.stopPropagation();
+                  const dropFrameIndex = getFrameIndexAtPoint(screenIndex, e.clientX, e.clientY);
+                  const mediaId = Number(e.dataTransfer.getData('mediaId'));
+                  if (Number.isFinite(mediaId) && mediaId > 0) {
+                    if (dropFrameIndex != null) onMediaSelect?.(screenIndex, dropFrameIndex, mediaId);
+                    else onCanvasBackgroundMediaSelect?.(screenIndex, mediaId);
                   } else {
-                    // Dropped on canvas background area (not on a frame) → set as canvas background
-                    onCanvasBackgroundMediaSelect?.(screenIndex, mediaId);
+                    onReplaceScreen?.(Array.from(e.dataTransfer.files), dropFrameIndex ?? hoveredFrameIndex ?? undefined, screenIndex);
                   }
                   setHoveredFrameIndex(null);
                   setHoveredScreenIndex(null);
                   setDragFileCount(0);
-                  return;
-                }
-
-                // 2) Otherwise treat it as a file drop (upload/replace)
-                const files = Array.from(e.dataTransfer.files);
-                handleDrop(files, dropFrameIndex ?? hoveredFrameIndex ?? undefined, screenIndex);
-              }}
-              onDragOver={(e) => {
-                e.preventDefault();
-                setHoveredScreenIndex(screenIndex);
-                if (e.dataTransfer?.types?.includes('Files')) {
-                  const idx = getFrameIndexAtPoint(screenIndex, e.clientX, e.clientY);
-                  setHoveredFrameIndex(idx);
-                }
-              }}
-            >
-              <Box
-                id={`canvas-${screen.id}`}
-                data-canvas="true"
-                ref={(el) => setCanvasRef(screenIndex, el)}
-                style={{
-                  width: '100%',
-                  maxWidth: aspectRatio > 1 ? '90%' : '100%',
-                  aspectRatio: `${aspectRatio}`,
-                  position: 'relative',
-                  boxShadow: '0 10px 40px rgba(0,0,0,0.15)',
-                  borderRadius: 8,
-                  overflow: 'hidden',
                 }}
-                onMouseDown={(e) => {
-                  // Clicking on the canvas background (not on a frame device or text element)
-                  const target = e.target as HTMLElement;
-                  const isOnFrame = !!target.closest('[data-frame-drop-zone="true"]');
-                  const isOnText = !!target.closest('[data-text-element="true"]');
-                  if (!isOnFrame && !isOnText) {
-                    onClickCanvas?.(screenIndex);
-                  }
-                  // Clear text selection on any canvas click (not just primary)
-                  onSelectTextElement?.(screenIndex, null);
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  setHoveredScreenIndex(screenIndex);
+                  if (e.dataTransfer?.types?.includes('Files')) setHoveredFrameIndex(getFrameIndexAtPoint(screenIndex, e.clientX, e.clientY));
                 }}
               >
-                {dragFileCount > 0 && hoveredScreenIndex === screenIndex && hoveredFrameIndex == null && (
+                <Box
+                  id={`canvas-${screen.id}`}
+                  data-canvas="true"
+                  ref={(el) => setCanvasRef(screenIndex, screen.id, el)}
+                  style={{
+                    width: '100%',
+                    maxWidth: aspectRatio > 1 ? '90%' : '100%',
+                    aspectRatio: `${aspectRatio}`,
+                    position: 'relative',
+                    boxShadow: '0 10px 40px rgba(0,0,0,0.15)',
+                    borderRadius: 8,
+                    overflow: 'hidden',
+                  }}
+                  onMouseDown={(e) => {
+                    const target = e.target as HTMLElement;
+                    if (!target.closest('[data-frame-drop-zone="true"]') && !target.closest('[data-text-element="true"]')) onClickCanvas?.(screenIndex);
+                    onSelectTextElement?.(screenIndex, null);
+                  }}
+                >
+                  {/* Scaling Content Container (Stability Layer) */}
                   <Box
-                    data-export-hide="true"
                     style={{
                       position: 'absolute',
-                      inset: 0,
+                      top: 0,
+                      left: 0,
+                      width: designRefWidth,
+                      height: designHeight,
+                      transformOrigin: 'top left',
+                      transform: `scale(${contentScale})`,
                       pointerEvents: 'none',
-                      zIndex: 0,
-                      border: '2px dashed rgba(102, 126, 234, 0.7)',
-                      borderRadius: 8,
-                      boxShadow: 'inset 0 0 0 2px rgba(102, 126, 234, 0.15)',
                     }}
-                  />
-                )}
-                {/* Background color/gradient layer (separate div for blur support) */}
-                {(() => {
-                  const blurAmount = screenSettings.backgroundEffects?.blur ?? 0;
-                  const hasBlur = blurAmount > 0;
-                  return (
-                    <Box
-                      style={{
-                        position: 'absolute',
-                        inset: hasBlur ? `-${blurAmount}px` : 0,
-                        clipPath: hasBlur ? `inset(${blurAmount}px)` : undefined,
-                        ...getBackgroundStyle(screenSettings.backgroundColor),
-                        filter: hasBlur ? `blur(${blurAmount}px)` : undefined,
-                        pointerEvents: 'none',
-                        zIndex: 0,
-                      }}
-                    />
-                  );
-                })()}
-                {/* Render shared background if this screen is part of a shared background group */}
-                {sharedBackground && sharedBackground.screenIds.includes(screen.id) ? (
-                  <SharedCanvasBackground
-                    screenId={screen.id}
-                    allScreens={screens}
-                    sharedBackground={sharedBackground}
-                    screenWidth={canvasDimensions.width}
-                    screenHeight={canvasDimensions.height}
-                    blur={screenSettings.backgroundEffects?.blur}
-                  />
-                ) : (
-                  <CanvasBackground
-                    mediaId={screenSettings.canvasBackgroundMediaId}
-                    blur={screenSettings.backgroundEffects?.blur}
-                  />
-                )}
-                <BackgroundEffectsOverlay
-                  effects={screenSettings.backgroundEffects}
-                  screenId={screen.id}
-                />
-                <Box style={{ position: 'relative', zIndex: 1, width: '100%', height: '100%' }}>
-                  <CompositionRenderer
-                    settings={screenSettings}
-                    screen={screen}
-                    screenIndex={screenIndex}
-                    viewportScale={zoom / 100}
-                    onPanChange={(frameIndex, x, y) => onPanChange?.(screenIndex, frameIndex, x, y)}
-                    onFramePositionChange={(frameIndex, x, y) => onFramePositionChange?.(screenIndex, frameIndex, x, y)}
-                    onFrameScaleChange={(frameIndex, scale) => onFrameScaleChange?.(screenIndex, frameIndex, scale)}
-                    onFrameRotateChange={(frameIndex, rotateZ) => onFrameRotateChange?.(screenIndex, frameIndex, rotateZ)}
-                    hoveredFrameIndex={hoveredScreenIndex === screenIndex ? hoveredFrameIndex : null}
-                    onFrameHover={setHoveredFrameIndex}
-                    dragFileCount={dragFileCount}
-                    selectedFrameIndex={effectiveSelectedFrameIndex}
-                    onSelectFrame={(frameIndex) => onSelectFrame?.(screenIndex, frameIndex)}
-                    onMediaSelect={(frameIndex, mediaId) => onMediaSelect?.(screenIndex, frameIndex, mediaId)}
-                    onPexelsSelect={(frameIndex, url) => onPexelsSelect?.(screenIndex, frameIndex, url)}
-                  />
-                </Box>
-                {(screen.textElements || [])
-                  .filter(t => t.visible)
-                  .sort((a, b) => (a.zIndex ?? 0) - (b.zIndex ?? 0))
-                  .map((t) => (
-                    <CanvasTextElement
-                      key={t.id}
-                      element={t}
-                      selected={screenSettings.selectedTextId === t.id}
-                      disabled={false}
-                      onSelect={() => onSelectTextElement?.(screenIndex, t.id)}
-                      onUpdate={(updates) => onUpdateTextElement?.(screenIndex, t.id, updates)}
-                      onDelete={() => onDeleteTextElement?.(screenIndex, t.id)}
-                    />
-                  ))}
-              </Box>
-              {/* Render overflow from devices dragged from other canvases (or persisted shared devices) */}
-              {(() => {
-                const overflow = crossCanvasDrag.getOverflowForCanvas(screenIndex);
-                if (overflow && overflow.visible) {
-                  const sourceScreen = screens[overflow.sourceScreenIndex];
-                  const size = canvasSizes.current.get(screenIndex);
-                  const canvasEl = canvasRefs.current.get(screenIndex);
-                  const rect = !size && canvasEl ? canvasEl.getBoundingClientRect() : null;
-                  const width = size?.width ?? rect?.width;
-                  const height = size?.height ?? rect?.height;
+                  >
+                    <Box style={{ position: 'absolute', inset: 0, pointerEvents: 'auto' }}>
+                      {/* Background layer */}
+                      {(() => {
+                        const blur = screenSettings.backgroundEffects?.blur ?? 0;
+                        return (
+                          <Box
+                            style={{
+                              position: 'absolute',
+                              inset: blur > 0 ? `-${blur}px` : 0,
+                              clipPath: blur > 0 ? `inset(${blur}px)` : undefined,
+                              ...getBackgroundStyle(screenSettings.backgroundColor),
+                              filter: blur > 0 ? `blur(${blur}px)` : undefined,
+                              zIndex: 0,
+                            }}
+                          />
+                        );
+                      })()}
 
-                  if (sourceScreen && width && height) {
-                    // If we fell back to a one-off rect read, cache it to avoid repeated reads
-                    if (!size) {
-                      canvasSizes.current.set(screenIndex, { width, height });
-                    }
+                      {sharedBackground && sharedBackground.screenIds.includes(screen.id) ? (
+                        <SharedCanvasBackground
+                          screenId={screen.id}
+                          allScreens={screens}
+                          sharedBackground={sharedBackground}
+                          screenWidth={designRefWidth}
+                          screenHeight={designHeight}
+                          blur={screenSettings.backgroundEffects?.blur}
+                        />
+                      ) : (
+                        <CanvasBackground mediaId={screenSettings.canvasBackgroundMediaId} blur={screenSettings.backgroundEffects?.blur} />
+                      )}
 
-                    return (
-                      <Box
-                        style={{
-                          position: 'absolute',
-                          top: '50%',
-                          left: '50%',
-                          transform: 'translate(-50%, -50%)',
-                          width,
-                          height,
-                          pointerEvents: 'none',
-                          overflow: 'hidden',
-                          zIndex: 10,
-                        }}
-                      >
-                        <OverflowDeviceRenderer
-                          screen={sourceScreen}
-                          settings={{
-                            ...sourceScreen.settings,
-                            selectedScreenIndex: overflow.sourceScreenIndex,
-                          }}
-                          frameIndex={overflow.frameIndex}
-                          clipLeft={overflow.clipLeft}
-                          clipRight={overflow.clipRight}
-                          offsetX={overflow.offsetX}
-                          offsetY={overflow.offsetY}
+                      <BackgroundEffectsOverlay effects={screenSettings.backgroundEffects} screenId={screen.id} />
+
+                      <Box style={{ position: 'relative', zIndex: 1, width: designRefWidth, height: designHeight }}>
+                        <CompositionRenderer
+                          settings={screenSettings}
+                          screen={screen}
+                          screenIndex={screenIndex}
+                          // Important: normalize coordinates by BOTH zoom and design scale
+                          viewportScale={(zoom / 100) * contentScale}
+                          onPanChange={(fi, x, y) => onPanChange?.(screenIndex, fi, x, y)}
+                          onFramePositionChange={(fi, x, y) => onFramePositionChange?.(screenIndex, fi, x, y)}
+                          onFrameScaleChange={(fi, s) => onFrameScaleChange?.(screenIndex, fi, s)}
+                          onFrameRotateChange={(fi, r) => onFrameRotateChange?.(screenIndex, fi, r)}
+                          hoveredFrameIndex={hoveredScreenIndex === screenIndex ? hoveredFrameIndex : null}
+                          onFrameHover={setHoveredFrameIndex}
+                          dragFileCount={dragFileCount}
+                          selectedFrameIndex={effSelectedFrameIndex}
+                          onSelectFrame={(fi) => onSelectFrame?.(screenIndex, fi)}
+                          onMediaSelect={(fi, mid) => onMediaSelect?.(screenIndex, fi, mid)}
+                          onPexelsSelect={(fi, url) => onPexelsSelect?.(screenIndex, fi, url)}
                         />
                       </Box>
-                    );
+                      {(screen.textElements || [])
+                        .filter(t => t.visible)
+                        .sort((a, b) => (a.zIndex ?? 0) - (b.zIndex ?? 0))
+                        .map((t) => (
+                          <CanvasTextElement
+                            key={t.id}
+                            element={t}
+                            selected={screenSettings.selectedTextId === t.id}
+                            onSelect={() => onSelectTextElement?.(screenIndex, t.id)}
+                            onUpdate={(u) => onUpdateTextElement?.(screenIndex, t.id, u)}
+                            onDelete={() => onDeleteTextElement?.(screenIndex, t.id)}
+                          />
+                        ))}
+                    </Box>
+                  </Box>
+                  {/* Drop highlight overlay (Outside design box to ensure correct depth) */}
+                  {dragFileCount > 0 && hoveredScreenIndex === screenIndex && hoveredFrameIndex == null && (
+                    <Box style={{ position: 'absolute', inset: 0, border: '2px dashed #667eea', borderRadius: 8, zIndex: 10, pointerEvents: 'none' }} />
+                  )}
+                </Box>
+                {/* Render overflow from devices dragged from other canvases (or persisted shared devices) */}
+                {(() => {
+                  const overflow = crossCanvasDrag.getOverflowForCanvas(screenIndex);
+                  if (overflow && overflow.visible) {
+                    const sourceScreen = screens[overflow.sourceScreenIndex];
+                    if (sourceScreen && actualWidth) {
+                      const actualHeight = actualWidth / aspectRatio;
+                      return (
+                        <Box
+                          style={{
+                            position: 'absolute',
+                            top: '50%',
+                            left: '50%',
+                            transform: 'translate(-50%, -50%)',
+                            width: actualWidth,
+                            height: actualHeight,
+                            pointerEvents: 'none',
+                            overflow: 'hidden',
+                            zIndex: 10,
+                          }}
+                        >
+                          <OverflowDeviceRenderer
+                            screen={sourceScreen}
+                            settings={{
+                              ...sourceScreen.settings,
+                              selectedScreenIndex: overflow.sourceScreenIndex,
+                            }}
+                            frameIndex={overflow.frameIndex}
+                            clipLeft={overflow.clipLeft}
+                            clipRight={overflow.clipRight}
+                            offsetX={overflow.offsetX}
+                            offsetY={overflow.offsetY}
+                            designScale={contentScale}
+                          />
+                        </Box>
+                      );
+                    }
                   }
-                }
-                return null;
-              })()}
-            </Box>
-          );
+                  return null;
+                })()}
+              </Box>
+            );
           });
         })()}
       </Box>

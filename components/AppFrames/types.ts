@@ -26,7 +26,7 @@ export interface ScreenImage {
   tiltY?: number;
   /** -180 to 180 degrees, default 0 */
   rotateZ?: number;
-  /** 20 to 200 percent, default 100 */
+  /** 20 to 500 percent, default 100 */
   frameScale?: number;
 
   // Per-frame appearance
@@ -200,7 +200,7 @@ export function clampFrameTransform(value: number, property: FrameTransformPrope
     case 'rotateZ':
       return Math.max(-180, Math.min(180, value));
     case 'frameScale':
-      return Math.max(20, Math.min(200, value));
+      return Math.max(20, Math.min(500, value));
     case 'tiltX':
     case 'tiltY':
     default:

@@ -41,9 +41,9 @@ const getCompositionFrameCount = (composition: string): number => {
   }
 };
 
-// Legacy default for the old global `compositionScale` slider.
-// We keep this as the baseline so new projects (frameScale=100) look like the old default (compositionScale=85).
-const BASE_COMPOSITION_SCALE = 0.85;
+// Bumped from 0.85 to 1.6 to account for the high-res coordinate baseline (e.g. 1320px).
+// This ensures "100%" scale feels like a proper default on modern high-res canvases.
+const BASE_COMPOSITION_SCALE = 1.6;
 
 const buildFrameTransform = (args: {
   baseTransform: string;
@@ -127,7 +127,7 @@ const DraggableFrame = ({
     rotateZ,
   };
 
-  const applyPreview = useRef(() => {});
+  const applyPreview = useRef(() => { });
   applyPreview.current = () => {
     const el = frameRef.current;
     if (!el) return;
@@ -680,75 +680,75 @@ export function CompositionRenderer({
         <Box style={{ height: '100%', perspective: '2000px', perspectiveOrigin: 'center center' }}>
           <Center style={{ height: '100%', position: 'relative' }}>
             <Box style={{ position: 'relative', width: 600, height: 500 }}>
-            <DraggableFrame
-              frameX={fanOffset0.frameX}
-              frameY={fanOffset0.frameY}
-              baseStyle={{
-                position: 'absolute',
-                top: '50%',
-                left: '20%',
-                transform: 'translate(-50%, -50%) rotate(-8deg)',
-                zIndex: 1,
-              }}
-              viewportScale={viewportScale}
-              frameScale={ft0.frameScale}
-              tiltX={ft0.tiltX}
-              tiltY={ft0.tiltY}
-              rotateZ={ft0.rotateZ}
-              isSelected={selectedFrameIndex === 0 && !isClearedFan0}
-              onResizeScale={isClearedFan0 ? undefined : (next) => onFrameScaleChange?.(0, next)}
-              onRotate={isClearedFan0 ? undefined : (next) => onFrameRotateChange?.(0, next)}
-              gestureOwnerKey={`frame:${screen.id}:0`}
-              frameEffects={getFrameEffects(0)}
-            >
-              {isClearedFan0 ? null : <DeviceFrame {...getFrameProps(0, 0.7, -8)} />}
-            </DraggableFrame>
-            <DraggableFrame
-              frameX={fanOffset1.frameX}
-              frameY={fanOffset1.frameY}
-              baseStyle={{
-                position: 'absolute',
-                top: '50%',
-                left: '50%',
-                transform: 'translate(-50%, -50%)',
-                zIndex: 3,
-              }}
-              viewportScale={viewportScale}
-              frameScale={ft1.frameScale}
-              tiltX={ft1.tiltX}
-              tiltY={ft1.tiltY}
-              rotateZ={ft1.rotateZ}
-              isSelected={selectedFrameIndex === 1 && !isClearedFan1}
-              onResizeScale={isClearedFan1 ? undefined : (next) => onFrameScaleChange?.(1, next)}
-              onRotate={isClearedFan1 ? undefined : (next) => onFrameRotateChange?.(1, next)}
-              gestureOwnerKey={`frame:${screen.id}:1`}
-              frameEffects={getFrameEffects(1)}
-            >
-              {isClearedFan1 ? null : <DeviceFrame {...getFrameProps(1, 0.7, 0)} />}
-            </DraggableFrame>
-            <DraggableFrame
-              frameX={fanOffset2.frameX}
-              frameY={fanOffset2.frameY}
-              baseStyle={{
-                position: 'absolute',
-                top: '50%',
-                left: '80%',
-                transform: 'translate(-50%, -50%) rotate(8deg)',
-                zIndex: 2,
-              }}
-              viewportScale={viewportScale}
-              frameScale={ft2.frameScale}
-              tiltX={ft2.tiltX}
-              tiltY={ft2.tiltY}
-              rotateZ={ft2.rotateZ}
-              isSelected={selectedFrameIndex === 2 && !isClearedFan2}
-              onResizeScale={isClearedFan2 ? undefined : (next) => onFrameScaleChange?.(2, next)}
-              onRotate={isClearedFan2 ? undefined : (next) => onFrameRotateChange?.(2, next)}
-              gestureOwnerKey={`frame:${screen.id}:2`}
-              frameEffects={getFrameEffects(2)}
-            >
-              {isClearedFan2 ? null : <DeviceFrame {...getFrameProps(2, 0.7, 8)} />}
-            </DraggableFrame>
+              <DraggableFrame
+                frameX={fanOffset0.frameX}
+                frameY={fanOffset0.frameY}
+                baseStyle={{
+                  position: 'absolute',
+                  top: '50%',
+                  left: '20%',
+                  transform: 'translate(-50%, -50%) rotate(-8deg)',
+                  zIndex: 1,
+                }}
+                viewportScale={viewportScale}
+                frameScale={ft0.frameScale}
+                tiltX={ft0.tiltX}
+                tiltY={ft0.tiltY}
+                rotateZ={ft0.rotateZ}
+                isSelected={selectedFrameIndex === 0 && !isClearedFan0}
+                onResizeScale={isClearedFan0 ? undefined : (next) => onFrameScaleChange?.(0, next)}
+                onRotate={isClearedFan0 ? undefined : (next) => onFrameRotateChange?.(0, next)}
+                gestureOwnerKey={`frame:${screen.id}:0`}
+                frameEffects={getFrameEffects(0)}
+              >
+                {isClearedFan0 ? null : <DeviceFrame {...getFrameProps(0, 0.7, -8)} />}
+              </DraggableFrame>
+              <DraggableFrame
+                frameX={fanOffset1.frameX}
+                frameY={fanOffset1.frameY}
+                baseStyle={{
+                  position: 'absolute',
+                  top: '50%',
+                  left: '50%',
+                  transform: 'translate(-50%, -50%)',
+                  zIndex: 3,
+                }}
+                viewportScale={viewportScale}
+                frameScale={ft1.frameScale}
+                tiltX={ft1.tiltX}
+                tiltY={ft1.tiltY}
+                rotateZ={ft1.rotateZ}
+                isSelected={selectedFrameIndex === 1 && !isClearedFan1}
+                onResizeScale={isClearedFan1 ? undefined : (next) => onFrameScaleChange?.(1, next)}
+                onRotate={isClearedFan1 ? undefined : (next) => onFrameRotateChange?.(1, next)}
+                gestureOwnerKey={`frame:${screen.id}:1`}
+                frameEffects={getFrameEffects(1)}
+              >
+                {isClearedFan1 ? null : <DeviceFrame {...getFrameProps(1, 0.7, 0)} />}
+              </DraggableFrame>
+              <DraggableFrame
+                frameX={fanOffset2.frameX}
+                frameY={fanOffset2.frameY}
+                baseStyle={{
+                  position: 'absolute',
+                  top: '50%',
+                  left: '80%',
+                  transform: 'translate(-50%, -50%) rotate(8deg)',
+                  zIndex: 2,
+                }}
+                viewportScale={viewportScale}
+                frameScale={ft2.frameScale}
+                tiltX={ft2.tiltX}
+                tiltY={ft2.tiltY}
+                rotateZ={ft2.rotateZ}
+                isSelected={selectedFrameIndex === 2 && !isClearedFan2}
+                onResizeScale={isClearedFan2 ? undefined : (next) => onFrameScaleChange?.(2, next)}
+                onRotate={isClearedFan2 ? undefined : (next) => onFrameRotateChange?.(2, next)}
+                gestureOwnerKey={`frame:${screen.id}:2`}
+                frameEffects={getFrameEffects(2)}
+              >
+                {isClearedFan2 ? null : <DeviceFrame {...getFrameProps(2, 0.7, 8)} />}
+              </DraggableFrame>
             </Box>
           </Center>
         </Box>

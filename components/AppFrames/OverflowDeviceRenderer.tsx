@@ -16,6 +16,7 @@ interface OverflowDeviceRendererProps {
   clipRight: number; // Percentage to clip from right (0-100)
   offsetX: number; // Position offset within the target canvas (in pixels)
   offsetY: number;
+  designScale?: number;
 }
 
 export function OverflowDeviceRenderer({
@@ -26,9 +27,10 @@ export function OverflowDeviceRenderer({
   clipRight,
   offsetX,
   offsetY,
+  designScale = 1,
 }: OverflowDeviceRendererProps) {
   const image = screen.images?.[frameIndex];
-  const effectiveScale = BASE_COMPOSITION_SCALE * ((image?.frameScale ?? 100) / 100);
+  const effectiveScale = BASE_COMPOSITION_SCALE * ((image?.frameScale ?? 100) / 100) * designScale;
 
   // We render even without an image to show the device frame itself
   if (image?.cleared === true || !image?.diyOptions) return null;

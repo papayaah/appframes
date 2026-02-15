@@ -102,6 +102,7 @@ export function AppFrames() {
     setSharedBackground,
     toggleScreenInSharedBackground,
     applyBackgroundEffectsToAll,
+    removeAllScreens,
   } = useFrames();
 
   const isMobile = useMediaQuery('(max-width: 48em)');
@@ -644,504 +645,505 @@ export function AppFrames() {
 
   return (
     <CrossCanvasDragProvider>
-    <InteractionLockProvider>
+      <InteractionLockProvider>
 
-      {/* Global drop zone overlay for .appframes import */}
-      {importDragOver && (
-        <Box
-          style={{
-            position: 'fixed',
-            inset: 0,
-            zIndex: 9999,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            backgroundColor: 'rgba(0, 0, 0, 0.5)',
-            backdropFilter: 'blur(4px)',
-            pointerEvents: 'none',
-          }}
-        >
+        {/* Global drop zone overlay for .appframes import */}
+        {importDragOver && (
           <Box
             style={{
-              padding: '48px 64px',
-              borderRadius: 16,
-              border: '3px dashed rgba(255, 255, 255, 0.6)',
-              backgroundColor: 'rgba(255, 255, 255, 0.1)',
-              textAlign: 'center',
+              position: 'fixed',
+              inset: 0,
+              zIndex: 9999,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: 'rgba(0, 0, 0, 0.5)',
+              backdropFilter: 'blur(4px)',
+              pointerEvents: 'none',
             }}
           >
-            <IconFileImport size={48} color="white" style={{ marginBottom: 12 }} />
-            <div style={{ color: 'white', fontSize: 20, fontWeight: 600 }}>
-              Drop to import project
-            </div>
-            <div style={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: 14, marginTop: 4 }}>
-              .appframes file
-            </div>
+            <Box
+              style={{
+                padding: '48px 64px',
+                borderRadius: 16,
+                border: '3px dashed rgba(255, 255, 255, 0.6)',
+                backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                textAlign: 'center',
+              }}
+            >
+              <IconFileImport size={48} color="white" style={{ marginBottom: 12 }} />
+              <div style={{ color: 'white', fontSize: 20, fontWeight: 600 }}>
+                Drop to import project
+              </div>
+              <div style={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: 14, marginTop: 4 }}>
+                .appframes file
+              </div>
+            </Box>
           </Box>
-        </Box>
-      )}
-
-      <AppShell
-      header={{ height: 45 }}
-      navbar={isMobile ? undefined : { width: navWidth, breakpoint: 'sm' }}
-      aside={isMobile ? undefined : { width: historyWidth, breakpoint: 'sm' }}
-      padding={0}
-      styles={{
-        main: {
-          backgroundColor: '#F9FAFB',
-          ...(isMobile ? { paddingBottom: MOBILE_NAV_HEIGHT } : {}),
-        },
-        navbar: { overflow: 'visible' },
-        aside: { overflow: 'visible' },
-      }}
-    >
-      <AppShell.Header>
-        <Header
-          onDownload={handleDownload}
-          outputDimensions={(() => {
-            const label = getCanvasSizeLabel(settings.canvasSize);
-            const { width, height } = getCanvasDimensions(settings.canvasSize, settings.orientation);
-            const dims = `${width}×${height}`;
-            return label.includes('×') ? label : `${label} (${dims})`;
-          })()}
-          canvasSizes={Object.entries(screensByCanvasSize)
-            .filter(([, s]) => s.length > 0)
-            .map(([size, s]) => {
-              const label = getCanvasSizeLabel(size);
-              const { width, height } = getCanvasDimensions(size, 'portrait');
-              const dims = `${width}×${height}`;
-              const frameCount = s.reduce((count, screen) =>
-                count + screen.images.filter(img => !img.cleared && (img.mediaId || img.image || img.serverMediaPath)).length, 0);
-              return {
-                id: size,
-                label: label.includes('×') ? label : `${label} (${dims})`,
-                screenCount: s.length,
-                frameCount,
-              };
-            })}
-          currentCanvasSize={currentCanvasSize}
-          onCanvasSizeSwitch={switchCanvasSize}
-          onCopyToCanvasSize={copyScreensToCanvasSize}
-          zoom={zoom}
-          onZoomChange={setZoom}
-          selectedCount={selectedScreenIndices.length}
-          totalCount={screens.length}
-          currentProjectId={currentProjectId}
-          currentProjectName={currentProjectName}
-          onCreateProject={createNewProject}
-          onSwitchProject={switchProject}
-          onRenameProject={renameProject}
-          onDeleteProject={deleteProject}
-          onGetAllProjects={getAllProjects}
-          onExportProject={exportProject}
-          onImportProject={importProject}
-          isSignedIn={isSignedIn}
-          saveStatus={saveStatus}
-          syncStatus={syncStatus}
-          historyOpen={historyPanelOpen}
-          onToggleHistory={() => setHistoryPanelOpen((v) => !v)}
-        />
-      </AppShell.Header>
-
-      {!isMobile && (
-        <AppShell.Navbar p={0} style={{ borderRight: '1px solid #E5E7EB', transition: animateNav ? 'width 0.2s ease' : 'none' }}>
-          <SidebarTabs
-            settings={settings}
-            setSettings={setSettings}
-            screens={screens}
-            selectedFrameIndex={selectedFrameIndex}
-            onPanelToggle={(isOpen, animate = false) => {
-              setAnimateNav(animate);
-              setNavWidth(isOpen ? 360 : 80);
-            }}
-            downloadFormat={downloadFormat}
-            onDownloadFormatChange={setDownloadFormat}
-            downloadJpegQuality={downloadJpegQuality}
-            onDownloadJpegQualityChange={setDownloadJpegQuality}
-            onMediaSelect={(mediaId) => {
-              // If no screens exist, create one
-              if (screens.length === 0) {
-                addScreen(mediaId);
-              } else {
-                // Use selectedFrameIndex to determine which slot to fill
-                replaceScreen(primarySelectedIndex, mediaId, selectedFrameIndex);
-              }
-            }}
-            sharedBackground={currentSharedBackground}
-            onSharedBackgroundChange={(sharedBg) => setSharedBackground(currentCanvasSize, sharedBg)}
-            onToggleScreenInSharedBg={toggleScreenInSharedBackground}
-            onApplyEffectsToAll={applyBackgroundEffectsToAll}
-          />
-        </AppShell.Navbar>
-      )}
-
-      <AppShell.Main style={{
-        transition: [
-          animateNav ? 'padding-left 0.2s ease, margin-left 0.2s ease' : '',
-          'padding-right 0.2s ease, margin-right 0.2s ease',
-        ].filter(Boolean).join(', '),
-      }}>
-        {isInitializing ? (
-          <Center style={{ height: 'calc(100vh - 45px)', backgroundColor: '#F9FAFB' }}>
-            <Loader size="lg" color="gray" />
-          </Center>
-        ) : (
-        <Box style={{ height: isMobile ? `calc(100vh - 45px - ${MOBILE_NAV_HEIGHT}px)` : 'calc(100vh - 40px)', display: 'flex', flexDirection: 'column' }}>
-          <Canvas
-            settings={settings}
-            screens={screens}
-            selectedScreenIndices={selectedScreenIndices}
-            selectedFrameIndex={selectedFrameIndex}
-            frameSelectionVisible={frameSelectionVisible}
-            sharedBackground={currentSharedBackground}
-            onSelectFrame={(screenIndex, frameIndex) => {
-              // Track which screen the selected frame belongs to (for floating panels)
-              // This doesn't change the canvas order - just tracks where the frame is
-              setActiveFrameScreenIndex(screenIndex);
-              setSelectedFrameIndex(frameIndex);
-              setFrameSelectionVisible(true);
-              setCanvasSelected(false);
-              // Frame interactions stop propagation (for smooth drag/pan), so make sure
-              // selecting a frame explicitly clears any selected text element.
-              selectTextElement(null);
-            }}
-            onSelectScreen={handleScreenSelect}
-            zoom={zoom}
-            onZoomChange={setZoom}
-            onSelectTextElement={(screenIndex, textId) => {
-              // Allow text selection on any selected screen
-              if (!selectedScreenIndices.includes(screenIndex)) return;
-              selectTextElementOnScreen(screenIndex, textId);
-              // Removed auto-activation of text tab for performance
-            }}
-            onUpdateTextElement={(screenIndex, textId, updates) => {
-              const screen = screens[screenIndex];
-              if (!screen) return;
-              updateTextElement(screen.id, textId, updates);
-            }}
-            onDeleteTextElement={(screenIndex, textId) => {
-              const screen = screens[screenIndex];
-              if (!screen) return;
-              deleteTextElement(screen.id, textId);
-            }}
-            onClickCanvas={(screenIndex) => {
-              setCanvasSelected(true);
-              setFrameSelectionVisible(false);
-              selectTextElement(null);
-            }}
-            onClickOutsideCanvas={() => {
-              selectTextElement(null);
-              setFrameSelectionVisible(false);
-              setCanvasSelected(false);
-            }}
-            onReplaceScreen={async (files, targetFrameIndex, targetScreenIndex) => {
-              try {
-                // Use targetScreenIndex if provided, otherwise primarySelectedIndex
-                const screenIndex = targetScreenIndex !== undefined ? targetScreenIndex : primarySelectedIndex;
-                const targetScreen = screens[screenIndex];
-
-                if (!targetScreen) return;
-
-                const layoutFrameCount = getCompositionFrameCount(targetScreen.settings.composition);
-
-                // Pre-process uploads
-                const uploadPromises = files.map(file => handleMediaUpload(file));
-                const mediaIds = await Promise.all(uploadPromises);
-
-                const validMediaIds = mediaIds.filter((id): id is number => typeof id === 'number');
-                const failedCount = mediaIds.length - validMediaIds.length;
-                if (failedCount > 0) {
-                  notifications.show({
-                    title: 'Some uploads failed',
-                    message: `Failed to import ${failedCount} file${failedCount === 1 ? '' : 's'} into your media library.`,
-                    color: 'red',
-                  });
-                }
-
-                // Dropped outside any device frame:
-                // - single file -> set full canvas background
-                // - multi file -> smart-fill device frames (empty-first), ignore excess
-                const effectiveTargetFrameIndex =
-                  targetFrameIndex === undefined && files.length > 1 ? 0 : targetFrameIndex;
-                if (targetFrameIndex === undefined && files.length <= 1) {
-                  const backgroundMediaId = validMediaIds[0];
-                  if (!backgroundMediaId) return;
-                  setCanvasBackgroundMedia(screenIndex, backgroundMediaId);
-                  return;
-                }
-
-                // Limit to number of frames in composition
-                const filesToProcess = Math.min(validMediaIds.length, layoutFrameCount);
-
-                // Update the target screen's images array
-                setScreens(prevScreens => {
-                  const updated = [...prevScreens];
-
-                  if (!updated[screenIndex]) return prevScreens;
-
-                  const screen = updated[screenIndex];
-                  const newImages = [...screen.images];
-
-                  // Ensure images array has enough slots for the composition
-                  while (newImages.length < layoutFrameCount) {
-                    newImages.push({});
-                  }
-
-                  const startIndex = Math.max(0, Math.min(effectiveTargetFrameIndex ?? 0, layoutFrameCount - 1));
-                  const orderedIndices = Array.from({ length: layoutFrameCount }, (_, i) => (startIndex + i) % layoutFrameCount);
-                  const isEmptySlot = (img: any) =>
-                    img?.cleared === true || img?.deviceFrame === '' || (!img?.mediaId && !img?.image);
-
-                  // Add images to the current screen's images array
-                  if (filesToProcess <= 0) {
-                    return updated;
-                  }
-
-                  if (files.length <= 1) {
-                    // Single drop on an explicit device frame: always replace that frame.
-                    const mediaId = validMediaIds[0];
-                    if (typeof mediaId === 'number') {
-                      newImages[startIndex] = { ...newImages[startIndex], mediaId, image: undefined, cleared: false };
-                    }
-                  } else {
-                    // Multi-drop: prefer empty slots first, then fill remaining frames in order, ignoring excess.
-                    const toFill = validMediaIds.slice(0, filesToProcess);
-                    const emptyIndices = orderedIndices.filter((idx) => isEmptySlot(newImages[idx]));
-                    const filled = new Set<number>();
-
-                    let cursor = 0;
-                    // Pass 1: empties
-                    for (const idx of emptyIndices) {
-                      const mediaId = toFill[cursor];
-                      if (mediaId == null) break;
-                      newImages[idx] = { ...newImages[idx], mediaId, image: undefined, cleared: false };
-                      filled.add(idx);
-                      cursor += 1;
-                      if (cursor >= toFill.length) break;
-                    }
-                    // Pass 2: remaining indices (overwrite) up to frameCount
-                    for (const idx of orderedIndices) {
-                      if (cursor >= toFill.length) break;
-                      if (filled.has(idx)) continue;
-                      const mediaId = toFill[cursor];
-                      newImages[idx] = { ...newImages[idx], mediaId, image: undefined, cleared: false };
-                      cursor += 1;
-                    }
-                  }
-
-                  updated[screenIndex] = {
-                    ...screen,
-                    images: newImages,
-                  };
-
-                  return updated;
-                });
-
-              } catch (error) {
-                // eslint-disable-next-line no-console
-                console.error('Error processing dropped files:', error);
-                const msg = error instanceof Error ? error.message : String(error);
-                notifications.show({
-                  title: 'Drop failed',
-                  message: msg || 'Failed to process images. Please try again.',
-                  color: 'red',
-                });
-              }
-            }}
-            onPanChange={(screenIndex, frameIndex, panX, panY) => {
-              setFramePan(screenIndex, frameIndex, panX, panY);
-            }}
-            onFramePositionChange={(screenIndex, frameIndex, frameX, frameY) => {
-              addFramePositionDelta(screenIndex, frameIndex, frameX, frameY);
-            }}
-            onFrameScaleChange={(screenIndex, frameIndex, frameScale) => {
-              setFrameScale(screenIndex, frameIndex, clampFrameTransform(frameScale, 'frameScale'));
-            }}
-            onFrameRotateChange={(screenIndex, frameIndex, rotateZ) => {
-              setFrameRotate(screenIndex, frameIndex, clampFrameTransform(rotateZ, 'rotateZ'));
-            }}
-            onMediaSelect={(screenIndex, frameIndex, mediaId) => {
-              replaceScreen(screenIndex, mediaId, frameIndex);
-            }}
-            onCanvasBackgroundMediaSelect={(screenIndex, mediaId) => {
-              setCanvasBackgroundMedia(screenIndex, mediaId);
-            }}
-            onPexelsSelect={async (screenIndex, frameIndex, url) => {
-              try {
-                // Fetch the pexels image and upload to media library
-                const res = await fetch(url);
-                const blob = await res.blob();
-                const fileName = url.split('/').pop() || 'pexels-image.jpg';
-                const file = new File([blob], fileName, { type: blob.type });
-                const mediaId = await handleMediaUpload(file);
-                if (mediaId) {
-                  replaceScreen(screenIndex, mediaId, frameIndex);
-                }
-              } catch (error) {
-                console.error('Error importing pexels image:', error);
-              }
-            }}
-          />
-          <ScreensPanel
-            screens={screens}
-            addScreen={addScreen}
-            removeScreen={removeScreen}
-            duplicateScreen={duplicateScreen}
-            selectedIndices={selectedScreenIndices}
-            onSelectScreen={handleScreenSelect}
-            onSetScreenSelection={setSelectedScreenIndices}
-            onReorderScreens={reorderScreens}
-            onMediaUpload={handleMediaUpload}
-            sharedBackground={currentSharedBackground}
-          />
-        </Box>
         )}
 
-        {/* Settings sidebar — overlays canvas, does not push content */}
-        <SettingsSidebar
-          isOpen={!!hasValidFrame || canvasSelected || hasTextSelected}
-          onClose={() => {
-            setFrameSelectionVisible(false);
-            setCanvasSelected(false);
-            if (hasTextSelected) {
-              selectTextElement(null);
-            }
+        <AppShell
+          header={{ height: 45 }}
+          navbar={isMobile ? undefined : { width: navWidth, breakpoint: 'sm' }}
+          aside={isMobile ? undefined : { width: historyWidth, breakpoint: 'sm' }}
+          padding={0}
+          styles={{
+            main: {
+              backgroundColor: '#F9FAFB',
+              ...(isMobile ? { paddingBottom: MOBILE_NAV_HEIGHT } : {}),
+            },
+            navbar: { overflow: 'visible' },
+            aside: { overflow: 'visible' },
           }}
-          mode={hasValidFrame ? 'frame' : 'canvas'}
-          slotLabel={hasValidFrame ? `Slot ${(selectedFrameIndex ?? 0) + 1}` : undefined}
-          hasImage={!!hasImage}
-          canvasSettings={{
-            settings,
-            setSettings,
-            hasBackgroundMedia: !!currentScreen?.settings?.canvasBackgroundMediaId,
-            onClearBackgroundMedia: () => {
-              if (currentScreen) {
-                setCanvasBackgroundMedia(activeFrameScreenIndex, undefined);
-              }
-            },
-            onApplyEffectsToAll: applyBackgroundEffectsToAll,
-          }}
-          imageSettings={{
-            screenScale: currentScreen?.settings?.screenScale ?? 0,
-            screenPanX: currentFrameData?.panX ?? 50,
-            screenPanY: currentFrameData?.panY ?? 50,
-            imageRotation: currentFrameData?.imageRotation ?? 0,
-            onScaleChange: (value) => {
-              if (!currentScreen) return;
-              setSettings({ ...settings, screenScale: value });
-            },
-            onPanXChange: (value) => {
-              if (selectedFrameIndex === null || selectedFrameIndex === undefined) return;
-              setFramePan(activeFrameScreenIndex, selectedFrameIndex, value, currentFrameData?.panY ?? 50);
-            },
-            onPanYChange: (value) => {
-              if (selectedFrameIndex === null || selectedFrameIndex === undefined) return;
-              setFramePan(activeFrameScreenIndex, selectedFrameIndex, currentFrameData?.panX ?? 50, value);
-            },
-            onRotationChange: (value) => {
-              if (selectedFrameIndex === null || selectedFrameIndex === undefined) return;
-              setImageRotation(activeFrameScreenIndex, selectedFrameIndex, value);
-            },
-            onReset: () => {
-              if (selectedFrameIndex === null || selectedFrameIndex === undefined) return;
-              setSettings({ ...settings, screenScale: 0 });
-              setFramePan(activeFrameScreenIndex, selectedFrameIndex, 50, 50);
-              setImageRotation(activeFrameScreenIndex, selectedFrameIndex, 0);
-            },
-          }}
-          frameSettings={{
-            frameColor: currentFrameData?.frameColor,
-            defaultFrameColor: '#1a1a1a',
-            onFrameColorChange: (color) => {
-              if (selectedFrameIndex === null || selectedFrameIndex === undefined) return;
-              setFrameColor(activeFrameScreenIndex, selectedFrameIndex, color);
-            },
-            frameRotation: currentFrameData?.rotateZ ?? 0,
-            onFrameRotationChange: (rotation) => {
-              if (selectedFrameIndex === null || selectedFrameIndex === undefined) return;
-              setFrameRotate(activeFrameScreenIndex, selectedFrameIndex, clampFrameTransform(rotation, 'rotateZ'));
-            },
-            frameScale: currentFrameData?.frameScale ?? 100,
-            onFrameScaleChange: (scale) => {
-              if (selectedFrameIndex === null || selectedFrameIndex === undefined) return;
-              setFrameScale(activeFrameScreenIndex, selectedFrameIndex, clampFrameTransform(scale, 'frameScale'));
-            },
-            frameTiltX: currentFrameData?.tiltX ?? 0,
-            frameTiltY: currentFrameData?.tiltY ?? 0,
-            onFrameTiltChange: (tiltX, tiltY) => {
-              if (selectedFrameIndex === null || selectedFrameIndex === undefined) return;
-              setFrameTilt(activeFrameScreenIndex, selectedFrameIndex, tiltX, tiltY);
-            },
-            frameX: currentFrameData?.frameX ?? 0,
-            frameY: currentFrameData?.frameY ?? 0,
-            onFramePositionChange: (frameX, frameY) => {
-              if (selectedFrameIndex === null || selectedFrameIndex === undefined) return;
-              setFramePosition(activeFrameScreenIndex, selectedFrameIndex, frameX, frameY);
-            },
-            onResetTransforms: () => {
-              if (selectedFrameIndex === null || selectedFrameIndex === undefined) return;
-              setFrameRotate(activeFrameScreenIndex, selectedFrameIndex, 0);
-              setFrameScale(activeFrameScreenIndex, selectedFrameIndex, 100);
-              setFrameTilt(activeFrameScreenIndex, selectedFrameIndex, 0, 0);
-              setFramePosition(activeFrameScreenIndex, selectedFrameIndex, 0, 0);
-            },
-            diyOptions: currentDiyOptions,
-            onDIYOptionsChange: (options: DIYOptions) => {
-              if (selectedFrameIndex === null || selectedFrameIndex === undefined) return;
-              setFrameDIYOptions(activeFrameScreenIndex, selectedFrameIndex, options);
-            },
-            frameEffects: currentFrameData?.frameEffects,
-            onFrameEffectsChange: (effects) => {
-              if (selectedFrameIndex === null || selectedFrameIndex === undefined) return;
-              setFrameEffects(activeFrameScreenIndex, selectedFrameIndex, effects);
-            },
-          }}
-          hasTextSelected={hasTextSelected}
-          selectedTextStyle={selectedTextElement?.style}
-          onTextStyleChange={(updates) => {
-            if (!textSelectionInfo) return;
-            updateTextElement(textSelectionInfo.screen.id, textSelectionInfo.textElement.id, { style: { ...textSelectionInfo.textElement.style, ...updates } });
-          }}
-        />
-      </AppShell.Main>
+        >
+          <AppShell.Header>
+            <Header
+              onDownload={handleDownload}
+              outputDimensions={(() => {
+                const label = getCanvasSizeLabel(settings.canvasSize);
+                const { width, height } = getCanvasDimensions(settings.canvasSize, settings.orientation);
+                const dims = `${width}×${height}`;
+                return label.includes('×') ? label : `${label} (${dims})`;
+              })()}
+              canvasSizes={Object.entries(screensByCanvasSize)
+                .filter(([, s]) => s.length > 0)
+                .map(([size, s]) => {
+                  const label = getCanvasSizeLabel(size);
+                  const { width, height } = getCanvasDimensions(size, 'portrait');
+                  const dims = `${width}×${height}`;
+                  const frameCount = s.reduce((count, screen) =>
+                    count + screen.images.filter(img => !img.cleared && (img.mediaId || img.image || img.serverMediaPath)).length, 0);
+                  return {
+                    id: size,
+                    label: label.includes('×') ? label : `${label} (${dims})`,
+                    screenCount: s.length,
+                    frameCount,
+                  };
+                })}
+              currentCanvasSize={currentCanvasSize}
+              onCanvasSizeSwitch={switchCanvasSize}
+              onCopyToCanvasSize={copyScreensToCanvasSize}
+              zoom={zoom}
+              onZoomChange={setZoom}
+              selectedCount={selectedScreenIndices.length}
+              totalCount={screens.length}
+              currentProjectId={currentProjectId}
+              currentProjectName={currentProjectName}
+              onCreateProject={createNewProject}
+              onSwitchProject={switchProject}
+              onRenameProject={renameProject}
+              onDeleteProject={deleteProject}
+              onGetAllProjects={getAllProjects}
+              onExportProject={exportProject}
+              onImportProject={importProject}
+              isSignedIn={isSignedIn}
+              saveStatus={saveStatus}
+              syncStatus={syncStatus}
+              historyOpen={historyPanelOpen}
+              onToggleHistory={() => setHistoryPanelOpen((v) => !v)}
+              onDeleteAllScreens={removeAllScreens}
+            />
+          </AppShell.Header>
 
-      {!isMobile && (
-        <AppShell.Aside p={0} style={{ borderLeft: '1px solid #E5E7EB', transition: 'width 0.2s ease' }}>
-          <HistorySidebar
-            open={historyPanelOpen}
-            entries={historyEntries}
-            position={historyPosition}
-            goTo={goToHistory}
-            canUndo={canUndo}
-            canRedo={canRedo}
-            undo={undo}
-            redo={redo}
-          />
-        </AppShell.Aside>
-      )}
+          {!isMobile && (
+            <AppShell.Navbar p={0} style={{ borderRight: '1px solid #E5E7EB', transition: animateNav ? 'width 0.2s ease' : 'none' }}>
+              <SidebarTabs
+                settings={settings}
+                setSettings={setSettings}
+                screens={screens}
+                selectedFrameIndex={selectedFrameIndex}
+                onPanelToggle={(isOpen, animate = false) => {
+                  setAnimateNav(animate);
+                  setNavWidth(isOpen ? 360 : 80);
+                }}
+                downloadFormat={downloadFormat}
+                onDownloadFormatChange={setDownloadFormat}
+                downloadJpegQuality={downloadJpegQuality}
+                onDownloadJpegQualityChange={setDownloadJpegQuality}
+                onMediaSelect={(mediaId) => {
+                  // If no screens exist, create one
+                  if (screens.length === 0) {
+                    addScreen(mediaId);
+                  } else {
+                    // Use selectedFrameIndex to determine which slot to fill
+                    replaceScreen(primarySelectedIndex, mediaId, selectedFrameIndex);
+                  }
+                }}
+                sharedBackground={currentSharedBackground}
+                onSharedBackgroundChange={(sharedBg) => setSharedBackground(currentCanvasSize, sharedBg)}
+                onToggleScreenInSharedBg={toggleScreenInSharedBackground}
+                onApplyEffectsToAll={applyBackgroundEffectsToAll}
+              />
+            </AppShell.Navbar>
+          )}
 
-      {isMobile && (
-        <MobileBottomNav
-          settings={settings}
-          setSettings={setSettings}
-          screens={screens}
-          selectedFrameIndex={selectedFrameIndex}
-          onMediaSelect={(mediaId) => {
-            if (screens.length === 0) {
-              addScreen(mediaId);
-            } else {
-              replaceScreen(primarySelectedIndex, mediaId, selectedFrameIndex);
-            }
-          }}
-          downloadFormat={downloadFormat}
-          onDownloadFormatChange={setDownloadFormat}
-          downloadJpegQuality={downloadJpegQuality}
-          onDownloadJpegQualityChange={setDownloadJpegQuality}
-        />
-      )}
+          <AppShell.Main style={{
+            transition: [
+              animateNav ? 'padding-left 0.2s ease, margin-left 0.2s ease' : '',
+              'padding-right 0.2s ease, margin-right 0.2s ease',
+            ].filter(Boolean).join(', '),
+          }}>
+            {isInitializing ? (
+              <Center style={{ height: 'calc(100vh - 45px)', backgroundColor: '#F9FAFB' }}>
+                <Loader size="lg" color="gray" />
+              </Center>
+            ) : (
+              <Box style={{ height: isMobile ? `calc(100vh - 45px - ${MOBILE_NAV_HEIGHT}px)` : 'calc(100vh - 40px)', display: 'flex', flexDirection: 'column' }}>
+                <Canvas
+                  settings={settings}
+                  screens={screens}
+                  selectedScreenIndices={selectedScreenIndices}
+                  selectedFrameIndex={selectedFrameIndex}
+                  frameSelectionVisible={frameSelectionVisible}
+                  sharedBackground={currentSharedBackground}
+                  onSelectFrame={(screenIndex, frameIndex) => {
+                    // Track which screen the selected frame belongs to (for floating panels)
+                    // This doesn't change the canvas order - just tracks where the frame is
+                    setActiveFrameScreenIndex(screenIndex);
+                    setSelectedFrameIndex(frameIndex);
+                    setFrameSelectionVisible(true);
+                    setCanvasSelected(false);
+                    // Frame interactions stop propagation (for smooth drag/pan), so make sure
+                    // selecting a frame explicitly clears any selected text element.
+                    selectTextElement(null);
+                  }}
+                  onSelectScreen={handleScreenSelect}
+                  zoom={zoom}
+                  onZoomChange={setZoom}
+                  onSelectTextElement={(screenIndex, textId) => {
+                    // Allow text selection on any selected screen
+                    if (!selectedScreenIndices.includes(screenIndex)) return;
+                    selectTextElementOnScreen(screenIndex, textId);
+                    // Removed auto-activation of text tab for performance
+                  }}
+                  onUpdateTextElement={(screenIndex, textId, updates) => {
+                    const screen = screens[screenIndex];
+                    if (!screen) return;
+                    updateTextElement(screen.id, textId, updates);
+                  }}
+                  onDeleteTextElement={(screenIndex, textId) => {
+                    const screen = screens[screenIndex];
+                    if (!screen) return;
+                    deleteTextElement(screen.id, textId);
+                  }}
+                  onClickCanvas={(screenIndex) => {
+                    setCanvasSelected(true);
+                    setFrameSelectionVisible(false);
+                    selectTextElement(null);
+                  }}
+                  onClickOutsideCanvas={() => {
+                    selectTextElement(null);
+                    setFrameSelectionVisible(false);
+                    setCanvasSelected(false);
+                  }}
+                  onReplaceScreen={async (files, targetFrameIndex, targetScreenIndex) => {
+                    try {
+                      // Use targetScreenIndex if provided, otherwise primarySelectedIndex
+                      const screenIndex = targetScreenIndex !== undefined ? targetScreenIndex : primarySelectedIndex;
+                      const targetScreen = screens[screenIndex];
 
-      </AppShell>
-    </InteractionLockProvider>
-  </CrossCanvasDragProvider>
+                      if (!targetScreen) return;
+
+                      const layoutFrameCount = getCompositionFrameCount(targetScreen.settings.composition);
+
+                      // Pre-process uploads
+                      const uploadPromises = files.map(file => handleMediaUpload(file));
+                      const mediaIds = await Promise.all(uploadPromises);
+
+                      const validMediaIds = mediaIds.filter((id): id is number => typeof id === 'number');
+                      const failedCount = mediaIds.length - validMediaIds.length;
+                      if (failedCount > 0) {
+                        notifications.show({
+                          title: 'Some uploads failed',
+                          message: `Failed to import ${failedCount} file${failedCount === 1 ? '' : 's'} into your media library.`,
+                          color: 'red',
+                        });
+                      }
+
+                      // Dropped outside any device frame:
+                      // - single file -> set full canvas background
+                      // - multi file -> smart-fill device frames (empty-first), ignore excess
+                      const effectiveTargetFrameIndex =
+                        targetFrameIndex === undefined && files.length > 1 ? 0 : targetFrameIndex;
+                      if (targetFrameIndex === undefined && files.length <= 1) {
+                        const backgroundMediaId = validMediaIds[0];
+                        if (!backgroundMediaId) return;
+                        setCanvasBackgroundMedia(screenIndex, backgroundMediaId);
+                        return;
+                      }
+
+                      // Limit to number of frames in composition
+                      const filesToProcess = Math.min(validMediaIds.length, layoutFrameCount);
+
+                      // Update the target screen's images array
+                      setScreens(prevScreens => {
+                        const updated = [...prevScreens];
+
+                        if (!updated[screenIndex]) return prevScreens;
+
+                        const screen = updated[screenIndex];
+                        const newImages = [...screen.images];
+
+                        // Ensure images array has enough slots for the composition
+                        while (newImages.length < layoutFrameCount) {
+                          newImages.push({});
+                        }
+
+                        const startIndex = Math.max(0, Math.min(effectiveTargetFrameIndex ?? 0, layoutFrameCount - 1));
+                        const orderedIndices = Array.from({ length: layoutFrameCount }, (_, i) => (startIndex + i) % layoutFrameCount);
+                        const isEmptySlot = (img: any) =>
+                          img?.cleared === true || img?.deviceFrame === '' || (!img?.mediaId && !img?.image);
+
+                        // Add images to the current screen's images array
+                        if (filesToProcess <= 0) {
+                          return updated;
+                        }
+
+                        if (files.length <= 1) {
+                          // Single drop on an explicit device frame: always replace that frame.
+                          const mediaId = validMediaIds[0];
+                          if (typeof mediaId === 'number') {
+                            newImages[startIndex] = { ...newImages[startIndex], mediaId, image: undefined, cleared: false };
+                          }
+                        } else {
+                          // Multi-drop: prefer empty slots first, then fill remaining frames in order, ignoring excess.
+                          const toFill = validMediaIds.slice(0, filesToProcess);
+                          const emptyIndices = orderedIndices.filter((idx) => isEmptySlot(newImages[idx]));
+                          const filled = new Set<number>();
+
+                          let cursor = 0;
+                          // Pass 1: empties
+                          for (const idx of emptyIndices) {
+                            const mediaId = toFill[cursor];
+                            if (mediaId == null) break;
+                            newImages[idx] = { ...newImages[idx], mediaId, image: undefined, cleared: false };
+                            filled.add(idx);
+                            cursor += 1;
+                            if (cursor >= toFill.length) break;
+                          }
+                          // Pass 2: remaining indices (overwrite) up to frameCount
+                          for (const idx of orderedIndices) {
+                            if (cursor >= toFill.length) break;
+                            if (filled.has(idx)) continue;
+                            const mediaId = toFill[cursor];
+                            newImages[idx] = { ...newImages[idx], mediaId, image: undefined, cleared: false };
+                            cursor += 1;
+                          }
+                        }
+
+                        updated[screenIndex] = {
+                          ...screen,
+                          images: newImages,
+                        };
+
+                        return updated;
+                      });
+
+                    } catch (error) {
+                      // eslint-disable-next-line no-console
+                      console.error('Error processing dropped files:', error);
+                      const msg = error instanceof Error ? error.message : String(error);
+                      notifications.show({
+                        title: 'Drop failed',
+                        message: msg || 'Failed to process images. Please try again.',
+                        color: 'red',
+                      });
+                    }
+                  }}
+                  onPanChange={(screenIndex, frameIndex, panX, panY) => {
+                    setFramePan(screenIndex, frameIndex, panX, panY);
+                  }}
+                  onFramePositionChange={(screenIndex, frameIndex, frameX, frameY) => {
+                    addFramePositionDelta(screenIndex, frameIndex, frameX, frameY);
+                  }}
+                  onFrameScaleChange={(screenIndex, frameIndex, frameScale) => {
+                    setFrameScale(screenIndex, frameIndex, clampFrameTransform(frameScale, 'frameScale'));
+                  }}
+                  onFrameRotateChange={(screenIndex, frameIndex, rotateZ) => {
+                    setFrameRotate(screenIndex, frameIndex, clampFrameTransform(rotateZ, 'rotateZ'));
+                  }}
+                  onMediaSelect={(screenIndex, frameIndex, mediaId) => {
+                    replaceScreen(screenIndex, mediaId, frameIndex);
+                  }}
+                  onCanvasBackgroundMediaSelect={(screenIndex, mediaId) => {
+                    setCanvasBackgroundMedia(screenIndex, mediaId);
+                  }}
+                  onPexelsSelect={async (screenIndex, frameIndex, url) => {
+                    try {
+                      // Fetch the pexels image and upload to media library
+                      const res = await fetch(url);
+                      const blob = await res.blob();
+                      const fileName = url.split('/').pop() || 'pexels-image.jpg';
+                      const file = new File([blob], fileName, { type: blob.type });
+                      const mediaId = await handleMediaUpload(file);
+                      if (mediaId) {
+                        replaceScreen(screenIndex, mediaId, frameIndex);
+                      }
+                    } catch (error) {
+                      console.error('Error importing pexels image:', error);
+                    }
+                  }}
+                />
+                <ScreensPanel
+                  screens={screens}
+                  addScreen={addScreen}
+                  removeScreen={removeScreen}
+                  duplicateScreen={duplicateScreen}
+                  selectedIndices={selectedScreenIndices}
+                  onSelectScreen={handleScreenSelect}
+                  onSetScreenSelection={setSelectedScreenIndices}
+                  onReorderScreens={reorderScreens}
+                  onMediaUpload={handleMediaUpload}
+                  sharedBackground={currentSharedBackground}
+                />
+              </Box>
+            )}
+
+            {/* Settings sidebar — overlays canvas, does not push content */}
+            <SettingsSidebar
+              isOpen={!!hasValidFrame || canvasSelected || hasTextSelected}
+              onClose={() => {
+                setFrameSelectionVisible(false);
+                setCanvasSelected(false);
+                if (hasTextSelected) {
+                  selectTextElement(null);
+                }
+              }}
+              mode={hasValidFrame ? 'frame' : 'canvas'}
+              slotLabel={hasValidFrame ? `Slot ${(selectedFrameIndex ?? 0) + 1}` : undefined}
+              hasImage={!!hasImage}
+              canvasSettings={{
+                settings,
+                setSettings,
+                hasBackgroundMedia: !!currentScreen?.settings?.canvasBackgroundMediaId,
+                onClearBackgroundMedia: () => {
+                  if (currentScreen) {
+                    setCanvasBackgroundMedia(activeFrameScreenIndex, undefined);
+                  }
+                },
+                onApplyEffectsToAll: applyBackgroundEffectsToAll,
+              }}
+              imageSettings={{
+                screenScale: currentScreen?.settings?.screenScale ?? 0,
+                screenPanX: currentFrameData?.panX ?? 50,
+                screenPanY: currentFrameData?.panY ?? 50,
+                imageRotation: currentFrameData?.imageRotation ?? 0,
+                onScaleChange: (value) => {
+                  if (!currentScreen) return;
+                  setSettings({ ...settings, screenScale: value });
+                },
+                onPanXChange: (value) => {
+                  if (selectedFrameIndex === null || selectedFrameIndex === undefined) return;
+                  setFramePan(activeFrameScreenIndex, selectedFrameIndex, value, currentFrameData?.panY ?? 50);
+                },
+                onPanYChange: (value) => {
+                  if (selectedFrameIndex === null || selectedFrameIndex === undefined) return;
+                  setFramePan(activeFrameScreenIndex, selectedFrameIndex, currentFrameData?.panX ?? 50, value);
+                },
+                onRotationChange: (value) => {
+                  if (selectedFrameIndex === null || selectedFrameIndex === undefined) return;
+                  setImageRotation(activeFrameScreenIndex, selectedFrameIndex, value);
+                },
+                onReset: () => {
+                  if (selectedFrameIndex === null || selectedFrameIndex === undefined) return;
+                  setSettings({ ...settings, screenScale: 0 });
+                  setFramePan(activeFrameScreenIndex, selectedFrameIndex, 50, 50);
+                  setImageRotation(activeFrameScreenIndex, selectedFrameIndex, 0);
+                },
+              }}
+              frameSettings={{
+                frameColor: currentFrameData?.frameColor,
+                defaultFrameColor: '#1a1a1a',
+                onFrameColorChange: (color) => {
+                  if (selectedFrameIndex === null || selectedFrameIndex === undefined) return;
+                  setFrameColor(activeFrameScreenIndex, selectedFrameIndex, color);
+                },
+                frameRotation: currentFrameData?.rotateZ ?? 0,
+                onFrameRotationChange: (rotation) => {
+                  if (selectedFrameIndex === null || selectedFrameIndex === undefined) return;
+                  setFrameRotate(activeFrameScreenIndex, selectedFrameIndex, clampFrameTransform(rotation, 'rotateZ'));
+                },
+                frameScale: currentFrameData?.frameScale ?? 100,
+                onFrameScaleChange: (scale) => {
+                  if (selectedFrameIndex === null || selectedFrameIndex === undefined) return;
+                  setFrameScale(activeFrameScreenIndex, selectedFrameIndex, clampFrameTransform(scale, 'frameScale'));
+                },
+                frameTiltX: currentFrameData?.tiltX ?? 0,
+                frameTiltY: currentFrameData?.tiltY ?? 0,
+                onFrameTiltChange: (tiltX, tiltY) => {
+                  if (selectedFrameIndex === null || selectedFrameIndex === undefined) return;
+                  setFrameTilt(activeFrameScreenIndex, selectedFrameIndex, tiltX, tiltY);
+                },
+                frameX: currentFrameData?.frameX ?? 0,
+                frameY: currentFrameData?.frameY ?? 0,
+                onFramePositionChange: (frameX, frameY) => {
+                  if (selectedFrameIndex === null || selectedFrameIndex === undefined) return;
+                  setFramePosition(activeFrameScreenIndex, selectedFrameIndex, frameX, frameY);
+                },
+                onResetTransforms: () => {
+                  if (selectedFrameIndex === null || selectedFrameIndex === undefined) return;
+                  setFrameRotate(activeFrameScreenIndex, selectedFrameIndex, 0);
+                  setFrameScale(activeFrameScreenIndex, selectedFrameIndex, 100);
+                  setFrameTilt(activeFrameScreenIndex, selectedFrameIndex, 0, 0);
+                  setFramePosition(activeFrameScreenIndex, selectedFrameIndex, 0, 0);
+                },
+                diyOptions: currentDiyOptions,
+                onDIYOptionsChange: (options: DIYOptions) => {
+                  if (selectedFrameIndex === null || selectedFrameIndex === undefined) return;
+                  setFrameDIYOptions(activeFrameScreenIndex, selectedFrameIndex, options);
+                },
+                frameEffects: currentFrameData?.frameEffects,
+                onFrameEffectsChange: (effects) => {
+                  if (selectedFrameIndex === null || selectedFrameIndex === undefined) return;
+                  setFrameEffects(activeFrameScreenIndex, selectedFrameIndex, effects);
+                },
+              }}
+              hasTextSelected={hasTextSelected}
+              selectedTextStyle={selectedTextElement?.style}
+              onTextStyleChange={(updates) => {
+                if (!textSelectionInfo) return;
+                updateTextElement(textSelectionInfo.screen.id, textSelectionInfo.textElement.id, { style: { ...textSelectionInfo.textElement.style, ...updates } });
+              }}
+            />
+          </AppShell.Main>
+
+          {!isMobile && (
+            <AppShell.Aside p={0} style={{ borderLeft: '1px solid #E5E7EB', transition: 'width 0.2s ease' }}>
+              <HistorySidebar
+                open={historyPanelOpen}
+                entries={historyEntries}
+                position={historyPosition}
+                goTo={goToHistory}
+                canUndo={canUndo}
+                canRedo={canRedo}
+                undo={undo}
+                redo={redo}
+              />
+            </AppShell.Aside>
+          )}
+
+          {isMobile && (
+            <MobileBottomNav
+              settings={settings}
+              setSettings={setSettings}
+              screens={screens}
+              selectedFrameIndex={selectedFrameIndex}
+              onMediaSelect={(mediaId) => {
+                if (screens.length === 0) {
+                  addScreen(mediaId);
+                } else {
+                  replaceScreen(primarySelectedIndex, mediaId, selectedFrameIndex);
+                }
+              }}
+              downloadFormat={downloadFormat}
+              onDownloadFormatChange={setDownloadFormat}
+              downloadJpegQuality={downloadJpegQuality}
+              onDownloadJpegQualityChange={setDownloadJpegQuality}
+            />
+          )}
+
+        </AppShell>
+      </InteractionLockProvider>
+    </CrossCanvasDragProvider>
   );
 }
