@@ -22,8 +22,8 @@ export default function RootLayout({ children }: { children: any }) {
       <head>
         <ColorSchemeScript />
         {/* Preconnect helps when we lazy-load Google Fonts on demand */}
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
+        <link rel="preconnect" href="https://fonts.googleapis.com" crossOrigin="anonymous" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link rel="shortcut icon" href="/favicon.svg" />
         <meta
           name="viewport"

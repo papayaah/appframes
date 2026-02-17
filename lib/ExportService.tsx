@@ -48,15 +48,75 @@ const collectImageUrls = (root: HTMLElement): string[] => {
   // <img src>
   root.querySelectorAll('img').forEach((img) => {
     const el = img as HTMLImageElement;
-    const src = el.currentSrc || el.src;
-    if (src) urls.add(src);
+    if (el.src && el.src.length < 10000) urls.add(el.src);
+    if (el.currentSrc && el.currentSrc.length < 10000) urls.add(el.currentSrc);
   });
   // background-image urls
   root.querySelectorAll('*').forEach((el) => {
+    const htmlEl = el as HTMLElement;
+    const inlineBg = htmlEl.style.backgroundImage;
+    if (inlineBg && inlineBg !== 'none' && inlineBg.length < 10000) {
+      extractCssUrls(inlineBg).forEach((u) => urls.add(u));
+    }
     const bg = window.getComputedStyle(el as Element).backgroundImage;
-    extractCssUrls(bg).forEach((u) => urls.add(u));
+    if (bg && bg !== 'none' && bg.length < 10000) {
+      extractCssUrls(bg).forEach((u) => urls.add(u));
+    }
   });
-  return Array.from(urls);
+  return Array.from(urls).filter(u => u && !u.startsWith('data:'));
+};
+
+const blobToDataUrl = async (blobUrl: string): Promise<string> => {
+  try {
+    const response = await fetch(blobUrl);
+    const blob = await response.blob();
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result as string);
+      reader.onerror = () => resolve(blobUrl);
+      reader.readAsDataURL(blob);
+    });
+  } catch (e) {
+    console.error('Failed to inline blob:', blobUrl, e);
+    return blobUrl;
+  }
+};
+
+const inlineBlobUrls = async (root: HTMLElement) => {
+  const allUrls = collectImageUrls(root);
+  const blobUrls = allUrls.filter((u) => u.startsWith('blob:'));
+  if (blobUrls.length === 0) return;
+
+  const blobMap = new Map<string, string>();
+  for (const url of blobUrls) {
+    if (!blobMap.has(url)) {
+      blobMap.set(url, await blobToDataUrl(url));
+    }
+  }
+
+  // Replace in <img> tags
+  root.querySelectorAll('img').forEach((img) => {
+    const el = img as HTMLImageElement;
+    if (el.src.startsWith('blob:') && blobMap.has(el.src)) {
+      el.src = blobMap.get(el.src)!;
+    }
+  });
+
+  // Replace in background images
+  root.querySelectorAll('*').forEach((el) => {
+    const htmlEl = el as HTMLElement;
+    const bgs = [htmlEl.style.backgroundImage, window.getComputedStyle(el).backgroundImage];
+    bgs.forEach((bg, i) => {
+      if (bg && bg !== 'none' && bg.includes('blob:')) {
+        let newBg = bg;
+        blobMap.forEach((dataUrl, blobUrl) => {
+          newBg = newBg.split(blobUrl).join(dataUrl);
+        });
+        if (i === 0) htmlEl.style.backgroundImage = newBg;
+        else htmlEl.style.setProperty('background-image', newBg, 'important');
+      }
+    });
+  });
 };
 
 const preloadImage = (url: string) =>
@@ -130,10 +190,28 @@ const orderedCanvasSizes = (selected: string[]) => {
   ];
 };
 
-function CanvasBackground({ mediaId, blur }: { mediaId?: number; blur?: number }) {
+function CanvasBackground({
+  mediaId,
+  blur,
+  panX = 50,
+  panY = 50,
+  backgroundScale = 0,
+  backgroundRotation = 0
+}: {
+  mediaId?: number;
+  blur?: number;
+  panX?: number;
+  panY?: number;
+  backgroundScale?: number;
+  backgroundRotation?: number;
+}) {
   const { imageUrl } = useMediaImage(mediaId);
   if (!imageUrl) return null;
   const hasBlur = blur != null && blur > 0;
+
+  const rotationCompensation = [90, 270].includes(Math.abs(backgroundRotation % 360)) ? 1.42 : 1;
+  const finalScale = (1 + backgroundScale / 100) * rotationCompensation;
+
   return (
     <div
       style={{
@@ -142,9 +220,10 @@ function CanvasBackground({ mediaId, blur }: { mediaId?: number; blur?: number }
         clipPath: hasBlur ? `inset(${blur}px)` : undefined,
         backgroundImage: `url(${imageUrl})`,
         backgroundSize: 'cover',
-        backgroundPosition: 'center',
+        backgroundPosition: `${panX}% ${panY}%`,
         backgroundRepeat: 'no-repeat',
         filter: hasBlur ? `blur(${blur}px)` : undefined,
+        transform: `scale(${finalScale}) rotate(${backgroundRotation}deg)`,
         pointerEvents: 'none',
         zIndex: 0,
       }}
@@ -160,6 +239,7 @@ function ExportSurface({
   isPro,
   allScreens,
   sharedBackground,
+  sharedImageDimensions,
 }: {
   screen: Screen;
   canvasSize: string;
@@ -168,6 +248,7 @@ function ExportSurface({
   isPro: boolean;
   allScreens?: Screen[];
   sharedBackground?: SharedBackground;
+  sharedImageDimensions?: { width: number; height: number } | null;
 }) {
   const screenSettings = {
     ...screen.settings,
@@ -183,6 +264,7 @@ function ExportSurface({
 
   return (
     <div
+      data-export-surface="true"
       style={{
         width,
         height,
@@ -211,9 +293,17 @@ function ExportSurface({
           screenWidth={width}
           screenHeight={height}
           blur={blurAmount}
+          imageDimensions={sharedImageDimensions}
         />
       ) : (
-        <CanvasBackground mediaId={screenSettings.canvasBackgroundMediaId} blur={blurAmount} />
+        <CanvasBackground
+          mediaId={screenSettings.canvasBackgroundMediaId}
+          blur={blurAmount}
+          panX={screenSettings.screenPanX}
+          panY={screenSettings.screenPanY}
+          backgroundScale={screenSettings.backgroundScale}
+          backgroundRotation={screenSettings.backgroundRotation}
+        />
       )}
       <BackgroundEffectsOverlay effects={screenSettings.backgroundEffects} screenId={screen.id} />
       <div style={{ position: 'relative', zIndex: 1, width: '100%', height: '100%' }}>
@@ -234,9 +324,9 @@ function ExportSurface({
             element={t}
             selected={false}
             disabled={true}
-            onSelect={() => {}}
-            onUpdate={() => {}}
-            onDelete={() => {}}
+            onSelect={() => { }}
+            onUpdate={() => { }}
+            onDelete={() => { }}
           />
         ))}
       {!isPro && (
@@ -396,23 +486,37 @@ export class ExportService {
     const { width, height } = getCanvasDimensions(canvasSize, orientation);
     const isPro = this.isProUser();
 
+    // Pre-resolve shared background dimensions to avoid useEffect delays during render
+    let sharedImageDimensions: { width: number; height: number } | null = null;
+    if (sharedBackground?.type === 'image' && sharedBackground.mediaId) {
+      try {
+        const db = await (import('@reactkits.dev/react-media-library').then(m => m.initDB()));
+        const asset = await db.get('assets', sharedBackground.mediaId);
+        if (asset?.width && asset.height) {
+          sharedImageDimensions = { width: asset.width, height: asset.height };
+        }
+      } catch (err) {
+        console.warn('Failed to pre-resolve shared background dimensions', err);
+      }
+    }
+
     const container = document.createElement('div');
     container.style.position = 'fixed';
-    // Keep it off-screen but still in the DOM/layout flow.
-    container.style.left = '-10000px';
+    // Use conventional positioning but keep it hidden from human eyes
+    container.style.left = '0';
     container.style.top = '0';
     container.style.width = `${width}px`;
     container.style.height = `${height}px`;
     container.style.background = 'transparent';
-    container.style.zIndex = '-1';
+    container.style.zIndex = '-10000';
     container.style.pointerEvents = 'none';
+    container.style.opacity = '0';
+    container.id = 'appframes-export-container';
     document.body.appendChild(container);
 
     const root = createRoot(container);
     try {
       root.render(
-        // IMPORTANT: This is a separate React root; Mantine context does not cross roots.
-        // Wrap with MantineProvider to avoid "MantineProvider was not found" crashes during export.
         <MantineProvider theme={theme}>
           <InteractionLockProvider>
             <ExportSurface
@@ -423,53 +527,75 @@ export class ExportService {
               isPro={isPro}
               allScreens={allScreens}
               sharedBackground={sharedBackground}
+              sharedImageDimensions={sharedImageDimensions}
             />
           </InteractionLockProvider>
         </MantineProvider>
       );
 
-      // Give React + media loading a moment.
-      // (html-to-image will also attempt to inline assets, but this reduces flakiness.)
-      await sleep(0);
+      // Give React a moment to render
+      await sleep(100);
+
+      // Wait for React to commit meaningful content
+      const renderWaitStart = Date.now();
+      while (Date.now() - renderWaitStart < 3000) {
+        // Look for any element that might be a frame or text
+        const hasContent = container.querySelector('[data-frame-drop-zone="true"], .canvas-text-element');
+        if (hasContent) break;
+        await sleep(100);
+      }
+
+      const node = container.querySelector('[data-export-surface="true"]') as HTMLElement | null
+        || container.firstElementChild as HTMLElement | null;
+
+      if (!node) throw new Error('Export render failed: DOM remains empty after 3s');
+
       await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
       if (document.fonts?.ready) {
         try { await document.fonts.ready; } catch { /* ignore */ }
       }
-
-      const node = container.firstElementChild as HTMLElement | null;
-      if (!node) throw new Error('Export render failed: no node');
 
       // Wait for CSS background images to be available, especially OPFS blob URLs.
       const expectedMediaCount =
         new Set<number>([
           ...(typeof screen.settings.canvasBackgroundMediaId === 'number' ? [screen.settings.canvasBackgroundMediaId] : []),
           ...((screen.images || [])
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             .filter((img) => !(img as any)?.cleared)
             .map((img) => img?.mediaId)
             .filter((id): id is number => typeof id === 'number')),
         ]).size;
 
       const waitStart = Date.now();
+      let allUrls: string[] = [];
       while (expectedMediaCount > 0) {
-        const urls = collectImageUrls(node);
-        const blobCount = urls.filter((u) => u.startsWith('blob:')).length;
+        allUrls = collectImageUrls(container);
+        const blobCount = allUrls.filter((u) => u.startsWith('blob:')).length;
         if (blobCount >= expectedMediaCount) break;
-        if (Date.now() - waitStart > 2500) break;
-        await sleep(60);
+        if (Date.now() - waitStart > 10000) { // 10s for high-res exports
+          console.warn(`Export timeout waiting for ${expectedMediaCount} media items. Found: ${blobCount}`);
+          break;
+        }
+        await sleep(150);
       }
 
-      const allUrls = collectImageUrls(node);
+      // STEP: Manually inline blobs to prevent ERR_FILE_NOT_FOUND in html-to-image
+      await inlineBlobUrls(container);
 
+      const finalUrls = collectImageUrls(container);
       // Preload any discovered images (best-effort).
-      const urlsToPreload = allUrls
-        .filter((u) => !u.startsWith('data:'))
+      const urlsToPreload = finalUrls
         .slice(0, 40); // avoid pathological cases
       await Promise.all(urlsToPreload.map(preloadImage));
+
+      // Visual stability wait
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+      await sleep(100);
 
       const options = {
         cacheBust: true,
         pixelRatio: 1,
+        width,
+        height,
         // If tainting occurs, having useCORS may help when servers set proper headers.
         useCORS: true,
       };
@@ -478,29 +604,40 @@ export class ExportService {
 
       // IMPORTANT: Store uploads require exact pixel dimensions.
       // Since the node is already sized to the store resolution, use pixelRatio=1.
-      const renderOnce = async (): Promise<Blob> => {
+      const renderOnce = async (skipFonts = false): Promise<Blob> => {
+        const renderOptions = {
+          ...options,
+          ...(skipFonts ? { skipFonts: true } : {}),
+        };
+
         if (format === 'png' && typeof toBlob === 'function') {
-          const blob: Blob | null = await toBlob(node, options);
+          const blob: Blob | null = await toBlob(node, renderOptions);
           if (blob && blob.size > 0) return blob;
         }
 
         const dataUrl =
           format === 'png'
-            ? await toPng(node, options)
-            : await toJpeg(node, { ...options, quality: Math.max(0, Math.min(1, quality / 100)) });
+            ? await toPng(node, renderOptions)
+            : await toJpeg(node, { ...renderOptions, quality: Math.max(0, Math.min(1, quality / 100)) });
         return dataUrlToBlob(dataUrl);
       };
 
       // Retry a couple times to avoid rare “empty blob” races.
-      let blob = await renderOnce();
+      let blob;
+      try {
+        blob = await renderOnce(false);
+      } catch (err) {
+        console.warn('Initial render failed, retrying without fonts...', err);
+        blob = await renderOnce(true);
+      }
+
       if (!blob || blob.size === 0) {
         await sleep(150);
-        await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
-        blob = await renderOnce();
+        blob = await renderOnce(false);
       }
       if (!blob || blob.size === 0) {
         await sleep(300);
-        blob = await renderOnce();
+        blob = await renderOnce(true); // Last resort: skip fonts
       }
 
       if (!blob || blob.size === 0) {

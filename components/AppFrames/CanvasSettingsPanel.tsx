@@ -11,14 +11,18 @@ import {
   Popover,
   ColorPicker,
   Tabs,
+  Slider,
+  Divider,
 } from '@mantine/core';
-import { IconPlus } from '@tabler/icons-react';
+import { IconPlus, IconZoomIn } from '@tabler/icons-react';
 import { CanvasSettings } from './AppFrames';
 import { GradientEditor } from './GradientEditor';
 import { isGradient, getBackgroundStyle, BACKGROUND_PRESETS } from './Sidebar';
 import { isFixedOrientationCanvas } from './FramesContext';
 import { BackgroundEffectsPanel } from './BackgroundEffectsPanel';
 import { DEFAULT_BACKGROUND_EFFECTS } from './types';
+import { PanControl } from './PanControl';
+import { RotationControl } from './RotationControl';
 
 export interface CanvasSettingsPanelProps {
   settings: CanvasSettings;
@@ -26,6 +30,9 @@ export interface CanvasSettingsPanelProps {
   hasBackgroundMedia?: boolean;
   onClearBackgroundMedia?: () => void;
   onApplyEffectsToAll?: (effects: import('./types').BackgroundEffects) => void;
+  onBackgroundScaleChange?: (value: number, persistent?: boolean) => void;
+  onBackgroundRotationChange?: (value: number, persistent?: boolean) => void;
+  onBackgroundPanChange?: (x: number, y: number, persistent?: boolean) => void;
 }
 
 export function CanvasSettingsPanel({
@@ -34,6 +41,9 @@ export function CanvasSettingsPanel({
   hasBackgroundMedia,
   onClearBackgroundMedia,
   onApplyEffectsToAll,
+  onBackgroundScaleChange,
+  onBackgroundRotationChange,
+  onBackgroundPanChange,
 }: CanvasSettingsPanelProps) {
   const [customColorOpen, setCustomColorOpen] = useState(false);
   const [customColor, setCustomColor] = useState('#ffffff');
@@ -173,21 +183,81 @@ export function CanvasSettingsPanel({
         </SimpleGrid>
       </Box>
 
-      {hasBackgroundMedia && onClearBackgroundMedia && (
-        <Box>
-          <Text size="sm" fw={700} mb="xs">
-            Background Image
-          </Text>
-          <Button
-            size="xs"
-            variant="light"
-            color="red"
-            fullWidth
-            onClick={onClearBackgroundMedia}
-          >
-            Remove Background Image
-          </Button>
-        </Box>
+      {hasBackgroundMedia && (
+        <>
+          <Divider size="xs" label="Background Image" labelPosition="center" />
+
+          {/* 2x2 Grid Layout for Zoom and Rotation */}
+          <SimpleGrid cols={2} spacing="sm">
+            {/* 1. Rotation Dial */}
+            <Box style={{ display: 'flex', justifyContent: 'center' }}>
+              <RotationControl
+                rotation={settings.backgroundRotation ?? 0}
+                onRotationChange={(value) => {
+                  if (onBackgroundRotationChange) onBackgroundRotationChange(value, true);
+                  else setSettings({ ...settings, backgroundRotation: value });
+                }}
+              />
+            </Box>
+
+            {/* 2. Zoom Slider */}
+            <Box>
+              <Text size="xs" c="dimmed" mb={4} tt="uppercase" ta="center">Image Zoom</Text>
+              <Stack gap={4} align="center">
+                <IconZoomIn size={14} color="#666" />
+                <Slider
+                  w="100%"
+                  value={settings.backgroundScale ?? 0}
+                  onChange={(value) => {
+                    if (onBackgroundScaleChange) onBackgroundScaleChange(value, false);
+                    else setSettings({ ...settings, backgroundScale: value });
+                  }}
+                  onChangeEnd={(value) => {
+                    if (onBackgroundScaleChange) onBackgroundScaleChange(value, true);
+                  }}
+                  min={0}
+                  max={300}
+                  label={(v) => `${Math.round(100 + (v ?? 0))}%`}
+                  styles={{ thumb: { width: 12, height: 12 } }}
+                />
+                <Text size="xs" c="dimmed">{Math.round(100 + (settings.backgroundScale ?? 0))}%</Text>
+              </Stack>
+            </Box>
+
+            {/* 3. Pan Control - Spans 2 columns */}
+            <Box style={{ display: 'flex', justifyContent: 'center', gridColumn: 'span 2' }}>
+              <PanControl
+                panX={settings.screenPanX ?? 50}
+                panY={settings.screenPanY ?? 50}
+                onPanChange={(newPanX: number, newPanY: number, p?: boolean) => {
+                  if (onBackgroundPanChange) onBackgroundPanChange(newPanX, newPanY, p);
+                  else setSettings({ ...settings, screenPanX: newPanX, screenPanY: newPanY });
+                }}
+                onReset={() => {
+                  if (onBackgroundPanChange && onBackgroundScaleChange && onBackgroundRotationChange) {
+                    onBackgroundPanChange(50, 50, true);
+                    onBackgroundScaleChange(0, true);
+                    onBackgroundRotationChange(0, true);
+                  } else {
+                    setSettings({ ...settings, screenPanX: 50, screenPanY: 50, backgroundScale: 0, backgroundRotation: 0 });
+                  }
+                }}
+              />
+            </Box>
+          </SimpleGrid>
+
+          {onClearBackgroundMedia && (
+            <Button
+              size="xs"
+              variant="light"
+              color="red"
+              fullWidth
+              onClick={onClearBackgroundMedia}
+            >
+              Remove Background Image
+            </Button>
+          )}
+        </>
       )}
 
       {/* Background Effects */}

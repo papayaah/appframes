@@ -24,6 +24,7 @@ interface CanvasProps {
   onSelectScreen?: (index: number, multi: boolean) => void;
   onReplaceScreen?: (files: File[], targetFrameIndex?: number, screenIndex?: number) => void;
   onPanChange?: (screenIndex: number, frameIndex: number, panX: number, panY: number, persistent?: boolean) => void;
+  onBackgroundPanChange?: (screenIndex: number, panX: number, panY: number, persistent?: boolean) => void;
   onFramePositionChange?: (screenIndex: number, frameIndex: number, frameX: number, frameY: number, persistent?: boolean) => void;
   onFrameScaleChange?: (screenIndex: number, frameIndex: number, frameScale: number, persistent?: boolean) => void;
   onFrameRotateChange?: (screenIndex: number, frameIndex: number, rotateZ: number, persistent?: boolean) => void;
@@ -39,21 +40,47 @@ interface CanvasProps {
   onZoomChange?: (zoom: number) => void;
 }
 
-function CanvasBackground({ mediaId, blur }: { mediaId?: number; blur?: number }) {
+function CanvasBackground({
+  mediaId,
+  blur,
+  panX = 50,
+  panY = 50,
+  backgroundScale = 0,
+  backgroundRotation = 0
+}: {
+  mediaId?: number;
+  blur?: number;
+  panX?: number;
+  panY?: number;
+  backgroundScale?: number;
+  backgroundRotation?: number;
+}) {
   const { imageUrl } = useMediaImage(mediaId);
   if (!imageUrl) return null;
   const hasBlur = blur != null && blur > 0;
+
+  // backgroundScale 0 = cover (1x), 100 = 2x zoom
+  // Negative inset makes the element larger, creating real overflow for backgroundPosition to pan
+  const zoomInset = -(backgroundScale / 2);
+  const blurPadding = hasBlur ? blur : 0;
+
+  // Rotation compensation to avoid empty corners when rotated
+  const rotationCompensation = [90, 270].includes(backgroundRotation % 360) ? 1.42 : 1;
+
   return (
     <Box
       style={{
         position: 'absolute',
-        inset: hasBlur ? `-${blur}px` : 0,
-        clipPath: hasBlur ? `inset(${blur}px)` : undefined,
+        inset: `calc(${zoomInset}% - ${blurPadding}px)`,
+        clipPath: hasBlur ? `inset(${blurPadding}px)` : undefined,
         backgroundImage: `url(${imageUrl})`,
         backgroundSize: 'cover',
-        backgroundPosition: 'center',
+        backgroundPosition: `${panX}% ${panY}%`,
         backgroundRepeat: 'no-repeat',
         filter: hasBlur ? `blur(${blur}px)` : undefined,
+        transform: backgroundRotation !== 0 ? `rotate(${backgroundRotation}deg)` : undefined,
+        transformOrigin: 'center center',
+        scale: rotationCompensation !== 1 ? rotationCompensation : undefined,
         pointerEvents: 'none',
         zIndex: 0,
       }}
@@ -72,6 +99,7 @@ export function Canvas({
   onSelectScreen,
   onReplaceScreen,
   onPanChange,
+  onBackgroundPanChange,
   onFramePositionChange,
   onFrameScaleChange,
   onFrameRotateChange,
@@ -90,6 +118,7 @@ export function Canvas({
   const [hoveredScreenIndex, setHoveredScreenIndex] = useState<number | null>(null);
   const [dragFileCount, setDragFileCount] = useState<number>(0);
   const [isPanning, setIsPanning] = useState(false);
+  const [isBackgroundPanning, setIsBackgroundPanning] = useState(false);
 
   // Track the actual rendered width of EACH canvas to enable proportional scaling
   const [canvasWidths, setCanvasWidths] = useState<Record<string, number>>({});
@@ -98,6 +127,7 @@ export function Canvas({
   const innerRef = useRef<HTMLDivElement>(null);
   const canvasRefs = useRef<Map<number, HTMLElement>>(new Map());
   const canvasResizeObservers = useRef<Map<number, ResizeObserver>>(new Map());
+  const spacePressedRef = useRef(false);
 
   // Pan + zoom hot path: keep in refs, apply transform in rAF (avoid React renders per mousemove)
   const panOffsetRef = useRef({ x: 0, y: 0 });
@@ -105,8 +135,86 @@ export function Canvas({
   const transformRafRef = useRef<number | null>(null);
   zoomRef.current = zoom;
 
+  // Track global spacebar state for background panning
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.code === 'Space') spacePressedRef.current = true;
+    };
+    const onKeyUp = (e: KeyboardEvent) => {
+      if (e.code === 'Space') spacePressedRef.current = false;
+    };
+    window.addEventListener('keydown', onKeyDown);
+    window.addEventListener('keyup', onKeyUp);
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('keyup', onKeyUp);
+    };
+  }, []);
+
   // Get cross-canvas drag context
   const crossCanvasDrag = useCrossCanvasDrag();
+
+  const handleBackgroundPan = useCallback((e: React.MouseEvent, screenIndex: number) => {
+    const screen = screens[screenIndex];
+    if (!screen || !onBackgroundPanChange) return;
+
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const startPanX = screen.settings.screenPanX ?? 50;
+    const startPanY = screen.settings.screenPanY ?? 50;
+    const backgroundScale = screen.settings.backgroundScale ?? 0;
+
+    const canvasEl = canvasRefs.current.get(screenIndex);
+    if (!canvasEl) return;
+
+    const actualWidth = canvasEl.offsetWidth;
+    const actualHeight = canvasEl.offsetHeight;
+
+    // totalScale for the background includes the image's own zoom (backgroundScale)
+    // plus the canvas viewport scaling (zoom/100)
+    const currentZoom = zoomRef.current / 100;
+    const scaleFactor = currentZoom * (1 + backgroundScale / 100);
+
+    // Account for rotation the same way DeviceFrame does
+    const backgroundRotation = screen.settings.backgroundRotation ?? 0;
+    const radians = (backgroundRotation * Math.PI) / 180;
+    const cos = Math.cos(-radians);
+    const sin = Math.sin(-radians);
+
+    setIsBackgroundPanning(true);
+
+    let currentPanX = startPanX;
+    let currentPanY = startPanY;
+
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      const screenDx = moveEvent.clientX - startX;
+      const screenDy = moveEvent.clientY - startY;
+
+      // Rotate delta into image local space
+      const localDx = screenDx * cos - screenDy * sin;
+      const localDy = screenDx * sin + screenDy * cos;
+
+      const dx = (localDx / (actualWidth * scaleFactor)) * 100;
+      const dy = (localDy / (actualHeight * scaleFactor)) * 100;
+
+      currentPanX = Math.round(Math.max(0, Math.min(100, startPanX + dx)));
+      currentPanY = Math.round(Math.max(0, Math.min(100, startPanY + dy)));
+
+      onBackgroundPanChange(screenIndex, currentPanX, currentPanY, false);
+    };
+
+    const handleMouseUp = () => {
+      setIsBackgroundPanning(false);
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+
+      // Final persistent commit
+      onBackgroundPanChange(screenIndex, currentPanX, currentPanY, true);
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+  }, [screens, onBackgroundPanChange]);
 
   const getFrameIndexAtPoint = useCallback((screenIndex: number, clientX: number, clientY: number): number | null => {
     const canvasEl = canvasRefs.current.get(screenIndex);
@@ -432,7 +540,18 @@ export function Canvas({
                   }}
                   onMouseDown={(e) => {
                     const target = e.target as HTMLElement;
-                    if (!target.closest('[data-frame-drop-zone="true"]') && !target.closest('[data-text-element="true"]')) onClickCanvas?.(screenIndex);
+                    const isFrameHit = !!target.closest('[data-frame-drop-zone="true"]');
+                    const isTextHit = !!target.closest('[data-text-element="true"]');
+
+                    // Space held + background click = pan background
+                    if (spacePressedRef.current && !isFrameHit && !isTextHit) {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      handleBackgroundPan(e, screenIndex);
+                      return;
+                    }
+
+                    if (!isFrameHit && !isTextHit) onClickCanvas?.(screenIndex);
                     onSelectTextElement?.(screenIndex, null);
                   }}
                 >
@@ -474,11 +593,19 @@ export function Canvas({
                             blur={screenSettings.backgroundEffects?.blur}
                           />
                         ) : (
-                          <CanvasBackground mediaId={screenSettings.canvasBackgroundMediaId} blur={screenSettings.backgroundEffects?.blur} />
+                          <CanvasBackground
+                            mediaId={screenSettings.canvasBackgroundMediaId}
+                            blur={screenSettings.backgroundEffects?.blur}
+                            panX={screenSettings.screenPanX}
+                            panY={screenSettings.screenPanY}
+                            backgroundScale={screenSettings.backgroundScale}
+                            backgroundRotation={screenSettings.backgroundRotation}
+                          />
                         )}
 
                         {/* Background Effects Overlay */}
                         <BackgroundEffectsOverlay effects={screenSettings.backgroundEffects} screenId={screen.id} />
+
 
                         {/* Global Background Blur */}
                         {(() => {

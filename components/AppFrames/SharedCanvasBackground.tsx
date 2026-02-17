@@ -64,9 +64,10 @@ function SharedImageBackground({
   screenWidth,
   screenHeight,
   blur,
-}: SharedImageBackgroundProps) {
+  initialDimensions,
+}: SharedImageBackgroundProps & { initialDimensions?: { width: number; height: number } | null }) {
   const { imageUrl } = useMediaImage(mediaId);
-  const [imageDimensions, setImageDimensions] = useState<{ width: number; height: number } | null>(null);
+  const [imageDimensions, setImageDimensions] = useState<{ width: number; height: number } | null>(initialDimensions || null);
 
   // Load image dimensions from IndexedDB, fallback to loading from image itself
   useEffect(() => {
@@ -148,6 +149,7 @@ export interface SharedCanvasBackgroundProps {
   screenWidth: number;
   screenHeight: number;
   blur?: number;
+  imageDimensions?: { width: number; height: number } | null;
 }
 
 export function SharedCanvasBackground({
@@ -157,6 +159,7 @@ export function SharedCanvasBackground({
   screenWidth,
   screenHeight,
   blur,
+  imageDimensions,
 }: SharedCanvasBackgroundProps) {
   if (!sharedBackground.screenIds.length) return null;
 
@@ -188,6 +191,7 @@ export function SharedCanvasBackground({
         screenWidth={screenWidth}
         screenHeight={screenHeight}
         blur={blur}
+        initialDimensions={imageDimensions}
       />
     );
   }

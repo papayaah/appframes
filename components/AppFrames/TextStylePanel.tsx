@@ -25,8 +25,7 @@ const RAW_FONT_OPTIONS: FontOption[] = [
   { value: 'Helvetica', label: 'Helvetica' },
   { value: 'Impact', label: 'Impact' },
   { value: 'Inter', label: 'Inter' },
-  // Note: This font is commonly distributed as “personal use only” unless you purchase a commercial license.
-  { value: 'Jimmy Script', label: 'Jimmy Script (license required for commercial use)' },
+  { value: 'Jimmy Script', label: 'Jimmy Script' },
   { value: 'Lato', label: 'Lato' },
   { value: 'Montserrat', label: 'Montserrat' },
   { value: 'Noto Sans', label: 'Noto Sans' },

@@ -23,12 +23,6 @@ import {
 } from '@tabler/icons-react';
 import { useAppStore } from '@/stores/useAppStore';
 
-// Sample YouTube video - replace with actual demo video later
-const DEMO_VIDEO_ID = 'dQw4w9WgXcQ';
-
-// YouTube embed URL with autoplay, muted, no controls, looping
-const getEmbedUrl = (videoId: string) =>
-  `https://www.youtube.com/embed/${videoId}?autoplay=1&mute=1&controls=0&loop=1&playlist=${videoId}&modestbranding=1&rel=0`;
 
 interface FeatureItem {
   icon: React.ReactNode;
@@ -147,12 +141,19 @@ export function WelcomeModal() {
             }}
           >
             <AspectRatio ratio={16 / 9}>
-              <iframe
-                src={getEmbedUrl(DEMO_VIDEO_ID)}
+              <video
+                src="/appframes_demo.mp4"
                 title="AppFrames Demo"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                allowFullScreen
-                style={{ border: 0, borderRadius: 8 }}
+                autoPlay
+                loop
+                muted
+                playsInline
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'cover',
+                  borderRadius: 8,
+                }}
               />
             </AspectRatio>
           </Box>

@@ -81,7 +81,9 @@ export function AppFrames() {
     clearFrameSlot,
     setFrameDIYOptions,
     setFramePan,
-
+    setBackgroundPan,
+    setBackgroundRotation,
+    setBackgroundScale,
     setFramePosition,
     setFrameScale,
     setFrameRotate,
@@ -124,12 +126,22 @@ export function AppFrames() {
   useEffect(() => {
     const isAppframesDrag = (e: DragEvent) => {
       if (!e.dataTransfer) return false;
+      let hasFile = false;
+      let hasImage = false;
       // Check if any dragged item looks like an .appframes or .zip file
+      // During dragenter/dragover we can't see filenames, but we can see MIME types.
+      // If we see an image type, it's definitely NOT an appframes project file import.
       for (let i = 0; i < e.dataTransfer.items.length; i++) {
         const item = e.dataTransfer.items[i];
-        if (item.kind === 'file') return true;
+        if (item.kind === 'file') {
+          hasFile = true;
+          if (item.type.startsWith('image/')) {
+            hasImage = true;
+            break;
+          }
+        }
       }
-      return false;
+      return hasFile && !hasImage;
     };
 
     const handleDragEnter = (e: DragEvent) => {
@@ -999,6 +1011,9 @@ export function AppFrames() {
                   onFrameRotateChange={(screenIndex, frameIndex, rotateZ, p) => {
                     setFrameRotate(screenIndex, frameIndex, clampFrameTransform(rotateZ, 'rotateZ'), p);
                   }}
+                  onBackgroundPanChange={(screenIndex, x, y, p) => {
+                    setBackgroundPan(screenIndex, x, y, p);
+                  }}
                   onMediaSelect={(screenIndex, frameIndex, mediaId) => {
                     replaceScreen(screenIndex, mediaId, frameIndex);
                   }}
@@ -1060,6 +1075,9 @@ export function AppFrames() {
                   }
                 },
                 onApplyEffectsToAll: applyBackgroundEffectsToAll,
+                onBackgroundScaleChange: (value, p) => setBackgroundScale(activeFrameScreenIndex, value, p),
+                onBackgroundRotationChange: (value, p) => setBackgroundRotation(activeFrameScreenIndex, value, p),
+                onBackgroundPanChange: (x, y, p) => setBackgroundPan(activeFrameScreenIndex, x, y, p),
               }}
               imageSettings={{
                 screenScale: currentScreen?.settings?.screenScale ?? 0,

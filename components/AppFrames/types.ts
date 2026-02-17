@@ -152,6 +152,8 @@ export interface CanvasSettings {
   screenScale: number;
   screenPanX: number;
   screenPanY: number;
+  backgroundScale?: number; // Zoom for the canvas background image specifically
+  backgroundRotation?: number; // Rotation for the canvas background image specifically
   orientation: 'portrait' | 'landscape';
   backgroundColor: string;
   canvasBackgroundMediaId?: number; // Full-canvas background image (optional)

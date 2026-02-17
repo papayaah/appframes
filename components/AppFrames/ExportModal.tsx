@@ -231,7 +231,7 @@ export function ExportModal({
         if (isExporting) return;
         onClose();
       }}
-      title={<Title order={4}>Export</Title>}
+      title="Export"
       centered
       size="lg"
       closeOnEscape={!isExporting}

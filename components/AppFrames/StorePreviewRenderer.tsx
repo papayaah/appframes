@@ -41,9 +41,24 @@ const sortCanvasSizesByDimensionsDesc = (canvasSizes: string[]) => {
   });
 };
 
-function CanvasBackground({ mediaId }: { mediaId?: number }) {
+function CanvasBackground({
+  mediaId,
+  panX = 50,
+  panY = 50,
+  backgroundScale = 0,
+  backgroundRotation = 0
+}: {
+  mediaId?: number;
+  panX?: number;
+  panY?: number;
+  backgroundScale?: number;
+  backgroundRotation?: number;
+}) {
   const { imageUrl } = useMediaImage(mediaId);
   if (!imageUrl) return null;
+
+  const rotationCompensation = [90, 270].includes(Math.abs(backgroundRotation % 360)) ? 1.42 : 1;
+
   return (
     <Box
       style={{
@@ -51,8 +66,11 @@ function CanvasBackground({ mediaId }: { mediaId?: number }) {
         inset: 0,
         backgroundImage: `url(${imageUrl})`,
         backgroundSize: 'cover',
-        backgroundPosition: 'center',
+        backgroundPosition: `${panX}% ${panY}%`,
         backgroundRepeat: 'no-repeat',
+        transform: backgroundRotation !== 0 ? `rotate(${backgroundRotation}deg)` : undefined,
+        transformOrigin: 'center center',
+        scale: (1 + backgroundScale / 100) * rotationCompensation,
         pointerEvents: 'none',
         zIndex: 0,
       }}
@@ -77,51 +95,59 @@ function StaticCanvas({
   };
 
   return (
-    <Box
-      style={{
-        width: width * scale,
-        height: height * scale,
-        position: 'relative',
-        overflow: 'hidden',
-        borderRadius: 8,
-        boxShadow: '0 10px 40px rgba(0,0,0,0.12)',
-        ...getBackgroundStyle(screenSettings.backgroundColor),
-      }}
-    >
+    <Box style={{ display: 'flex', justifyContent: 'center', width: '100%' }}>
       <Box
         style={{
-          width,
-          height,
-          transform: `scale(${scale})`,
-          transformOrigin: 'top left',
-          position: 'absolute',
-          top: 0,
-          left: 0,
+          width: width * scale,
+          height: height * scale,
+          position: 'relative',
+          overflow: 'hidden',
+          borderRadius: 8,
+          boxShadow: '0 10px 40px rgba(0,0,0,0.12)',
+          ...getBackgroundStyle(screenSettings.backgroundColor),
         }}
       >
-        <CanvasBackground mediaId={screenSettings.canvasBackgroundMediaId} />
-        <Box style={{ position: 'relative', zIndex: 1, width: '100%', height: '100%' }}>
-          <CompositionRenderer
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            settings={screenSettings as any}
-            screen={screen as any}
-            disableCrossCanvasDrag={true}
+        <Box
+          style={{
+            width,
+            height,
+            transform: `scale(${scale})`,
+            transformOrigin: 'top left',
+            position: 'absolute',
+            top: 0,
+            left: 0,
+          }}
+        >
+          <CanvasBackground
+            mediaId={screenSettings.canvasBackgroundMediaId}
+            panX={screenSettings.screenPanX}
+            panY={screenSettings.screenPanY}
+            backgroundScale={screenSettings.backgroundScale}
+            backgroundRotation={screenSettings.backgroundRotation}
           />
-        </Box>
-        {(screen.textElements || [])
-          .filter((t) => t.visible)
-          .sort((a, b) => (a.zIndex ?? 0) - (b.zIndex ?? 0))
-          .map((t) => (
-            <CanvasTextElement
-              key={t.id}
-              element={t}
-              selected={false}
-              disabled={true}
-              onSelect={() => {}}
-              onUpdate={() => {}}
-              onDelete={() => {}}
+          <Box style={{ position: 'relative', zIndex: 1, width: '100%', height: '100%' }}>
+            <CompositionRenderer
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              settings={screenSettings as any}
+              screen={screen as any}
+              disableCrossCanvasDrag={true}
             />
-          ))}
+          </Box>
+          {(screen.textElements || [])
+            .filter((t) => t.visible)
+            .sort((a, b) => (a.zIndex ?? 0) - (b.zIndex ?? 0))
+            .map((t) => (
+              <CanvasTextElement
+                key={t.id}
+                element={t}
+                selected={false}
+                disabled={true}
+                onSelect={() => { }}
+                onUpdate={() => { }}
+                onDelete={() => { }}
+              />
+            ))}
+        </Box>
       </Box>
     </Box>
   );
@@ -237,8 +263,8 @@ export function StorePreviewRenderer() {
     const label = getCanvasSizeLabel(canvasSize);
 
     // Scale previews to fit comfortably.
-    const maxW = 240;
-    const maxH = 520;
+    const maxW = 180;
+    const maxH = 420;
     const dimsForScreens = screens.map((s) =>
       getCanvasDimensions(canvasSize, s?.settings?.orientation ?? 'portrait'),
     );
@@ -292,13 +318,16 @@ export function StorePreviewRenderer() {
           </Group>
         </Group>
 
-        <SimpleGrid
-          cols={{ base: 1, sm: 2, md: 3, lg: 4 }}
-          spacing="md"
-          verticalSpacing="md"
+        <Box
+          style={{
+            display: 'grid',
+            gridTemplateColumns: `repeat(auto-fill, minmax(${Math.max(160, maxDims.width * scale + 24)}px, 1fr))`,
+            gap: '16px',
+            width: '100%',
+          }}
         >
           {screens.map((screen) => (
-            <Card key={screen.id} padding="sm" radius="md" withBorder>
+            <Card key={screen.id} padding="xs" radius="md" withBorder h="fit-content" style={{ alignSelf: 'start', transition: 'transform 0.2s', cursor: 'pointer' }}>
               <Stack gap="xs">
                 <StaticCanvas screen={screen} canvasSize={canvasSize} scale={scale} />
                 <Text size="sm" fw={600} style={{ lineHeight: 1.2 }} lineClamp={2}>
@@ -307,7 +336,7 @@ export function StorePreviewRenderer() {
               </Stack>
             </Card>
           ))}
-        </SimpleGrid>
+        </Box>
       </Stack>
     );
   };

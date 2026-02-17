@@ -69,6 +69,7 @@ export function ensureFontLoaded(fontFamily: string | null | undefined) {
   const link = document.createElement('link');
   link.rel = 'stylesheet';
   link.href = href;
+  link.crossOrigin = 'anonymous';
   link.setAttribute('data-font-key', key);
   document.head.appendChild(link);
   loadedFontKeys.add(key);

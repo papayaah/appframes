@@ -199,6 +199,8 @@ export const getDefaultScreenSettings = (): Omit<CanvasSettings, 'selectedScreen
     screenScale: 0,
     screenPanX: 50,
     screenPanY: 50,
+    backgroundScale: 0,
+    backgroundRotation: 0,
     orientation: 'portrait',
     // Default to transparent so users can export/download with alpha without extra steps.
     backgroundColor: 'transparent',
@@ -291,6 +293,9 @@ interface FramesContextType {
   clearFrameSlot: (screenIndex: number, frameIndex: number) => void;
   setFrameDIYOptions: (screenIndex: number, frameIndex: number, options: DIYOptions, templateId?: string) => void;
   setFramePan: (screenIndex: number, frameIndex: number, panX: number, panY: number, persistent?: boolean) => void;
+  setBackgroundPan: (screenIndex: number, panX: number, panY: number, persistent?: boolean) => void;
+  setBackgroundRotation: (screenIndex: number, rotation: number, persistent?: boolean) => void;
+  setBackgroundScale: (screenIndex: number, scale: number, persistent?: boolean) => void;
 
   setFramePosition: (screenIndex: number, frameIndex: number, frameX: number, frameY: number, persistent?: boolean) => void;
   setFrameScale: (screenIndex: number, frameIndex: number, frameScale: number, persistent?: boolean) => void;
@@ -533,6 +538,56 @@ export function FramesProvider({ children }: { children: ReactNode }) {
     setSelectedFrameIndex(0);
   };
 
+  const generateDefaultScreenName = useCallback((canvasSize: string, screenList: Screen[]) => {
+    const { width, height } = getCanvasDimensions(canvasSize, 'portrait');
+    let label = getCanvasSizeLabel(canvasSize);
+    // Standardize: remove quotes, convert × to x
+    label = label.replace(/"/g, '').replace(/×/g, 'x');
+
+    // Ensure resolution is present if not already in label
+    if (!label.includes('x')) {
+      label = `${label} (${width}x${height})`;
+    }
+
+    // Find next number for screens within the given screen list
+    const pattern = new RegExp(`^${label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*-\\s*(\\d+)$`);
+    let maxNum = 0;
+
+    screenList.forEach(s => {
+      const match = s.name.match(pattern);
+      if (match) {
+        maxNum = Math.max(maxNum, parseInt(match[1], 10));
+      } else if (s.name === label) {
+        maxNum = Math.max(maxNum, 1);
+      }
+    });
+
+    return `${label} - ${maxNum + 1}`;
+  }, []);
+
+  const generateNextScreenName = useCallback((sourceName: string, canvasSize: string, screenList: Screen[]) => {
+    // If it's a default name like "Screen 1" or contains "(copy)", upgrade it to the smart name
+    if (sourceName.startsWith('Screen ') || sourceName.toLowerCase().includes('(copy)')) {
+      return generateDefaultScreenName(canvasSize, screenList);
+    }
+
+    // Otherwise, if it already follows the "Name - N" pattern, increment it
+    const pattern = /^(.*?)\s*-\s*(\d+)$/;
+    const match = sourceName.match(pattern);
+    if (match) {
+      const base = match[1];
+      let maxNum = parseInt(match[2], 10);
+      screenList.forEach(s => {
+        const m = s.name.match(new RegExp(`^${base.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*-\\s*(\\d+)$`));
+        if (m) maxNum = Math.max(maxNum, parseInt(m[1], 10));
+      });
+      return `${base} - ${maxNum + 1}`;
+    }
+
+    // Default fallback for custom names
+    return `${sourceName} (copy)`;
+  }, [generateDefaultScreenName]);
+
   const addScreen = (imageOrMediaId?: string | number) => {
     // Use default settings, inheriting only composition and orientation from the last screen
     const lastScreen = screens.length > 0 ? screens[screens.length - 1] : null;
@@ -594,7 +649,7 @@ export function FramesProvider({ children }: { children: ReactNode }) {
     const newScreen: Screen = {
       id: `screen-${screenIdCounter.current}`,
       images,
-      name: `Screen ${screens.length + 1}`,
+      name: generateDefaultScreenName(currentCanvasSizeRef.current, screens),
       settings: defaultSettings,
       textElements: [],
     };
@@ -625,7 +680,7 @@ export function FramesProvider({ children }: { children: ReactNode }) {
             : {}
         )
         : [],
-      name: `${sourceScreen.name} (copy)`,
+      name: generateNextScreenName(sourceScreen.name, currentCanvasSize, screens),
       settings: { ...sourceScreen.settings, canvasSize: currentCanvasSize, selectedTextId: undefined },
       textElements: sourceScreen.textElements
         ? sourceScreen.textElements.map((el) => ({
@@ -1091,6 +1146,36 @@ export function FramesProvider({ children }: { children: ReactNode }) {
       screen.images[frameIndex] = { ...(screen.images[frameIndex] || {}), panX, panY };
     };
     if (persistent) commitCurrentScreens('Pan media', update);
+    else mutateCurrentScreens(update);
+  }, [commitCurrentScreens, mutateCurrentScreens]);
+
+  const setBackgroundPan = useCallback((screenIndex: number, panX: number, panY: number, persistent = true) => {
+    const update = (list: Screen[]) => {
+      const screen = list[screenIndex];
+      if (!screen) return;
+      screen.settings = { ...screen.settings, screenPanX: panX, screenPanY: panY };
+    };
+    if (persistent) commitCurrentScreens('Pan background', update);
+    else mutateCurrentScreens(update);
+  }, [commitCurrentScreens, mutateCurrentScreens]);
+
+  const setBackgroundRotation = useCallback((screenIndex: number, rotation: number, persistent = true) => {
+    const update = (list: Screen[]) => {
+      const screen = list[screenIndex];
+      if (!screen) return;
+      screen.settings = { ...screen.settings, backgroundRotation: rotation };
+    };
+    if (persistent) commitCurrentScreens('Rotate background', update);
+    else mutateCurrentScreens(update);
+  }, [commitCurrentScreens, mutateCurrentScreens]);
+
+  const setBackgroundScale = useCallback((screenIndex: number, scale: number, persistent = true) => {
+    const update = (list: Screen[]) => {
+      const screen = list[screenIndex];
+      if (!screen) return;
+      screen.settings = { ...screen.settings, backgroundScale: scale };
+    };
+    if (persistent) commitCurrentScreens('Zoom background', update);
     else mutateCurrentScreens(update);
   }, [commitCurrentScreens, mutateCurrentScreens]);
 
@@ -2131,7 +2216,9 @@ export function FramesProvider({ children }: { children: ReactNode }) {
         clearFrameSlot,
         setFrameDIYOptions,
         setFramePan,
-
+        setBackgroundPan,
+        setBackgroundRotation,
+        setBackgroundScale,
         setFramePosition,
         setFrameScale,
         setFrameRotate,
