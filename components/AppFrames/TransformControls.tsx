@@ -14,10 +14,10 @@ interface TransformControlsProps {
   tiltY?: number;
   frameX?: number;
   frameY?: number;
-  onRotationChange: (rotation: number) => void;
-  onScaleChange: (scale: number) => void;
+  onRotationChange: (rotation: number, persistent?: boolean) => void;
+  onScaleChange: (scale: number, persistent?: boolean) => void;
   onTiltChange?: (tiltX: number, tiltY: number) => void;
-  onFramePositionChange?: (frameX: number, frameY: number) => void;
+  onFramePositionChange?: (frameX: number, frameY: number, persistent?: boolean) => void;
   onReset?: () => void;
 }
 
@@ -38,7 +38,9 @@ export function TransformControls({
   onReset,
 }: TransformControlsProps) {
   const dialRef = useRef<HTMLDivElement>(null);
+  const padRectRef = useRef<DOMRect | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [localDragRotation, setLocalDragRotation] = useState<number | null>(null);
 
   const hasChanges = rotation !== 0 || scale !== 100 || tiltX !== 0 || tiltY !== 0 || frameX !== 0 || frameY !== 0;
 
@@ -53,9 +55,7 @@ export function TransformControls({
   };
 
   // Calculate angle from mouse position relative to dial center
-  const getAngleFromPosition = (clientX: number, clientY: number) => {
-    if (!dialRef.current) return rotation;
-    const rect = dialRef.current.getBoundingClientRect();
+  const getAngleFromPosition = (clientX: number, clientY: number, rect: DOMRect) => {
     const centerX = rect.left + rect.width / 2;
     const centerY = rect.top + rect.height / 2;
     const dx = clientX - centerX;
@@ -67,25 +67,40 @@ export function TransformControls({
   };
 
   const handlePointerDown = useCallback((e: React.PointerEvent) => {
+    if (e.button !== 0) return;
+    if (!dialRef.current) return;
+
     e.preventDefault();
     setIsDragging(true);
+    const rect = dialRef.current.getBoundingClientRect();
+    padRectRef.current = rect;
     (e.target as HTMLElement).setPointerCapture(e.pointerId);
-    const newAngle = getAngleFromPosition(e.clientX, e.clientY);
-    onRotationChange(Math.max(-180, Math.min(180, newAngle)));
+
+    const newAngle = Math.max(-180, Math.min(180, getAngleFromPosition(e.clientX, e.clientY, rect)));
+    setLocalDragRotation(newAngle);
+    onRotationChange(newAngle, false);
   }, [onRotationChange]);
 
   const handlePointerMove = useCallback((e: React.PointerEvent) => {
-    if (!isDragging) return;
-    const newAngle = getAngleFromPosition(e.clientX, e.clientY);
-    onRotationChange(Math.max(-180, Math.min(180, newAngle)));
+    if (!isDragging || !padRectRef.current) return;
+    const newAngle = Math.max(-180, Math.min(180, getAngleFromPosition(e.clientX, e.clientY, padRectRef.current)));
+    setLocalDragRotation(newAngle);
+    onRotationChange(newAngle, false);
   }, [isDragging, onRotationChange]);
 
   const handlePointerUp = useCallback((e: React.PointerEvent) => {
+    if (isDragging && padRectRef.current) {
+      const newAngle = Math.max(-180, Math.min(180, getAngleFromPosition(e.clientX, e.clientY, padRectRef.current)));
+      onRotationChange(newAngle, true);
+    }
     setIsDragging(false);
+    setLocalDragRotation(null);
+    padRectRef.current = null;
     (e.target as HTMLElement).releasePointerCapture(e.pointerId);
-  }, []);
+  }, [isDragging, onRotationChange]);
 
-  const knobPos = getKnobPosition(rotation);
+  const displayRotation = localDragRotation !== null ? localDragRotation : rotation;
+  const knobPos = getKnobPosition(displayRotation);
 
   return (
     <Box>
@@ -181,7 +196,7 @@ export function TransformControls({
               />
             </Box>
             <Text size="xs" c="dimmed" ta="center" mt={4}>
-              {Math.round(rotation)}°
+              {Math.round(displayRotation)}°
             </Text>
           </Box>
         </Box>
@@ -214,7 +229,7 @@ export function TransformControls({
             <FramePositionControl
               frameX={frameX}
               frameY={frameY}
-              onPositionChange={onFramePositionChange}
+              onPositionChange={(x: number, y: number, p?: boolean) => onFramePositionChange?.(x, y, p)}
             />
           </Box>
         )}

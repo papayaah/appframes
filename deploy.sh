@@ -170,18 +170,12 @@ echo "  app_port:   ${APP_PORT}"
 echo "  deploy_dir: ${REMOTE_BASE}"
 echo
 
-# Build local packages (submodules) before deploying
-echo "Building local packages..."
-for pkg_dir in "$ROOT_DIR"/packages/*/; do
-  if [[ -f "${pkg_dir}package.json" ]] && grep -q '"build"' "${pkg_dir}package.json" 2>/dev/null; then
-    pkg_name="$(basename "$pkg_dir")"
-    echo "  Building $pkg_name..."
-    npm run build --silent --prefix "$pkg_dir" || {
-      echo "Failed to build $pkg_name" >&2
-      exit 1
-    }
-  fi
-done
+# Build everything (including local packages) before deploying
+echo "Building all components..."
+npm run build || {
+  echo "Build failed" >&2
+  exit 1
+}
 echo
 
 echo "Syncing code to ${REMOTE_HOST}:${REMOTE_BASE} ..."

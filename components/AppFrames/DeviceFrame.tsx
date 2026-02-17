@@ -47,6 +47,7 @@ interface DeviceFrameProps {
   scale: number;
   viewportScale?: number;
   dragRotateZ?: number;
+  baseRotateZ?: number;
   dragScale?: number;
   dragTiltX?: number; // Frame's X tilt in degrees
   dragTiltY?: number; // Frame's Y tilt in degrees
@@ -55,16 +56,16 @@ interface DeviceFrameProps {
   panX: number;
   panY: number;
   showInstructions?: boolean;
-  onPanChange?: (panX: number, panY: number) => void;
+  onPanChange?: (panX: number, panY: number, persistent?: boolean) => void;
   frameIndex?: number;
   isHighlighted?: boolean;
   isSelected?: boolean;
-  onClick?: () => void;
+  onClick?: (e: React.MouseEvent) => void;
   onDragOver?: () => void;
   onDragLeave?: () => void;
   onMediaSelect?: (mediaId: number) => void;
   onPexelsSelect?: (url: string) => void;
-  onFramePositionChange?: (frameX: number, frameY: number) => void;
+  onFramePositionChange?: (frameX: number, frameY: number, persistent?: boolean) => void;
   onFrameMove?: (deltaX: number, deltaY: number) => void;
   onFrameMoveEnd?: () => void;
   frameY?: number;
@@ -97,6 +98,7 @@ export function DeviceFrame({
   scale,
   viewportScale = 1,
   dragRotateZ = 0,
+  baseRotateZ = 0,
   dragScale = 1,
   dragTiltX = 0,
   dragTiltY = 0,
@@ -236,26 +238,39 @@ export function DeviceFrame({
 
     const startX = e.clientX;
     const startY = e.clientY;
-    const radians = (dragRotateZ * Math.PI) / 180;
-    const cos = Math.cos(-radians);
-    const sin = Math.sin(-radians);
     const totalScale = viewportScale * dragScale;
 
     const handleMove = (moveEvent: MouseEvent) => {
-      const rawDx = (moveEvent.clientX - startX) / totalScale;
-      const rawDy = (moveEvent.clientY - startY) / totalScale;
-      // Apply rotateZ compensation for visual (to align with rotated frame)
-      // Note: Tilt compensation is NOT applied for frame drag because the frame center
-      // (at rotation origin) doesn't shift with perspective transforms
-      const localDx = rawDx * cos - rawDy * sin;
-      const localDy = rawDx * sin + rawDy * cos;
-      pendingFrameOffsetRef.current = { x: rawDx, y: rawDy };
-      pendingFrameVisualOffsetRef.current = { x: localDx, y: localDy };
+      const screenDx = moveEvent.clientX - startX;
+      const screenDy = moveEvent.clientY - startY;
+
+      // 1. Commit Delta (for state update)
+      // frameX/frameY are applied BEFORE internal scaling (BASE_COMPOSITION_SCALE)
+      // in buildFrameTransform, so we only normalize by viewportScale (zoom/design scale).
+      // They are also applied AFTER the composition's baseTransform (baseRotateZ).
+      const baseRadians = (baseRotateZ * Math.PI) / 180;
+      const bCos = Math.cos(-baseRadians);
+      const bSin = Math.sin(-baseRadians);
+      const commitDx = (screenDx / viewportScale) * bCos - (screenDy / viewportScale) * bSin;
+      const commitDy = (screenDx / viewportScale) * bSin + (screenDy / viewportScale) * bCos;
+
+      // 2. Visual Preview Delta
+      // This is applied to the child element itself via translate3d, which IS inside
+      // the parent's scaled coordinate system. So we must normalize by totalScale.
+      const totalRadians = (dragRotateZ * Math.PI) / 180;
+      const vCos = Math.cos(-totalRadians);
+      const vSin = Math.sin(-totalRadians);
+      const visualDx = (screenDx / totalScale) * vCos - (screenDy / totalScale) * vSin;
+      const visualDy = (screenDx / totalScale) * vSin + (screenDy / totalScale) * vCos;
+
+      pendingFrameOffsetRef.current = { x: commitDx, y: commitDy };
+      pendingFrameVisualOffsetRef.current = { x: visualDx, y: visualDy };
       scheduleFrameDragVisual();
-      // Dispatch drag move event with offset for parent components
+
+      // Dispatch drag move event with visual offset for parent selection glow
       frameWrapperRef.current?.dispatchEvent(new CustomEvent('appframes:framedragmove', {
         bubbles: true,
-        detail: { x: localDx, y: localDy },
+        detail: { x: visualDx, y: visualDy },
       }));
     };
 
@@ -354,7 +369,7 @@ export function DeviceFrame({
 
       document.addEventListener('mousemove', handleMove);
       document.addEventListener('mouseup', handleEnd);
-      onClick?.();
+      onClick?.(e);
       return;
     }
 
@@ -363,7 +378,7 @@ export function DeviceFrame({
       if (isInteractiveTarget(e.target)) return;
       e.preventDefault();
       e.stopPropagation();
-      onClick?.();
+      onClick?.(e);
       if (gestureOwnerKey && !gestureTokenRef.current) {
         gestureTokenRef.current = begin(gestureOwnerKey, 'frame-move');
       }
@@ -371,7 +386,7 @@ export function DeviceFrame({
       return;
     }
 
-    onClick?.();
+    onClick?.(e);
   };
 
   const showGuides = !isLocked || (gestureOwnerKey && isOwnerActive(gestureOwnerKey));

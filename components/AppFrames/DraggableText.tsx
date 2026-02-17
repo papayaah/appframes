@@ -227,8 +227,9 @@ export function DraggableText({
             position: 'relative',
             padding: 8,
             borderRadius: 8,
-            backgroundColor: 'rgba(255, 255, 255, 0.95)',
-            boxShadow: '0 0 0 2px #667eea, 0 4px 20px rgba(102, 126, 234, 0.3)',
+            backgroundColor: 'transparent',
+            backdropFilter: 'blur(4px)',
+            boxShadow: '0 0 0 1px rgba(102, 126, 234, 0.4), 0 4px 20px rgba(102, 126, 234, 0.2)',
           }}
         >
           <Textarea
@@ -266,9 +267,15 @@ export function DraggableText({
               left: '50%',
               transform: 'translateX(-50%)',
               fontSize: 10,
-              color: '#667eea',
+              color: 'white',
               whiteSpace: 'nowrap',
               fontWeight: 500,
+              backgroundColor: 'rgba(0,0,0,0.4)',
+              backdropFilter: 'blur(8px)',
+              padding: '4px 10px',
+              borderRadius: 6,
+              boxShadow: '0 2px 10px rgba(0,0,0,0.2)',
+              border: '1px solid rgba(255,255,255,0.1)',
             }}
           >
             Press Enter to save, Esc to cancel
@@ -347,12 +354,15 @@ export function DraggableText({
                 left: '50%',
                 transform: 'translateX(-50%)',
                 fontSize: 10,
-                color: '#667eea',
+                color: 'white',
                 whiteSpace: 'nowrap',
                 fontWeight: 500,
-                backgroundColor: 'rgba(255, 255, 255, 0.9)',
-                padding: '2px 8px',
-                borderRadius: 4,
+                backgroundColor: 'rgba(0,0,0,0.4)',
+                backdropFilter: 'blur(8px)',
+                padding: '4px 10px',
+                borderRadius: 6,
+                boxShadow: '0 2px 10px rgba(0,0,0,0.2)',
+                border: '1px solid rgba(255,255,255,0.1)',
               }}
             >
               Drag to move, double-click to edit

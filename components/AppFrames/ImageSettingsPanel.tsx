@@ -18,9 +18,9 @@ export interface ImageSettingsPanelProps {
   /** Callback when scale changes */
   onScaleChange: (value: number) => void;
   /** Callback when pan X changes */
-  onPanXChange: (value: number) => void;
+  onPanXChange: (value: number, persistent?: boolean) => void;
   /** Callback when pan Y changes */
-  onPanYChange: (value: number) => void;
+  onPanYChange: (value: number, persistent?: boolean) => void;
   /** Callback when image rotation changes */
   onRotationChange: (value: number) => void;
   /** Callback to reset all values to defaults */
@@ -200,9 +200,9 @@ export function ImageSettingsPanel({
           <PanControl
             panX={screenPanX}
             panY={screenPanY}
-            onPanChange={(newPanX, newPanY) => {
-              onPanXChange(newPanX);
-              onPanYChange(newPanY);
+            onPanChange={(newPanX: number, newPanY: number, p?: boolean) => {
+              onPanXChange(newPanX, p);
+              onPanYChange(newPanY, p);
             }}
           />
         </Box>

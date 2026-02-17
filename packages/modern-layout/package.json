@@ -1,6 +1,7 @@
 {
     "name": "@reactkits.dev/modern-layout",
     "version": "0.0.1",
+    "type": "module",
     "description": "Headless Modern Layout Shell for React 19 - Sidebars, Floating Panels, Performance-First",
     "license": "MIT",
     "repository": {

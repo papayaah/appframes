@@ -7,7 +7,7 @@ import { IconRefresh } from '@tabler/icons-react';
 interface PanControlProps {
   panX: number; // 0-100, 50 = centered
   panY: number; // 0-100, 50 = centered
-  onPanChange: (panX: number, panY: number) => void;
+  onPanChange: (panX: number, panY: number, persistent?: boolean) => void;
   onReset?: () => void;
 }
 
@@ -24,20 +24,21 @@ export function PanControl({
 }: PanControlProps) {
   const padRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [localDragPos, setLocalDragPos] = useState<{ x: number; y: number; panX: number; panY: number } | null>(null);
+  const padRectRef = useRef<DOMRect | null>(null);
 
   const hasChanges = Math.round(panX) !== 50 || Math.round(panY) !== 50;
 
   // Convert pan values (0-100) to indicator position on pad
   const getIndicatorPosition = () => {
+    if (localDragPos) return { x: localDragPos.x, y: localDragPos.y };
     const x = (panX / 100) * PAD_SIZE;
     const y = (panY / 100) * PAD_SIZE;
     return { x, y };
   };
 
   // Convert mouse position to pan values
-  const getPanFromPosition = (clientX: number, clientY: number) => {
-    if (!padRef.current) return { panX, panY };
-    const rect = padRef.current.getBoundingClientRect();
+  const getPanFromPosition = (clientX: number, clientY: number, rect: DOMRect) => {
     const relX = clientX - rect.left;
     const relY = clientY - rect.top;
 
@@ -45,40 +46,53 @@ export function PanControl({
     const clampedX = Math.max(0, Math.min(PAD_SIZE, relX));
     const clampedY = Math.max(0, Math.min(PAD_SIZE, relY));
 
-    // Convert to pan values (0-100)
-    const newPanX = Math.round((clampedX / PAD_SIZE) * 100);
-    const newPanY = Math.round((clampedY / PAD_SIZE) * 100);
+    // Convert to pan values (0-100, fractional for smoothness)
+    const newPanX = (clampedX / PAD_SIZE) * 100;
+    const newPanY = (clampedY / PAD_SIZE) * 100;
 
-    return { panX: newPanX, panY: newPanY };
+    return { panX: newPanX, panY: newPanY, padX: clampedX, padY: clampedY };
   };
 
   const handlePointerDown = useCallback((e: React.PointerEvent) => {
+    if (e.button !== 0) return;
+    if (!padRef.current) return;
+
     e.preventDefault();
     setIsDragging(true);
+    const rect = padRef.current.getBoundingClientRect();
+    padRectRef.current = rect;
     (e.target as HTMLElement).setPointerCapture(e.pointerId);
-    const { panX: newPanX, panY: newPanY } = getPanFromPosition(e.clientX, e.clientY);
-    onPanChange(newPanX, newPanY);
+
+    const { panX: newPanX, panY: newPanY, padX, padY } = getPanFromPosition(e.clientX, e.clientY, rect);
+    setLocalDragPos({ x: padX, y: padY, panX: newPanX, panY: newPanY });
+    onPanChange(newPanX, newPanY, false);
   }, [onPanChange]);
 
   const handlePointerMove = useCallback((e: React.PointerEvent) => {
-    if (!isDragging) return;
-    const { panX: newPanX, panY: newPanY } = getPanFromPosition(e.clientX, e.clientY);
-    onPanChange(newPanX, newPanY);
+    if (!isDragging || !padRectRef.current) return;
+    const { panX: newPanX, panY: newPanY, padX, padY } = getPanFromPosition(e.clientX, e.clientY, padRectRef.current);
+    setLocalDragPos({ x: padX, y: padY, panX: newPanX, panY: newPanY });
+    onPanChange(newPanX, newPanY, false);
   }, [isDragging, onPanChange]);
 
   const handlePointerUp = useCallback((e: React.PointerEvent) => {
+    if (isDragging && padRectRef.current) {
+      const { panX: newPanX, panY: newPanY } = getPanFromPosition(e.clientX, e.clientY, padRectRef.current);
+      onPanChange(newPanX, newPanY, true);
+    }
     setIsDragging(false);
+    setLocalDragPos(null);
+    padRectRef.current = null;
     (e.target as HTMLElement).releasePointerCapture(e.pointerId);
-  }, []);
+  }, [isDragging, onPanChange]);
 
   const indicatorPos = getIndicatorPosition();
+  const displayPanX = localDragPos ? localDragPos.panX : panX;
+  const displayPanY = localDragPos ? localDragPos.panY : panY;
 
   // Calculate the visual offset for the "image" representation
-  // When panX=0, image is shifted right (showing left edge)
-  // When panX=100, image is shifted left (showing right edge)
-  // When panX=50, image is centered
-  const imageOffsetX = (50 - panX) * 0.4; // Scale down for visual
-  const imageOffsetY = (50 - panY) * 0.4;
+  const imageOffsetX = (50 - displayPanX) * 0.4;
+  const imageOffsetY = (50 - displayPanY) * 0.4;
 
   return (
     <Box>
@@ -183,11 +197,11 @@ export function PanControl({
 
           {/* Value display */}
           <Group gap={8} justify="center" mt={4}>
-            <Text size="xs" c="dimmed">
-              X: {Math.round(panX)}
+            <Text size="xs" c="dimmed" style={{ fontVariantNumeric: 'tabular-nums', width: 40, textAlign: 'right' }}>
+              X: {Math.round(displayPanX)}
             </Text>
-            <Text size="xs" c="dimmed">
-              Y: {Math.round(panY)}
+            <Text size="xs" c="dimmed" style={{ fontVariantNumeric: 'tabular-nums', width: 40, textAlign: 'left' }}>
+              Y: {Math.round(displayPanY)}
             </Text>
           </Group>
         </Box>

@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState, useEffect } from 'react';
-import { ActionIcon, Box, Divider, Group, ScrollArea, Stack, Text, TextInput } from '@mantine/core';
+import { ActionIcon, Badge, Box, Divider, Group, ScrollArea, Stack, Text, TextInput } from '@mantine/core';
 import { IconCopy, IconEye, IconEyeOff, IconTrash } from '@tabler/icons-react';
 import { useFrames, getCompositionFrameCount } from './FramesContext';
 import type { DIYOptions } from './diy-frames/types';
@@ -67,9 +67,7 @@ export function LayersTab() {
   const commitRename = () => {
     if (!screen || !renamingId) return;
     const next = renameValue.trim();
-    if (next.length > 0) {
-      updateTextElement(screen.id, renamingId, { name: next });
-    }
+    updateTextElement(screen.id, renamingId, { name: next });
     setRenamingId(null);
   };
 
@@ -124,7 +122,14 @@ export function LayersTab() {
   return (
     <ScrollArea h="100%" offsetScrollbars>
       <Stack p="md" gap="md">
-        <Text fw={700}>Layers</Text>
+        <Group justify="space-between" align="center">
+          <Text fw={700}>Layers</Text>
+          {screen && (
+            <Badge variant="light" color="blue" size="sm" style={{ textTransform: 'none' }}>
+              {screen.name}
+            </Badge>
+          )}
+        </Group>
 
         {/* Background Section */}
         <Box>
@@ -150,14 +155,14 @@ export function LayersTab() {
                     width: 20,
                     height: 20,
                     borderRadius: 4,
-                    backgroundColor: screen.settings.backgroundColor === 'transparent' 
-                      ? 'transparent' 
+                    backgroundColor: screen.settings.backgroundColor === 'transparent'
+                      ? 'transparent'
                       : screen.settings.backgroundColor,
-                    border: screen.settings.backgroundColor === 'transparent' 
-                      ? '1px solid #E5E7EB' 
+                    border: screen.settings.backgroundColor === 'transparent'
+                      ? '1px solid #E5E7EB'
                       : 'none',
-                    backgroundImage: screen.settings.backgroundColor === 'transparent' 
-                      ? 'linear-gradient(45deg, #f0f0f0 25%, transparent 25%), linear-gradient(-45deg, #f0f0f0 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #f0f0f0 75%), linear-gradient(-45deg, transparent 75%, #f0f0f0 75%)' 
+                    backgroundImage: screen.settings.backgroundColor === 'transparent'
+                      ? 'linear-gradient(45deg, #f0f0f0 25%, transparent 25%), linear-gradient(-45deg, #f0f0f0 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #f0f0f0 75%), linear-gradient(-45deg, transparent 75%, #f0f0f0 75%)'
                       : 'none',
                     backgroundSize: screen.settings.backgroundColor === 'transparent' ? '8px 8px' : 'auto',
                     backgroundPosition: screen.settings.backgroundColor === 'transparent' ? '0 0, 0 4px, 4px -4px, -4px 0px' : 'auto',

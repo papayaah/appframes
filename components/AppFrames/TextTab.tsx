@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { ActionIcon, Box, Button, Divider, Group, ScrollArea, Stack, Text, TextInput } from '@mantine/core';
+import { ActionIcon, Badge, Box, Button, Divider, Group, ScrollArea, Stack, Text, TextInput } from '@mantine/core';
 import { IconArrowBarDown, IconArrowBarUp, IconCopy, IconEye, IconEyeOff, IconPlus, IconTrash } from '@tabler/icons-react';
 import { useFrames } from './FramesContext';
 
@@ -38,9 +38,7 @@ export function TextTab() {
   const commitRename = () => {
     if (!screen || !renamingId) return;
     const next = renameValue.trim();
-    if (next.length > 0) {
-      updateTextElement(screen.id, renamingId, { name: next });
-    }
+    updateTextElement(screen.id, renamingId, { name: next });
     setRenamingId(null);
   };
 
@@ -53,7 +51,14 @@ export function TextTab() {
     <ScrollArea h="100%" offsetScrollbars>
       <Stack p="md" gap="md">
         <Group justify="space-between" align="center">
-          <Text fw={700}>Text</Text>
+          <Group gap="xs" align="center">
+            <Text fw={700}>Text</Text>
+            {screen && (
+              <Badge variant="light" color="blue" size="sm" style={{ textTransform: 'none' }}>
+                {screen.name}
+              </Badge>
+            )}
+          </Group>
           <Group gap="xs">
             <Button
               size="xs"

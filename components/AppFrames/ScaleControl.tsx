@@ -10,7 +10,7 @@ interface ScaleControlProps {
   max?: number;
   defaultValue?: number;
   label?: string;
-  onScaleChange: (scale: number) => void;
+  onScaleChange: (scale: number, persistent?: boolean) => void;
   onReset?: () => void;
 }
 
@@ -31,7 +31,9 @@ export function ScaleControl({
   onReset,
 }: ScaleControlProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const padRectRef = useRef<DOMRect | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [localDragScale, setLocalDragScale] = useState<number | null>(null);
 
   const hasChanges = Math.round(scale) !== defaultValue;
 
@@ -43,13 +45,21 @@ export function ScaleControl({
 
   // Convert angle to scale value
   const getScaleFromAngle = (angle: number) => {
-    // Normalize angle to our arc range
-    let normalizedAngle = angle;
-    if (normalizedAngle < START_ANGLE) normalizedAngle += 360;
+    // 1. Calculate angle relative to START_ANGLE (0 to 360)
+    let relAngle = (angle - START_ANGLE + 360) % 360;
 
-    const normalized = (normalizedAngle - START_ANGLE) / ARC_SPAN;
-    const clamped = Math.max(0, Math.min(1, normalized));
-    return Math.round(min + clamped * (max - min));
+    // 2. Handle the dead zone (the gap between 270 and 360 relative degrees)
+    if (relAngle > ARC_SPAN) {
+      const deadZoneStart = ARC_SPAN;
+      const deadZoneEnd = 360;
+      const deadZoneMid = deadZoneStart + (deadZoneEnd - deadZoneStart) / 2;
+
+      // Snap to end if past midpoint, otherwise snap to start
+      relAngle = relAngle > deadZoneMid ? 0 : ARC_SPAN;
+    }
+
+    const normalized = relAngle / ARC_SPAN;
+    return Math.round(min + normalized * (max - min));
   };
 
   // Get knob position from angle
@@ -62,9 +72,7 @@ export function ScaleControl({
   };
 
   // Get angle from mouse position
-  const getAngleFromPosition = (clientX: number, clientY: number) => {
-    if (!containerRef.current) return getAngleFromScale(scale);
-    const rect = containerRef.current.getBoundingClientRect();
+  const getAngleFromPosition = (clientX: number, clientY: number, rect: DOMRect) => {
     const centerX = rect.left + SIZE / 2;
     const centerY = rect.top + SIZE / 2;
     const dx = clientX - centerX;
@@ -75,27 +83,43 @@ export function ScaleControl({
   };
 
   const handlePointerDown = useCallback((e: React.PointerEvent) => {
+    if (e.button !== 0) return;
+    if (!containerRef.current) return;
+
     e.preventDefault();
     setIsDragging(true);
+    const rect = containerRef.current.getBoundingClientRect();
+    padRectRef.current = rect;
     (e.target as HTMLElement).setPointerCapture(e.pointerId);
-    const angle = getAngleFromPosition(e.clientX, e.clientY);
+
+    const angle = getAngleFromPosition(e.clientX, e.clientY, rect);
     const newScale = getScaleFromAngle(angle);
-    onScaleChange(newScale);
+    setLocalDragScale(newScale);
+    onScaleChange(newScale, false);
   }, [onScaleChange, min, max]);
 
   const handlePointerMove = useCallback((e: React.PointerEvent) => {
-    if (!isDragging) return;
-    const angle = getAngleFromPosition(e.clientX, e.clientY);
+    if (!isDragging || !padRectRef.current) return;
+    const angle = getAngleFromPosition(e.clientX, e.clientY, padRectRef.current);
     const newScale = getScaleFromAngle(angle);
-    onScaleChange(newScale);
+    setLocalDragScale(newScale);
+    onScaleChange(newScale, false);
   }, [isDragging, onScaleChange, min, max]);
 
   const handlePointerUp = useCallback((e: React.PointerEvent) => {
+    if (isDragging && padRectRef.current) {
+      const angle = getAngleFromPosition(e.clientX, e.clientY, padRectRef.current);
+      const newScale = getScaleFromAngle(angle);
+      onScaleChange(newScale, true);
+    }
     setIsDragging(false);
+    setLocalDragScale(null);
+    padRectRef.current = null;
     (e.target as HTMLElement).releasePointerCapture(e.pointerId);
-  }, []);
+  }, [isDragging, onScaleChange, min, max]);
 
-  const currentAngle = getAngleFromScale(scale);
+  const displayScale = localDragScale !== null ? localDragScale : scale;
+  const currentAngle = getAngleFromScale(displayScale);
   const knobPos = getKnobPosition(currentAngle);
 
   // Calculate the visual scale for the device icon (normalized to reasonable visual range)
@@ -201,7 +225,7 @@ export function ScaleControl({
 
           {/* Value display */}
           <Text size="xs" c="dimmed" ta="center" mt={4}>
-            {Math.round(scale)}%
+            {Math.round(displayScale)}%
           </Text>
         </Box>
 

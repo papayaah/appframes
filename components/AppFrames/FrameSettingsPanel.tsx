@@ -43,11 +43,11 @@ export interface FrameSettingsPanelProps {
   /** Current frame rotation in degrees (-180 to 180) */
   frameRotation?: number;
   /** Callback when frame rotation changes */
-  onFrameRotationChange?: (rotation: number) => void;
+  onFrameRotationChange?: (rotation: number, persistent?: boolean) => void;
   /** Current frame scale percentage (20 to 500) */
   frameScale?: number;
   /** Callback when frame scale changes */
-  onFrameScaleChange?: (scale: number) => void;
+  onFrameScaleChange?: (scale: number, persistent?: boolean) => void;
   /** Current frame tiltX in degrees (-60 to 60) */
   frameTiltX?: number;
   /** Current frame tiltY in degrees (-60 to 60) */
@@ -59,7 +59,7 @@ export interface FrameSettingsPanelProps {
   /** Current frame Y position in pixels */
   frameY?: number;
   /** Callback when frame position changes */
-  onFramePositionChange?: (frameX: number, frameY: number) => void;
+  onFramePositionChange?: (frameX: number, frameY: number, persistent?: boolean) => void;
   /** Callback to reset frame transforms to defaults */
   onResetTransforms?: () => void;
   /** Current DIY options */

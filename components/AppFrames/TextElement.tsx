@@ -128,7 +128,7 @@ interface TextElementProps {
   element: TextElementModel;
   selected: boolean;
   disabled?: boolean;
-  onSelect: () => void;
+  onSelect: (e: React.MouseEvent) => void;
   onUpdate: (updates: Omit<Partial<TextElementModel>, 'style'> & { style?: Partial<TextStyle> }) => void;
   onDelete: () => void;
 }
@@ -239,11 +239,11 @@ export function TextElement({
     if (disabled) return;
     if (isEditableTarget(e.target)) return;
     e.stopPropagation();
-    onSelect();
+    onSelect(e);
   };
 
-  const enterEditMode = () => {
-    onSelect();
+  const enterEditMode = (e?: React.MouseEvent) => {
+    if (e) onSelect(e);
     setIsEditing(true);
     setEditText(element.content);
   };
@@ -254,7 +254,7 @@ export function TextElement({
     if (isEditableTarget(e.target)) return;
     // Always stop propagation so the canvas doesn't deselect between clicks
     e.stopPropagation();
-    onSelect();
+    onSelect(e);
     // Don't start a drag on the 2nd click (we'll treat it as a potential edit)
     if (e.detail >= 2) return;
 
@@ -337,7 +337,7 @@ export function TextElement({
     if (isEditing || isRotating || isDragging) return;
     e.preventDefault();
     e.stopPropagation();
-    onSelect();
+    onSelect(e);
 
     const el = rootRef.current;
     const parent = el?.parentElement;
@@ -493,7 +493,7 @@ export function TextElement({
     if (isEditing) return;
     e.preventDefault();
     e.stopPropagation();
-    onSelect();
+    onSelect(e);
 
     const rect = rootRef.current?.getBoundingClientRect();
     if (!rect) return;
@@ -549,9 +549,9 @@ export function TextElement({
             ? 'text'
             : isResizing
               ? 'ew-resize'
-            : isDragging
-              ? 'grabbing'
-              : 'grab',
+              : isDragging
+                ? 'grabbing'
+                : 'grab',
         userSelect: isEditing ? 'text' : 'none',
         pointerEvents: disabled ? 'none' : 'auto',
         zIndex: selected ? 1000 : (element.zIndex ?? 1) + 10,
@@ -574,7 +574,7 @@ export function TextElement({
         if (delta > 0 && delta < 320) {
           lastClickAtRef.current = 0;
           e.stopPropagation();
-          enterEditMode();
+          enterEditMode(e);
         }
       }}
       onClick={handleSelect}
@@ -582,7 +582,7 @@ export function TextElement({
         // Keep native dblclick too (when it does fire)
         if (disabled) return;
         e.stopPropagation();
-        enterEditMode();
+        enterEditMode(e);
       }}
       onMouseEnter={() => {
         if (disabled) return;
@@ -639,7 +639,7 @@ export function TextElement({
             <Box
               data-export-hide="true"
               style={{
-                fontSize: 11,
+                fontSize: 'calc(14px / var(--appframes-canvas-scale, 1))',
                 fontWeight: 600,
                 color: '#7950f2',
                 backgroundColor: 'rgba(255,255,255,0.95)',
@@ -715,8 +715,9 @@ export function TextElement({
             position: 'relative',
             padding: `max(var(--appframes-text-bg-padding), 4px)`,
             borderRadius: style.backgroundRadius || 8,
-            backgroundColor: 'rgba(255, 255, 255, 0.95)',
-            boxShadow: '0 0 0 2px #667eea, 0 4px 20px rgba(102, 126, 234, 0.3)',
+            backgroundColor: 'transparent',
+            backdropFilter: 'blur(4px)',
+            boxShadow: '0 0 0 1px rgba(102, 126, 234, 0.4), 0 4px 20px rgba(102, 126, 234, 0.2)',
           }}
         >
           <Textarea
@@ -757,18 +758,22 @@ export function TextElement({
             }}
           />
           <Box
+            data-export-hide="true"
             style={{
               position: 'absolute',
-              bottom: -24,
+              bottom: 'calc(-28px / var(--appframes-canvas-scale, 1))',
               left: '50%',
               transform: 'translateX(-50%)',
-              fontSize: 10,
-              color: '#667eea',
+              fontSize: 'calc(14px / var(--appframes-canvas-scale, 1))',
+              color: 'white',
               whiteSpace: 'nowrap',
               fontWeight: 500,
-              backgroundColor: 'rgba(255,255,255,0.9)',
-              padding: '2px 8px',
-              borderRadius: 4,
+              backgroundColor: 'rgba(0,0,0,0.4)',
+              backdropFilter: 'blur(8px)',
+              padding: '4px 10px',
+              borderRadius: 6,
+              boxShadow: '0 2px 10px rgba(0,0,0,0.2)',
+              border: '1px solid rgba(255,255,255,0.1)',
             }}
           >
             Press Enter to save, Esc to cancel
@@ -825,18 +830,22 @@ export function TextElement({
 
           {isHovered && !isDragging && !selected && (
             <Box
+              data-export-hide="true"
               style={{
                 position: 'absolute',
-                bottom: -24,
+                bottom: 'calc(-28px / var(--appframes-canvas-scale, 1))',
                 left: '50%',
                 transform: 'translateX(-50%)',
-                fontSize: 10,
-                color: '#667eea',
+                fontSize: 'calc(14px / var(--appframes-canvas-scale, 1))',
+                color: 'white',
                 whiteSpace: 'nowrap',
                 fontWeight: 500,
-                backgroundColor: 'rgba(255, 255, 255, 0.9)',
-                padding: '2px 8px',
-                borderRadius: 4,
+                backgroundColor: 'rgba(0,0,0,0.4)',
+                backdropFilter: 'blur(8px)',
+                padding: '4px 10px',
+                borderRadius: 6,
+                boxShadow: '0 2px 10px rgba(0,0,0,0.2)',
+                border: '1px solid rgba(255,255,255,0.1)',
               }}
             >
               Drag to move, double-click to edit

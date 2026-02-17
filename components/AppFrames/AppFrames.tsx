@@ -81,7 +81,7 @@ export function AppFrames() {
     clearFrameSlot,
     setFrameDIYOptions,
     setFramePan,
-    addFramePositionDelta,
+
     setFramePosition,
     setFrameScale,
     setFrameRotate,
@@ -796,25 +796,62 @@ export function AppFrames() {
                   selectedFrameIndex={selectedFrameIndex}
                   frameSelectionVisible={frameSelectionVisible}
                   sharedBackground={currentSharedBackground}
-                  onSelectFrame={(screenIndex, frameIndex) => {
+                  onSelectFrame={(screenIndex, frameIndex, e) => {
+                    // Promote screen to primary, or select exclusively if no modifier held
+                    const isMulti = e?.shiftKey || e?.metaKey || e?.ctrlKey;
+                    if (isMulti) {
+                      setSelectedScreenIndices((prev) => {
+                        if (prev.includes(screenIndex)) {
+                          // Already selected: move to end to make it primary
+                          return [...prev.filter((i) => i !== screenIndex), screenIndex];
+                        } else {
+                          // Add to multi-selection
+                          return [...prev, screenIndex];
+                        }
+                      });
+                    } else if (!selectedScreenIndices.includes(screenIndex) || selectedScreenIndices.length > 1) {
+                      // Note: if user is just clicking a frame on an already-multi-selected screen without shift,
+                      // we keep the multi-selection but promote this screen to primary.
+                      // This feels more natural than dropping the whole multi-selection just by clicking a frame.
+                      setSelectedScreenIndices((prev) => {
+                        if (prev.includes(screenIndex)) {
+                          return [...prev.filter((i) => i !== screenIndex), screenIndex];
+                        }
+                        return [screenIndex];
+                      });
+                    }
+
                     // Track which screen the selected frame belongs to (for floating panels)
-                    // This doesn't change the canvas order - just tracks where the frame is
                     setActiveFrameScreenIndex(screenIndex);
                     setSelectedFrameIndex(frameIndex);
                     setFrameSelectionVisible(true);
                     setCanvasSelected(false);
-                    // Frame interactions stop propagation (for smooth drag/pan), so make sure
-                    // selecting a frame explicitly clears any selected text element.
+                    // Frame interactions stop propagation, so clear text selection manually
                     selectTextElement(null);
                   }}
                   onSelectScreen={handleScreenSelect}
                   zoom={zoom}
                   onZoomChange={setZoom}
-                  onSelectTextElement={(screenIndex, textId) => {
-                    // Allow text selection on any selected screen
-                    if (!selectedScreenIndices.includes(screenIndex)) return;
+                  onSelectTextElement={(screenIndex, textId, e) => {
+                    // Promote screen to primary when text on it is selected
+                    const isMulti = e?.shiftKey || e?.metaKey || e?.ctrlKey;
+                    if (isMulti) {
+                      setSelectedScreenIndices((prev) => {
+                        if (prev.includes(screenIndex)) {
+                          return [...prev.filter((i) => i !== screenIndex), screenIndex];
+                        }
+                        return [...prev, screenIndex];
+                      });
+                    } else {
+                      // Primary interaction: if already selected, just promote; if not, select exclusively
+                      setSelectedScreenIndices((prev) => {
+                        if (prev.includes(screenIndex)) {
+                          return [...prev.filter((i) => i !== screenIndex), screenIndex];
+                        }
+                        return [screenIndex];
+                      });
+                    }
                     selectTextElementOnScreen(screenIndex, textId);
-                    // Removed auto-activation of text tab for performance
                   }}
                   onUpdateTextElement={(screenIndex, textId, updates) => {
                     const screen = screens[screenIndex];
@@ -950,17 +987,17 @@ export function AppFrames() {
                       });
                     }
                   }}
-                  onPanChange={(screenIndex, frameIndex, panX, panY) => {
-                    setFramePan(screenIndex, frameIndex, panX, panY);
+                  onPanChange={(screenIndex, frameIndex, panX, panY, p) => {
+                    setFramePan(screenIndex, frameIndex, panX, panY, p);
                   }}
-                  onFramePositionChange={(screenIndex, frameIndex, frameX, frameY) => {
-                    addFramePositionDelta(screenIndex, frameIndex, frameX, frameY);
+                  onFramePositionChange={(screenIndex, frameIndex, frameX, frameY, p) => {
+                    setFramePosition(screenIndex, frameIndex, frameX, frameY, p);
                   }}
-                  onFrameScaleChange={(screenIndex, frameIndex, frameScale) => {
-                    setFrameScale(screenIndex, frameIndex, clampFrameTransform(frameScale, 'frameScale'));
+                  onFrameScaleChange={(screenIndex, frameIndex, frameScale, p) => {
+                    setFrameScale(screenIndex, frameIndex, clampFrameTransform(frameScale, 'frameScale'), p);
                   }}
-                  onFrameRotateChange={(screenIndex, frameIndex, rotateZ) => {
-                    setFrameRotate(screenIndex, frameIndex, clampFrameTransform(rotateZ, 'rotateZ'));
+                  onFrameRotateChange={(screenIndex, frameIndex, rotateZ, p) => {
+                    setFrameRotate(screenIndex, frameIndex, clampFrameTransform(rotateZ, 'rotateZ'), p);
                   }}
                   onMediaSelect={(screenIndex, frameIndex, mediaId) => {
                     replaceScreen(screenIndex, mediaId, frameIndex);
@@ -1033,13 +1070,13 @@ export function AppFrames() {
                   if (!currentScreen) return;
                   setSettings({ ...settings, screenScale: value });
                 },
-                onPanXChange: (value) => {
+                onPanXChange: (value, p) => {
                   if (selectedFrameIndex === null || selectedFrameIndex === undefined) return;
-                  setFramePan(activeFrameScreenIndex, selectedFrameIndex, value, currentFrameData?.panY ?? 50);
+                  setFramePan(activeFrameScreenIndex, selectedFrameIndex, value, currentFrameData?.panY ?? 50, p);
                 },
-                onPanYChange: (value) => {
+                onPanYChange: (value, p) => {
                   if (selectedFrameIndex === null || selectedFrameIndex === undefined) return;
-                  setFramePan(activeFrameScreenIndex, selectedFrameIndex, currentFrameData?.panX ?? 50, value);
+                  setFramePan(activeFrameScreenIndex, selectedFrameIndex, currentFrameData?.panX ?? 50, value, p);
                 },
                 onRotationChange: (value) => {
                   if (selectedFrameIndex === null || selectedFrameIndex === undefined) return;
@@ -1077,9 +1114,9 @@ export function AppFrames() {
                 },
                 frameX: currentFrameData?.frameX ?? 0,
                 frameY: currentFrameData?.frameY ?? 0,
-                onFramePositionChange: (frameX, frameY) => {
+                onFramePositionChange: (frameX, frameY, p) => {
                   if (selectedFrameIndex === null || selectedFrameIndex === undefined) return;
-                  setFramePosition(activeFrameScreenIndex, selectedFrameIndex, frameX, frameY);
+                  setFramePosition(activeFrameScreenIndex, selectedFrameIndex, frameX, frameY, p);
                 },
                 onResetTransforms: () => {
                   if (selectedFrameIndex === null || selectedFrameIndex === undefined) return;

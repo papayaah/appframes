@@ -17,15 +17,15 @@ interface CompositionRendererProps {
   // Scale applied by the outer canvas (e.g. zoom). Used to normalize drag deltas.
   viewportScale?: number;
   disableCrossCanvasDrag?: boolean;
-  onPanChange?: (frameIndex: number, panX: number, panY: number) => void;
-  onFramePositionChange?: (frameIndex: number, frameX: number, frameY: number) => void;
-  onFrameScaleChange?: (frameIndex: number, frameScale: number) => void;
-  onFrameRotateChange?: (frameIndex: number, rotateZ: number) => void;
+  onPanChange?: (frameIndex: number, panX: number, panY: number, persistent?: boolean) => void;
+  onFramePositionChange?: (frameIndex: number, frameX: number, frameY: number, persistent?: boolean) => void;
+  onFrameScaleChange?: (frameIndex: number, frameScale: number, persistent?: boolean) => void;
+  onFrameRotateChange?: (frameIndex: number, rotateZ: number, persistent?: boolean) => void;
   hoveredFrameIndex?: number | null;
   onFrameHover?: (index: number | null) => void;
   dragFileCount?: number;
   selectedFrameIndex?: number;
-  onSelectFrame?: (index: number) => void;
+  onSelectFrame?: (index: number, e: React.MouseEvent) => void;
   onMediaSelect?: (frameIndex: number, mediaId: number) => void;
   onPexelsSelect?: (frameIndex: number, url: string) => void;
 }
@@ -57,6 +57,7 @@ const buildFrameTransform = (args: {
   const positionTransform = `translate(${args.frameX}px, ${args.frameY}px)`;
   const scaleTransform = `scale(${BASE_COMPOSITION_SCALE * (args.frameScale / 100)})`;
   const rotationTransform = `rotateX(${args.tiltX}deg) rotateY(${args.tiltY}deg) rotateZ(${args.rotateZ}deg)`;
+  // Apply position AFTER baseTransform (which usually centers)
   return `${args.baseTransform} ${positionTransform} ${scaleTransform} ${rotationTransform}`.trim();
 };
 
@@ -97,8 +98,9 @@ const DraggableFrame = ({
   const { isLocked, isOwnerActive } = useInteractionLock();
   const [isHovered, setIsHovered] = useState(false);
   const [isChildFrameDragging, setIsChildFrameDragging] = useState(false);
-  const [childDragOffset, setChildDragOffset] = useState<{ x: number; y: number } | null>(null);
   const frameRef = useRef<HTMLDivElement | null>(null);
+  const glowRef = useRef<HTMLDivElement | null>(null);
+  const childDragOffsetRef = useRef<{ x: number; y: number } | null>(null);
   const rafRef = useRef<number | null>(null);
 
   // Preview values (avoid React re-render during drag)
@@ -242,11 +244,17 @@ const DraggableFrame = ({
 
     const onStart = () => setIsChildFrameDragging(true);
     const onMove = (e: CustomEvent<{ x: number; y: number }>) => {
-      setChildDragOffset(e.detail);
+      childDragOffsetRef.current = e.detail;
+      if (glowRef.current) {
+        glowRef.current.style.transform = `translate3d(${e.detail.x}px, ${e.detail.y}px, 0)`;
+      }
     };
     const onEnd = () => {
       setIsChildFrameDragging(false);
-      setChildDragOffset(null);
+      childDragOffsetRef.current = null;
+      if (glowRef.current) {
+        glowRef.current.style.transform = '';
+      }
     };
 
     el.addEventListener('appframes:framedragstart', onStart as EventListener);
@@ -266,6 +274,16 @@ const DraggableFrame = ({
       setIsHovered(false);
     }
   }, [gestureOwnerKey, isLocked, isOwnerActive]);
+
+  // Ensure manual transforms are reapplied if a render happens during drag
+  useEffect(() => {
+    if (isChildFrameDragging && childDragOffsetRef.current) {
+      const { x, y } = childDragOffsetRef.current;
+      if (glowRef.current) {
+        glowRef.current.style.transform = `translate3d(${x}px, ${y}px, 0)`;
+      }
+    }
+  }, [isChildFrameDragging]);
 
   // Build frame effects CSS using drop-shadow filter (follows frame shape, not wrapper box)
   const fx = frameEffects ?? DEFAULT_FRAME_EFFECTS;
@@ -334,6 +352,7 @@ const DraggableFrame = ({
       )}
       {(isHovered || isSelected) && (
         <Box
+          ref={glowRef}
           data-export-hide="true"
           className={isSelected ? 'frame-selection-glow' : undefined}
           style={{
@@ -344,7 +363,6 @@ const DraggableFrame = ({
             opacity: isSelected ? 1 : 0.5,
             pointerEvents: 'none',
             transition: 'border 0.15s ease, box-shadow 0.15s ease, inset 0.15s ease',
-            transform: childDragOffset ? `translate3d(${childDragOffset.x}px, ${childDragOffset.y}px, 0)` : undefined,
           }}
         />
       )}
@@ -433,6 +451,7 @@ export function CompositionRenderer({
       // The base size for layout (single/dual/stack/etc). Per-frame resizing is applied via wrapper transforms.
       scale: scaleMultiplier,
       viewportScale,
+      baseRotateZ,
       dragRotateZ: baseRotateZ + rotateZ,
       dragScale: BASE_COMPOSITION_SCALE * (frameScale / 100),
       dragTiltX: tiltX,
@@ -444,14 +463,17 @@ export function CompositionRenderer({
       frameIndex: index,
       isHighlighted: highlightedFrames.includes(index),
       isSelected: selectedFrameIndex === index,
-      onClick: () => onSelectFrame?.(index),
+      onClick: (e: React.MouseEvent) => onSelectFrame?.(index, e),
       onDragOver: () => onFrameHover?.(index),
       onDragLeave: () => onFrameHover?.(null),
       onMediaSelect: (mediaId: number) => onMediaSelect?.(index, mediaId),
       onPexelsSelect: (url: string) => onPexelsSelect?.(index, url),
-      onPanChange: (x: number, y: number) => onPanChange?.(index, x, y),
-      onFramePositionChange: (x: number, y: number) => onFramePositionChange?.(index, x, y),
-      onFrameMove: (dx: number, dy: number) => onFramePositionChange?.(index, dx, dy),
+      onPanChange: (x: number, y: number, persistent?: boolean) => onPanChange?.(index, x, y, persistent),
+      onFramePositionChange: (x: number, y: number, persistent?: boolean) => onFramePositionChange?.(index, x, y, persistent),
+      onFrameMove: (dx: number, dy: number) => {
+        const { frameX, frameY } = getFrameOffset(index);
+        onFramePositionChange?.(index, frameX + dx, frameY + dy, true);
+      },
       frameY: handlePosition,
       frameColor: images[index]?.frameColor,
       imageRotation: images[index]?.imageRotation ?? 0,

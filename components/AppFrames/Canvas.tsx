@@ -20,17 +20,17 @@ interface CanvasProps {
   selectedFrameIndex?: number;
   frameSelectionVisible?: boolean;
   sharedBackground?: SharedBackground;
-  onSelectFrame?: (screenIndex: number, frameIndex: number) => void;
+  onSelectFrame?: (screenIndex: number, frameIndex: number, e?: React.MouseEvent) => void;
   onSelectScreen?: (index: number, multi: boolean) => void;
   onReplaceScreen?: (files: File[], targetFrameIndex?: number, screenIndex?: number) => void;
-  onPanChange?: (screenIndex: number, frameIndex: number, panX: number, panY: number) => void;
-  onFramePositionChange?: (screenIndex: number, frameIndex: number, frameX: number, frameY: number) => void;
-  onFrameScaleChange?: (screenIndex: number, frameIndex: number, frameScale: number) => void;
-  onFrameRotateChange?: (screenIndex: number, frameIndex: number, rotateZ: number) => void;
+  onPanChange?: (screenIndex: number, frameIndex: number, panX: number, panY: number, persistent?: boolean) => void;
+  onFramePositionChange?: (screenIndex: number, frameIndex: number, frameX: number, frameY: number, persistent?: boolean) => void;
+  onFrameScaleChange?: (screenIndex: number, frameIndex: number, frameScale: number, persistent?: boolean) => void;
+  onFrameRotateChange?: (screenIndex: number, frameIndex: number, rotateZ: number, persistent?: boolean) => void;
   onMediaSelect?: (screenIndex: number, frameIndex: number, mediaId: number) => void;
   onCanvasBackgroundMediaSelect?: (screenIndex: number, mediaId: number) => void;
   onPexelsSelect?: (screenIndex: number, frameIndex: number, url: string) => void;
-  onSelectTextElement?: (screenIndex: number, textId: string | null) => void;
+  onSelectTextElement?: (screenIndex: number, textId: string | null, e?: React.MouseEvent) => void;
   onUpdateTextElement?: (screenIndex: number, textId: string, updates: any) => void;
   onDeleteTextElement?: (screenIndex: number, textId: string) => void;
   onClickCanvas?: (screenIndex: number) => void;
@@ -420,9 +420,15 @@ export function Canvas({
                     maxWidth: aspectRatio > 1 ? '90%' : '100%',
                     aspectRatio: `${aspectRatio}`,
                     position: 'relative',
-                    boxShadow: '0 10px 40px rgba(0,0,0,0.15)',
+                    boxShadow: selectedScreenIndices.length > 1
+                      ? (isPrimaryScreen
+                        ? '0 0 60px rgba(102, 126, 234, 0.5), 0 20px 50px rgba(0,0,0,0.25)'
+                        : '0 0 30px rgba(102, 126, 234, 0.2), 0 10px 40px rgba(0,0,0,0.15)')
+                      : '0 10px 40px rgba(0,0,0,0.15)',
                     borderRadius: 8,
                     overflow: 'hidden',
+                    transition: 'all 0.2s ease',
+                    zIndex: isPrimaryScreen ? 1 : 0,
                   }}
                   onMouseDown={(e) => {
                     const target = e.target as HTMLElement;
@@ -440,6 +446,7 @@ export function Canvas({
                       height: designHeight,
                       transformOrigin: 'top left',
                       transform: `scale(${contentScale})`,
+                      ['--appframes-canvas-scale' as any]: contentScale,
                       pointerEvents: 'none',
                     }}
                   >
@@ -502,15 +509,15 @@ export function Canvas({
                           screenIndex={screenIndex}
                           // Important: normalize coordinates by BOTH zoom and design scale
                           viewportScale={(zoom / 100) * contentScale}
-                          onPanChange={(fi, x, y) => onPanChange?.(screenIndex, fi, x, y)}
-                          onFramePositionChange={(fi, x, y) => onFramePositionChange?.(screenIndex, fi, x, y)}
-                          onFrameScaleChange={(fi, s) => onFrameScaleChange?.(screenIndex, fi, s)}
-                          onFrameRotateChange={(fi, r) => onFrameRotateChange?.(screenIndex, fi, r)}
+                          onPanChange={(fi, x, y, p) => onPanChange?.(screenIndex, fi, x, y, p)}
+                          onFramePositionChange={(fi, x, y, p) => onFramePositionChange?.(screenIndex, fi, x, y, p)}
+                          onFrameScaleChange={(fi, s, p) => onFrameScaleChange?.(screenIndex, fi, s, p)}
+                          onFrameRotateChange={(fi, r, p) => onFrameRotateChange?.(screenIndex, fi, r, p)}
                           hoveredFrameIndex={hoveredScreenIndex === screenIndex ? hoveredFrameIndex : null}
                           onFrameHover={setHoveredFrameIndex}
                           dragFileCount={dragFileCount}
                           selectedFrameIndex={effSelectedFrameIndex}
-                          onSelectFrame={(fi) => onSelectFrame?.(screenIndex, fi)}
+                          onSelectFrame={(frameIndex, e) => onSelectFrame?.(screenIndex, frameIndex, e)}
                           onMediaSelect={(fi, mid) => onMediaSelect?.(screenIndex, fi, mid)}
                           onPexelsSelect={(fi, url) => onPexelsSelect?.(screenIndex, fi, url)}
                         />
@@ -523,7 +530,7 @@ export function Canvas({
                             key={t.id}
                             element={t}
                             selected={screenSettings.selectedTextId === t.id}
-                            onSelect={() => onSelectTextElement?.(screenIndex, t.id)}
+                            onSelect={(e) => onSelectTextElement?.(screenIndex, t.id, e)}
                             onUpdate={(u) => onUpdateTextElement?.(screenIndex, t.id, u)}
                             onDelete={() => onDeleteTextElement?.(screenIndex, t.id)}
                           />

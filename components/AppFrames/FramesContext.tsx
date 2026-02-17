@@ -175,15 +175,16 @@ const getMaxZIndex = (existing: TextElement[]) =>
 
 const createDefaultTextElement = (existing: TextElement[], overrides?: Partial<TextElement>): TextElement => {
   const z = getMaxZIndex(existing) + 1;
+  const content = overrides?.content ?? 'Double-click to edit';
   return {
     id: createId('text'),
-    content: 'Double-click to edit',
+    content,
     x: 50,
     y: 20, // On top of canvas (was 50 = center)
     rotation: 0,
     style: { ...DEFAULT_TEXT_STYLE },
     visible: true,
-    name: getNextTextName(existing),
+    name: overrides?.name ?? content,
     zIndex: z,
     ...overrides,
   };
@@ -289,11 +290,11 @@ interface FramesContextType {
   setCanvasBackgroundMedia: (screenIndex: number, mediaId: number | undefined) => void;
   clearFrameSlot: (screenIndex: number, frameIndex: number) => void;
   setFrameDIYOptions: (screenIndex: number, frameIndex: number, options: DIYOptions, templateId?: string) => void;
-  setFramePan: (screenIndex: number, frameIndex: number, panX: number, panY: number) => void;
-  addFramePositionDelta: (screenIndex: number, frameIndex: number, dx: number, dy: number) => void;
-  setFramePosition: (screenIndex: number, frameIndex: number, frameX: number, frameY: number) => void;
-  setFrameScale: (screenIndex: number, frameIndex: number, frameScale: number) => void;
-  setFrameRotate: (screenIndex: number, frameIndex: number, rotateZ: number) => void;
+  setFramePan: (screenIndex: number, frameIndex: number, panX: number, panY: number, persistent?: boolean) => void;
+
+  setFramePosition: (screenIndex: number, frameIndex: number, frameX: number, frameY: number, persistent?: boolean) => void;
+  setFrameScale: (screenIndex: number, frameIndex: number, frameScale: number, persistent?: boolean) => void;
+  setFrameRotate: (screenIndex: number, frameIndex: number, rotateZ: number, persistent?: boolean) => void;
   setFrameTilt: (screenIndex: number, frameIndex: number, tiltX: number, tiltY: number) => void;
   setFrameColor: (screenIndex: number, frameIndex: number, frameColor: string | undefined) => void;
   setFrameEffects: (screenIndex: number, frameIndex: number, frameEffects: FrameEffects) => void;
@@ -370,11 +371,13 @@ export function FramesProvider({ children }: { children: ReactNode }) {
 
   const [currentCanvasSize, setCurrentCanvasSize] = useState<string>('iphone-6.9');
   const currentCanvasSizeRef = useRef<string>('iphone-6.9');
+  const primarySelectedIndexRef = useRef<number>(0);
   const projectCreatedAt = useRef<Date>(new Date());
   // Tracks if project is pristine (untouched) - used to skip syncing on sign-in
   const projectPristine = useRef<boolean>(true);
-  // Tracks first content save after load to avoid marking pristine=false on initial render
   const hasCompletedFirstContentSave = useRef<boolean>(false);
+  // Placeholder lines for move
+
 
   // Sidebar state
   const [sidebarTab, setSidebarTab] = useState<string>('layout');
@@ -453,10 +456,19 @@ export function FramesProvider({ children }: { children: ReactNode }) {
   });
 
   // Primary selected screen is the last one in the selection list (most recently selected)
-  const primarySelectedIndex = selectedScreenIndices.length > 0
-    ? selectedScreenIndices[selectedScreenIndices.length - 1]
-    : 0;
+  const primarySelectedIndex = useMemo(() => {
+    if (selectedScreenIndices.length === 0) return 0;
+    return selectedScreenIndices[selectedScreenIndices.length - 1];
+  }, [selectedScreenIndices]);
 
+  // Keep refs in sync for callbacks
+  useEffect(() => {
+    currentCanvasSizeRef.current = currentCanvasSize;
+  }, [currentCanvasSize]);
+
+  useEffect(() => {
+    primarySelectedIndexRef.current = primarySelectedIndex;
+  }, [primarySelectedIndex]);
   // Get current screen's settings (computed from primary selected screen)
   const currentScreen = screens[primarySelectedIndex];
   const settings: CanvasSettings = currentScreen
@@ -476,6 +488,14 @@ export function FramesProvider({ children }: { children: ReactNode }) {
       draft.screensByCanvasSize[size] = nextScreens;
     });
   }, [commitDoc]);
+
+  const mutateCurrentScreens = useCallback((updater: (screensDraft: Screen[]) => void) => {
+    mutateDoc((draft) => {
+      const size = currentCanvasSizeRef.current;
+      if (!draft.screensByCanvasSize[size]) draft.screensByCanvasSize[size] = [];
+      updater(draft.screensByCanvasSize[size]!);
+    });
+  }, [mutateDoc]);
 
   const commitCurrentScreens = useCallback((label: string, updater: (screensDraft: Screen[]) => void) => {
     commitDoc(label, (draft) => {
@@ -838,7 +858,7 @@ export function FramesProvider({ children }: { children: ReactNode }) {
       }
 
       if (typeof updates.visible === 'boolean' && hasOnly(['visible'])) return updates.visible ? 'Show text' : 'Hide text';
-      if (typeof updates.name === 'string' && hasOnly(['name'])) return 'Rename text';
+      if (updates.name !== undefined && hasOnly(['name'])) return 'Rename text';
 
       return 'Edit text';
     };
@@ -850,9 +870,37 @@ export function FramesProvider({ children }: { children: ReactNode }) {
       const idx = els.findIndex((t) => t.id === textId);
       if (idx === -1) return;
       const t = els[idx];
+
+      const newContent = typeof updates.content === 'string' ? updates.content : t.content;
+      const newName = typeof updates.name === 'string' ? updates.name : t.name;
+
+      // Check if they were previously in a "synced" state:
+      // - They exactly match
+      // - The name is a default one (Text X, Double-click...)
+      // - The name is missing/empty
+      const isCurrentlySynced = /^(Text|Double-click to edit)(\s+\d+)?$/i.test(t.name) || t.name === t.content || !t.name;
+
+      let finalContent = newContent;
+      let finalName = newName;
+
+      if (updates.content !== undefined && isCurrentlySynced) {
+        // Content changed, and we were syncing -> Update name to match
+        finalName = updates.content;
+      } else if (updates.name !== undefined && isCurrentlySynced) {
+        // Name changed, and we were syncing -> Update content to match
+        finalContent = updates.name;
+      }
+
+      // Special case: if name is explicitly cleared, snap it to content to resume syncing
+      if (updates.name === '') {
+        finalName = finalContent;
+      }
+
       els[idx] = {
         ...t,
         ...updates,
+        content: finalContent,
+        name: finalName,
         x: typeof updates.x === 'number' ? clamp01(updates.x) : t.x,
         y: typeof updates.y === 'number' ? clamp01(updates.y) : t.y,
         rotation: typeof updates.rotation === 'number' ? normalizeRotation(updates.rotation) : t.rotation,
@@ -888,42 +936,46 @@ export function FramesProvider({ children }: { children: ReactNode }) {
   }, [commitCurrentScreens]);
 
   const selectTextElement = useCallback((textId: string | null) => {
-    if (textId === null) {
-      // Clear selectedTextId on ALL screens (not just primary) for multi-select scenarios
-      mutateDoc((draft) => {
-        const size = currentCanvasSizeRef.current;
-        const list = draft.screensByCanvasSize[size] || [];
-        list.forEach((screen) => {
+    // When selecting text (even globally), we should clear selection on all other screens
+    // and all other canvas sizes to prevent multiple text handles appearing.
+    mutateDoc((draft) => {
+      Object.values(draft.screensByCanvasSize).forEach((screens) => {
+        screens.forEach((screen) => {
           if (screen.settings.selectedTextId) {
-            screen.settings = { ...screen.settings, selectedTextId: undefined };
+            screen.settings.selectedTextId = undefined;
           }
         });
       });
-    } else {
-      updateSelectedScreenSettings({ selectedTextId: textId });
-    }
-  }, [updateSelectedScreenSettings]);
+
+      if (textId !== null) {
+        const list = draft.screensByCanvasSize[currentCanvasSizeRef.current] || [];
+        const screen = list[primarySelectedIndexRef.current];
+        if (screen) {
+          screen.settings.selectedTextId = textId;
+        }
+      }
+    });
+  }, []);
 
   const selectTextElementOnScreen = useCallback((screenIndex: number, textId: string | null) => {
-    // Update a specific screen's selectedTextId (for multi-select scenarios)
-    // When selecting text on one screen, clear selection on all other screens
+    // When selecting text on one screen, clear selection on ALL screens across ALL sizes
     mutateDoc((draft) => {
-      const size = currentCanvasSizeRef.current;
-      const list = draft.screensByCanvasSize[size] || [];
-
-      // If selecting text (not clearing), clear selection on all other screens first
-      if (textId) {
-        list.forEach((screen, idx) => {
-          if (idx !== screenIndex && screen.settings.selectedTextId) {
-            screen.settings = { ...screen.settings, selectedTextId: undefined };
+      Object.values(draft.screensByCanvasSize).forEach((screens) => {
+        screens.forEach((screen) => {
+          if (screen.settings.selectedTextId) {
+            screen.settings.selectedTextId = undefined;
           }
         });
-      }
+      });
 
-      // Update the target screen's selection
-      const screen = list[screenIndex];
-      if (!screen) return;
-      screen.settings = { ...screen.settings, selectedTextId: textId ?? undefined };
+      if (textId) {
+        const size = currentCanvasSizeRef.current;
+        const list = draft.screensByCanvasSize[size] || [];
+        const screen = list[screenIndex];
+        if (screen) {
+          screen.settings.selectedTextId = textId;
+        }
+      }
     });
   }, []);
 
@@ -1030,57 +1082,55 @@ export function FramesProvider({ children }: { children: ReactNode }) {
     });
   }, [commitCurrentScreens]);
 
-  const setFramePan = useCallback((screenIndex: number, frameIndex: number, panX: number, panY: number) => {
-    commitCurrentScreens('Pan media', (list) => {
+  const setFramePan = useCallback((screenIndex: number, frameIndex: number, panX: number, panY: number, persistent = true) => {
+    const update = (list: Screen[]) => {
       const screen = list[screenIndex];
       if (!screen) return;
       if (!screen.images) screen.images = [];
       while (screen.images.length <= frameIndex) screen.images.push({});
       screen.images[frameIndex] = { ...(screen.images[frameIndex] || {}), panX, panY };
-    });
-  }, [commitCurrentScreens]);
+    };
+    if (persistent) commitCurrentScreens('Pan media', update);
+    else mutateCurrentScreens(update);
+  }, [commitCurrentScreens, mutateCurrentScreens]);
 
-  const addFramePositionDelta = useCallback((screenIndex: number, frameIndex: number, dx: number, dy: number) => {
-    commitCurrentScreens('Move frame', (list) => {
-      const screen = list[screenIndex];
-      if (!screen) return;
-      if (!screen.images) screen.images = [];
-      while (screen.images.length <= frameIndex) screen.images.push({});
-      const curX = screen.images[frameIndex]?.frameX ?? 0;
-      const curY = screen.images[frameIndex]?.frameY ?? 0;
-      screen.images[frameIndex] = { ...(screen.images[frameIndex] || {}), frameX: curX + dx, frameY: curY + dy };
-    });
-  }, [commitCurrentScreens]);
 
-  const setFramePosition = useCallback((screenIndex: number, frameIndex: number, frameX: number, frameY: number) => {
-    commitCurrentScreens('Move frame', (list) => {
+
+  const setFramePosition = useCallback((screenIndex: number, frameIndex: number, frameX: number, frameY: number, persistent = true) => {
+    const update = (list: Screen[]) => {
       const screen = list[screenIndex];
       if (!screen) return;
       if (!screen.images) screen.images = [];
       while (screen.images.length <= frameIndex) screen.images.push({});
       screen.images[frameIndex] = { ...(screen.images[frameIndex] || {}), frameX, frameY };
-    });
-  }, [commitCurrentScreens]);
+    };
+    if (persistent) commitCurrentScreens('Move frame', update);
+    else mutateCurrentScreens(update);
+  }, [commitCurrentScreens, mutateCurrentScreens]);
 
-  const setFrameScale = useCallback((screenIndex: number, frameIndex: number, frameScale: number) => {
-    commitCurrentScreens('Scale frame', (list) => {
+  const setFrameScale = useCallback((screenIndex: number, frameIndex: number, frameScale: number, persistent = true) => {
+    const update = (list: Screen[]) => {
       const screen = list[screenIndex];
       if (!screen) return;
       if (!screen.images) screen.images = [];
       while (screen.images.length <= frameIndex) screen.images.push({});
       screen.images[frameIndex] = { ...(screen.images[frameIndex] || {}), frameScale };
-    });
-  }, [commitCurrentScreens]);
+    };
+    if (persistent) commitCurrentScreens('Scale frame', update);
+    else mutateCurrentScreens(update);
+  }, [commitCurrentScreens, mutateCurrentScreens]);
 
-  const setFrameRotate = useCallback((screenIndex: number, frameIndex: number, rotateZ: number) => {
-    commitCurrentScreens('Rotate frame', (list) => {
+  const setFrameRotate = useCallback((screenIndex: number, frameIndex: number, rotateZ: number, persistent = true) => {
+    const update = (list: Screen[]) => {
       const screen = list[screenIndex];
       if (!screen) return;
       if (!screen.images) screen.images = [];
       while (screen.images.length <= frameIndex) screen.images.push({});
       screen.images[frameIndex] = { ...(screen.images[frameIndex] || {}), rotateZ };
-    });
-  }, [commitCurrentScreens]);
+    };
+    if (persistent) commitCurrentScreens('Rotate frame', update);
+    else mutateCurrentScreens(update);
+  }, [commitCurrentScreens, mutateCurrentScreens]);
 
   const setFrameTilt = useCallback((screenIndex: number, frameIndex: number, tiltX: number, tiltY: number) => {
     commitCurrentScreens('Tilt frame', (list) => {
@@ -2081,7 +2131,7 @@ export function FramesProvider({ children }: { children: ReactNode }) {
         clearFrameSlot,
         setFrameDIYOptions,
         setFramePan,
-        addFramePositionDelta,
+
         setFramePosition,
         setFrameScale,
         setFrameRotate,

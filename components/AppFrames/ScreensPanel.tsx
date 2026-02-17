@@ -382,6 +382,7 @@ export function ScreensPanel({
       <Group gap="md" align="flex-start" wrap="nowrap">
         {screens.map((screen, index) => {
           const isSelected = selectedIndices.includes(index);
+          const isPrimary = selectedIndices.length > 0 && selectedIndices[selectedIndices.length - 1] === index;
           const effectiveCanvasSize = canvasSize || screen.settings.canvasSize || 'iphone-6.5';
           const canvasDims = getCanvasDimensions(effectiveCanvasSize, screen.settings.orientation || 'portrait');
           const thumbAspectRatio = canvasDims.width / canvasDims.height;
@@ -404,13 +405,16 @@ export function ScreensPanel({
                   width: thumbWidth,
                   height: 80,
                   border: '2px solid',
-                  borderColor: isSelected ? '#667eea' : '#dee2e6',
+                  borderColor: isPrimary ? '#667eea' : (isSelected ? 'rgba(102, 126, 234, 0.5)' : '#dee2e6'),
                   borderRadius: 8,
                   overflow: 'hidden',
                   cursor: 'pointer',
                   backgroundColor: '#f8f9fa',
                   transition: 'all 0.2s',
-                  boxShadow: isSelected ? '0 4px 12px rgba(102, 126, 234, 0.3)' : 'none',
+                  boxShadow: isPrimary
+                    ? '0 0 15px rgba(102, 126, 234, 0.4), 0 4px 12px rgba(102, 126, 234, 0.2)'
+                    : (isSelected ? '0 2px 8px rgba(102, 126, 234, 0.1)' : 'none'),
+                  zIndex: isPrimary ? 2 : (isSelected ? 1 : 0),
                   outline:
                     dragOverIndex === index
                       ? '2px dashed rgba(102, 126, 234, 0.9)'

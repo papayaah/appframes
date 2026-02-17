@@ -868,9 +868,16 @@ export function Sidebar({ settings, setSettings, screens, sharedBackground, onSh
     <Stack gap="lg" style={{ overflow: 'auto', height: '100%', padding: '16px' }}>
       {/* Canvas Size */}
       <Box>
-        <Text size="xs" c="dimmed" mb="xs" tt="uppercase">
-          Canvas Size
-        </Text>
+        <Group justify="space-between" align="center" mb="xs">
+          <Text size="xs" c="dimmed" tt="uppercase">
+            Canvas Size
+          </Text>
+          {currentScreen && (
+            <Badge variant="light" color="blue" size="sm" style={{ textTransform: 'none' }}>
+              {currentScreen.name}
+            </Badge>
+          )}
+        </Group>
 
         {/* Store Tabs */}
         <Group gap={8} mb="sm">
@@ -1077,155 +1084,155 @@ export function Sidebar({ settings, setSettings, screens, sharedBackground, onSh
               </Group>
             </Box>
 
-              {/* Type Selector & Controls — shown once screens are selected */}
-              {sharedBackground && sharedBackground.screenIds.length > 0 && (
-                <>
-                  <Box>
-                    <Text size="sm" fw={600} mb="xs">Background Type</Text>
-                    <SegmentedControl fullWidth size="xs"
-                      value={sharedBackground.type}
-                      onChange={(v) => handleSharedTypeChange(v as 'gradient' | 'image')}
+            {/* Type Selector & Controls — shown once screens are selected */}
+            {sharedBackground && sharedBackground.screenIds.length > 0 && (
+              <>
+                <Box>
+                  <Text size="sm" fw={600} mb="xs">Background Type</Text>
+                  <SegmentedControl fullWidth size="xs"
+                    value={sharedBackground.type}
+                    onChange={(v) => handleSharedTypeChange(v as 'gradient' | 'image')}
+                    data={[
+                      { label: 'Gradient', value: 'gradient' },
+                      { label: 'Image', value: 'image' },
+                    ]}
+                  />
+                </Box>
+
+                {/* Gradient Controls */}
+                {sharedBackground.type === 'gradient' && sharedBackground.gradient && (
+                  <Stack gap="xs">
+                    <SharedGradientPreview gradient={sharedBackground.gradient} />
+                    <Select size="xs" label="Direction"
+                      value={sharedBackground.gradient.direction}
+                      onChange={handleDirectionChange}
                       data={[
-                        { label: 'Gradient', value: 'gradient' },
-                        { label: 'Image', value: 'image' },
+                        { value: 'horizontal', label: 'Horizontal (Left to Right)' },
+                        { value: 'vertical', label: 'Vertical (Top to Bottom)' },
+                        { value: 'diagonal-down', label: 'Diagonal (Top-Left to Bottom-Right)' },
+                        { value: 'diagonal-up', label: 'Diagonal (Bottom-Left to Top-Right)' },
                       ]}
                     />
-                  </Box>
+                    <Popover opened={sharedGradientOpen} onChange={setSharedGradientOpen} position="bottom" withArrow>
+                      <Popover.Target>
+                        <Button size="xs" variant="light" fullWidth onClick={() => setSharedGradientOpen(true)}>Edit Colors</Button>
+                      </Popover.Target>
+                      <Popover.Dropdown>
+                        <GradientEditor
+                          initialGradient={
+                            sharedBackground.gradient
+                              ? `linear-gradient(to right, ${sharedBackground.gradient.stops.map(s => `${s.color} ${s.position}%`).join(', ')})`
+                              : undefined
+                          }
+                          onApply={handleGradientApply}
+                          onCancel={() => setSharedGradientOpen(false)}
+                        />
+                      </Popover.Dropdown>
+                    </Popover>
+                  </Stack>
+                )}
 
-                  {/* Gradient Controls */}
-                  {sharedBackground.type === 'gradient' && sharedBackground.gradient && (
-                    <Stack gap="xs">
-                      <SharedGradientPreview gradient={sharedBackground.gradient} />
-                      <Select size="xs" label="Direction"
-                        value={sharedBackground.gradient.direction}
-                        onChange={handleDirectionChange}
-                        data={[
-                          { value: 'horizontal', label: 'Horizontal (Left to Right)' },
-                          { value: 'vertical', label: 'Vertical (Top to Bottom)' },
-                          { value: 'diagonal-down', label: 'Diagonal (Top-Left to Bottom-Right)' },
-                          { value: 'diagonal-up', label: 'Diagonal (Bottom-Left to Top-Right)' },
-                        ]}
-                      />
-                      <Popover opened={sharedGradientOpen} onChange={setSharedGradientOpen} position="bottom" withArrow>
+                {/* Image Controls */}
+                {sharedBackground.type === 'image' && (
+                  <Stack gap="xs">
+                    {sharedBackground.mediaId ? (
+                      <>
+                        <SharedImagePreview mediaId={sharedBackground.mediaId} />
+                        <Group grow>
+                          <Popover opened={imagePickerOpen} onChange={setImagePickerOpen} position="bottom" withArrow width={280}>
+                            <Popover.Target>
+                              <Button size="xs" variant="light" onClick={() => setImagePickerOpen(true)}>Change Image</Button>
+                            </Popover.Target>
+                            <Popover.Dropdown p={0}>
+                              <MediaLibraryProvider enableDragDrop={false}>
+                                <QuickMediaPicker onSelectMedia={handleSelectMedia} onClose={() => setImagePickerOpen(false)}
+                                  preset={quickPickerPreset} width={280} scrollHeight={200} maxItems={9} columns={3} gap="4px" />
+                              </MediaLibraryProvider>
+                            </Popover.Dropdown>
+                          </Popover>
+                          <Button size="xs" variant="light" color="red"
+                            onClick={() => onSharedBackgroundChange?.({ ...sharedBackground, mediaId: undefined })}>
+                            Remove
+                          </Button>
+                        </Group>
+                      </>
+                    ) : (
+                      <Popover opened={imagePickerOpen} onChange={setImagePickerOpen} position="bottom" withArrow width={280}>
                         <Popover.Target>
-                          <Button size="xs" variant="light" fullWidth onClick={() => setSharedGradientOpen(true)}>Edit Colors</Button>
+                          <Button size="xs" variant="light" fullWidth onClick={() => setImagePickerOpen(true)}>Select Image</Button>
                         </Popover.Target>
-                        <Popover.Dropdown>
-                          <GradientEditor
-                            initialGradient={
-                              sharedBackground.gradient
-                                ? `linear-gradient(to right, ${sharedBackground.gradient.stops.map(s => `${s.color} ${s.position}%`).join(', ')})`
-                                : undefined
-                            }
-                            onApply={handleGradientApply}
-                            onCancel={() => setSharedGradientOpen(false)}
-                          />
+                        <Popover.Dropdown p={0}>
+                          <MediaLibraryProvider enableDragDrop={false}>
+                            <QuickMediaPicker onSelectMedia={handleSelectMedia} onClose={() => setImagePickerOpen(false)}
+                              preset={quickPickerPreset} width={280} scrollHeight={200} maxItems={9} columns={3} gap="4px" />
+                          </MediaLibraryProvider>
                         </Popover.Dropdown>
                       </Popover>
-                    </Stack>
-                  )}
+                    )}
 
-                  {/* Image Controls */}
-                  {sharedBackground.type === 'image' && (
-                    <Stack gap="xs">
-                      {sharedBackground.mediaId ? (
-                        <>
-                          <SharedImagePreview mediaId={sharedBackground.mediaId} />
-                          <Group grow>
-                            <Popover opened={imagePickerOpen} onChange={setImagePickerOpen} position="bottom" withArrow width={280}>
-                              <Popover.Target>
-                                <Button size="xs" variant="light" onClick={() => setImagePickerOpen(true)}>Change Image</Button>
-                              </Popover.Target>
-                              <Popover.Dropdown p={0}>
-                                <MediaLibraryProvider enableDragDrop={false}>
-                                  <QuickMediaPicker onSelectMedia={handleSelectMedia} onClose={() => setImagePickerOpen(false)}
-                                    preset={quickPickerPreset} width={280} scrollHeight={200} maxItems={9} columns={3} gap="4px" />
-                                </MediaLibraryProvider>
-                              </Popover.Dropdown>
-                            </Popover>
-                            <Button size="xs" variant="light" color="red"
-                              onClick={() => onSharedBackgroundChange?.({ ...sharedBackground, mediaId: undefined })}>
-                              Remove
-                            </Button>
-                          </Group>
-                        </>
-                      ) : (
-                        <Popover opened={imagePickerOpen} onChange={setImagePickerOpen} position="bottom" withArrow width={280}>
-                          <Popover.Target>
-                            <Button size="xs" variant="light" fullWidth onClick={() => setImagePickerOpen(true)}>Select Image</Button>
-                          </Popover.Target>
-                          <Popover.Dropdown p={0}>
-                            <MediaLibraryProvider enableDragDrop={false}>
-                              <QuickMediaPicker onSelectMedia={handleSelectMedia} onClose={() => setImagePickerOpen(false)}
-                                preset={quickPickerPreset} width={280} scrollHeight={200} maxItems={9} columns={3} gap="4px" />
-                            </MediaLibraryProvider>
-                          </Popover.Dropdown>
-                        </Popover>
-                      )}
-
-                      <Group gap="md" align="flex-start" wrap="nowrap">
-                        {/* Fit Mode toggle */}
-                        <Box style={{ flex: 1 }}>
-                          <Text size="xs" c="dimmed" mb={4} tt="uppercase" ta="center">Fit Mode</Text>
-                          <SimpleGrid cols={2} spacing={4}>
-                            {([['fill', 'Fill'], ['fit', 'Fit']] as const).map(([value, label]) => {
-                              const isFill = value === 'fill';
-                              const selected = (sharedBackground.imageFit ?? 'fill') === value;
-                              return (
-                                <Box
-                                  key={value}
-                                  onClick={() => handleImageFitChange(value)}
-                                  style={{
-                                    border: '2px solid',
-                                    borderColor: selected ? '#228be6' : '#dee2e6',
-                                    borderRadius: 6,
-                                    padding: '6px 2px 4px',
-                                    cursor: 'pointer',
-                                    textAlign: 'center',
-                                    backgroundColor: selected ? '#e7f5ff' : 'white',
-                                    transition: 'all 0.2s',
-                                  }}
-                                >
-                                  <Box style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 24, marginBottom: 2 }}>
-                                    <Box style={{
-                                      position: 'relative', width: 28, height: 22,
-                                      border: '2px solid #495057', borderRadius: 2,
-                                      overflow: isFill ? 'hidden' : undefined,
-                                      display: isFill ? undefined : 'flex', alignItems: 'center', justifyContent: 'center',
-                                    }}>
-                                      {isFill ? (
-                                        <Box style={{ position: 'absolute', inset: -3, background: 'linear-gradient(135deg, #a8d8ea 0%, #aa96da 50%, #fcbad3 100%)' }} />
-                                      ) : (
-                                        <Box style={{ width: 14, height: 16, borderRadius: 1, background: 'linear-gradient(135deg, #a8d8ea 0%, #aa96da 50%, #fcbad3 100%)' }} />
-                                      )}
-                                    </Box>
+                    <Group gap="md" align="flex-start" wrap="nowrap">
+                      {/* Fit Mode toggle */}
+                      <Box style={{ flex: 1 }}>
+                        <Text size="xs" c="dimmed" mb={4} tt="uppercase" ta="center">Fit Mode</Text>
+                        <SimpleGrid cols={2} spacing={4}>
+                          {([['fill', 'Fill'], ['fit', 'Fit']] as const).map(([value, label]) => {
+                            const isFill = value === 'fill';
+                            const selected = (sharedBackground.imageFit ?? 'fill') === value;
+                            return (
+                              <Box
+                                key={value}
+                                onClick={() => handleImageFitChange(value)}
+                                style={{
+                                  border: '2px solid',
+                                  borderColor: selected ? '#228be6' : '#dee2e6',
+                                  borderRadius: 6,
+                                  padding: '6px 2px 4px',
+                                  cursor: 'pointer',
+                                  textAlign: 'center',
+                                  backgroundColor: selected ? '#e7f5ff' : 'white',
+                                  transition: 'all 0.2s',
+                                }}
+                              >
+                                <Box style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 24, marginBottom: 2 }}>
+                                  <Box style={{
+                                    position: 'relative', width: 28, height: 22,
+                                    border: '2px solid #495057', borderRadius: 2,
+                                    overflow: isFill ? 'hidden' : undefined,
+                                    display: isFill ? undefined : 'flex', alignItems: 'center', justifyContent: 'center',
+                                  }}>
+                                    {isFill ? (
+                                      <Box style={{ position: 'absolute', inset: -3, background: 'linear-gradient(135deg, #a8d8ea 0%, #aa96da 50%, #fcbad3 100%)' }} />
+                                    ) : (
+                                      <Box style={{ width: 14, height: 16, borderRadius: 1, background: 'linear-gradient(135deg, #a8d8ea 0%, #aa96da 50%, #fcbad3 100%)' }} />
+                                    )}
                                   </Box>
-                                  <Text size="xs" fw={500}>{label}</Text>
                                 </Box>
-                              );
-                            })}
-                          </SimpleGrid>
-                        </Box>
-                        {/* Alignment pad */}
-                        <AlignmentControl
-                          vertical={sharedBackground.imageVerticalAlign ?? 'center'}
-                          horizontal={sharedBackground.imageHorizontalAlign ?? 'center'}
-                          onVerticalChange={(v) => handleVerticalAlignChange(v)}
-                          onHorizontalChange={(h) => handleHorizontalAlignChange(h)}
-                        />
-                      </Group>
-                      {recommendedDimensions && (
-                        <Box style={{ backgroundColor: '#f1f3f5', borderRadius: 8, padding: '8px 12px' }}>
-                          <Text size="xs" c="dimmed">Recommended size: {recommendedDimensions.width} x {recommendedDimensions.height}px</Text>
-                          <Text size="xs" c="dimmed">Aspect ratio: {recommendedDimensions.aspectRatio}</Text>
-                        </Box>
-                      )}
-                    </Stack>
-                  )}
-                </>
-              )}
+                                <Text size="xs" fw={500}>{label}</Text>
+                              </Box>
+                            );
+                          })}
+                        </SimpleGrid>
+                      </Box>
+                      {/* Alignment pad */}
+                      <AlignmentControl
+                        vertical={sharedBackground.imageVerticalAlign ?? 'center'}
+                        horizontal={sharedBackground.imageHorizontalAlign ?? 'center'}
+                        onVerticalChange={(v) => handleVerticalAlignChange(v)}
+                        onHorizontalChange={(h) => handleHorizontalAlignChange(h)}
+                      />
+                    </Group>
+                    {recommendedDimensions && (
+                      <Box style={{ backgroundColor: '#f1f3f5', borderRadius: 8, padding: '8px 12px' }}>
+                        <Text size="xs" c="dimmed">Recommended size: {recommendedDimensions.width} x {recommendedDimensions.height}px</Text>
+                        <Text size="xs" c="dimmed">Aspect ratio: {recommendedDimensions.aspectRatio}</Text>
+                      </Box>
+                    )}
+                  </Stack>
+                )}
+              </>
+            )}
 
-            </Stack>
+          </Stack>
         </Box>
       )}
     </Stack>

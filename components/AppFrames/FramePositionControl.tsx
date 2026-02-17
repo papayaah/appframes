@@ -7,13 +7,13 @@ import { IconRefresh } from '@tabler/icons-react';
 interface FramePositionControlProps {
   frameX: number; // pixels, 0 = centered
   frameY: number; // pixels, 0 = centered
-  onPositionChange: (frameX: number, frameY: number) => void;
+  onPositionChange: (frameX: number, frameY: number, persistent?: boolean) => void;
   onReset?: () => void;
 }
 
 const PAD_SIZE = 100;
 const INDICATOR_SIZE = 14;
-const MAX_OFFSET = 200; // pixels - range will be -200 to +200
+const MAX_OFFSET = 2000; // pixels - range will be -2000 to +2000
 
 export function FramePositionControl({
   frameX,
@@ -23,12 +23,17 @@ export function FramePositionControl({
 }: FramePositionControlProps) {
   const padRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [localDragPos, setLocalDragPos] = useState<{ x: number; y: number; frameX: number; frameY: number } | null>(null);
+  const padRectRef = useRef<DOMRect | null>(null);
 
   const hasChanges = Math.round(frameX) !== 0 || Math.round(frameY) !== 0;
 
   // Convert frame position (pixels) to indicator position on pad
   // frameX/frameY of 0 = center of pad
   const getIndicatorPosition = () => {
+    // While dragging, use the local position for visual smoothness
+    if (localDragPos) return { x: localDragPos.x, y: localDragPos.y };
+
     const clampedX = Math.max(-MAX_OFFSET, Math.min(MAX_OFFSET, frameX));
     const clampedY = Math.max(-MAX_OFFSET, Math.min(MAX_OFFSET, frameY));
     const x = ((clampedX + MAX_OFFSET) / (MAX_OFFSET * 2)) * PAD_SIZE;
@@ -37,9 +42,7 @@ export function FramePositionControl({
   };
 
   // Convert mouse position to frame position (pixels)
-  const getPositionFromMouse = (clientX: number, clientY: number) => {
-    if (!padRef.current) return { frameX, frameY };
-    const rect = padRef.current.getBoundingClientRect();
+  const getPositionFromMouse = (clientX: number, clientY: number, rect: DOMRect) => {
     const relX = clientX - rect.left;
     const relY = clientY - rect.top;
 
@@ -47,33 +50,49 @@ export function FramePositionControl({
     const clampedX = Math.max(0, Math.min(PAD_SIZE, relX));
     const clampedY = Math.max(0, Math.min(PAD_SIZE, relY));
 
-    // Convert to frame position (pixels, -MAX_OFFSET to +MAX_OFFSET)
-    const newFrameX = Math.round((clampedX / PAD_SIZE) * MAX_OFFSET * 2 - MAX_OFFSET);
-    const newFrameY = Math.round((clampedY / PAD_SIZE) * MAX_OFFSET * 2 - MAX_OFFSET);
+    // Convert to frame position (pixels, -MAX_OFFSET to +MAX_OFFSET, fractional for smoothness)
+    const newFrameX = (clampedX / PAD_SIZE) * MAX_OFFSET * 2 - MAX_OFFSET;
+    const newFrameY = (clampedY / PAD_SIZE) * MAX_OFFSET * 2 - MAX_OFFSET;
 
-    return { frameX: newFrameX, frameY: newFrameY };
+    return { frameX: newFrameX, frameY: newFrameY, padX: clampedX, padY: clampedY };
   };
 
   const handlePointerDown = useCallback((e: React.PointerEvent) => {
+    if (e.button !== 0) return; // Only left click
+    if (!padRef.current) return;
+
     e.preventDefault();
     setIsDragging(true);
+    const rect = padRef.current.getBoundingClientRect();
+    padRectRef.current = rect;
     (e.target as HTMLElement).setPointerCapture(e.pointerId);
-    const { frameX: newX, frameY: newY } = getPositionFromMouse(e.clientX, e.clientY);
-    onPositionChange(newX, newY);
+
+    const { frameX: newX, frameY: newY, padX, padY } = getPositionFromMouse(e.clientX, e.clientY, rect);
+    setLocalDragPos({ x: padX, y: padY, frameX: newX, frameY: newY });
+    onPositionChange(newX, newY, false);
   }, [onPositionChange]);
 
   const handlePointerMove = useCallback((e: React.PointerEvent) => {
-    if (!isDragging) return;
-    const { frameX: newX, frameY: newY } = getPositionFromMouse(e.clientX, e.clientY);
-    onPositionChange(newX, newY);
+    if (!isDragging || !padRectRef.current) return;
+    const { frameX: newX, frameY: newY, padX, padY } = getPositionFromMouse(e.clientX, e.clientY, padRectRef.current);
+    setLocalDragPos({ x: padX, y: padY, frameX: newX, frameY: newY });
+    onPositionChange(newX, newY, false);
   }, [isDragging, onPositionChange]);
 
   const handlePointerUp = useCallback((e: React.PointerEvent) => {
+    if (isDragging && padRectRef.current) {
+      const { frameX: newX, frameY: newY } = getPositionFromMouse(e.clientX, e.clientY, padRectRef.current);
+      onPositionChange(newX, newY, true);
+    }
     setIsDragging(false);
+    setLocalDragPos(null);
+    padRectRef.current = null;
     (e.target as HTMLElement).releasePointerCapture(e.pointerId);
-  }, []);
+  }, [isDragging, onPositionChange]);
 
   const indicatorPos = getIndicatorPosition();
+  const displayFrameX = localDragPos ? localDragPos.frameX : frameX;
+  const displayFrameY = localDragPos ? localDragPos.frameY : frameY;
 
   return (
     <Box>
@@ -124,7 +143,7 @@ export function FramePositionControl({
                 position: 'absolute',
                 top: '50%',
                 left: '50%',
-                transform: `translate(calc(-50% + ${(frameX / MAX_OFFSET) * 25}px), calc(-50% + ${(frameY / MAX_OFFSET) * 25}px))`,
+                transform: `translate(calc(-50% + ${(displayFrameX / MAX_OFFSET) * 25}px), calc(-50% + ${(displayFrameY / MAX_OFFSET) * 25}px))`,
                 width: 24,
                 height: 36,
                 backgroundColor: '#228be6',
@@ -177,15 +196,17 @@ export function FramePositionControl({
             />
           </Box>
 
-          {/* Value display */}
-          <Group gap={8} justify="center" mt={4}>
-            <Text size="xs" c="dimmed">
-              X: {Math.round(frameX)}px
-            </Text>
-            <Text size="xs" c="dimmed">
-              Y: {Math.round(frameY)}px
-            </Text>
-          </Group>
+          {/* Value display - fixed height and width to prevent wiggling */}
+          <Box style={{ height: 20, marginTop: 4 }}>
+            <Group gap={4} justify="center" wrap="nowrap">
+              <Text size="xs" c="dimmed" style={{ fontVariantNumeric: 'tabular-nums', width: 65, textAlign: 'right' }}>
+                X: {Math.round(displayFrameX)}
+              </Text>
+              <Text size="xs" c="dimmed" style={{ fontVariantNumeric: 'tabular-nums', width: 65, textAlign: 'left' }}>
+                Y: {Math.round(displayFrameY)}
+              </Text>
+            </Group>
+          </Box>
         </Box>
 
         {/* Reset Button */}
