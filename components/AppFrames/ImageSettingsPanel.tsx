@@ -58,7 +58,7 @@ export function ImageSettingsPanel({
       {/* 2x2 Grid Layout */}
       <SimpleGrid cols={2} spacing="sm">
         {/* 1. Rotation Dial */}
-        <Box style={{ display: 'flex', justifyContent: 'center' }}>
+        <Box id="control-rotation" style={{ display: 'flex', justifyContent: 'center' }}>
           <RotationControl
             rotation={imageRotation}
             onRotationChange={onRotationChange}

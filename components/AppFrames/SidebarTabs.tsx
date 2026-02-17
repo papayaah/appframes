@@ -2,13 +2,14 @@
 
 import { useCallback, useRef, useState } from 'react';
 import { Box, Text, Stack, Select, Slider, Group, Tooltip, Button, Divider } from '@mantine/core';
-import { IconLayout, IconDeviceMobile, IconPhoto, IconTypography, IconSettings, IconStack } from '@tabler/icons-react';
+import { IconLayout, IconDeviceMobile, IconPhoto, IconTypography, IconSettings, IconStack, IconHelp } from '@tabler/icons-react';
 import { useAppStore } from '../../stores/useAppStore';
 import { Sidebar } from './Sidebar';
 import { DeviceTab } from './DeviceTab';
 import { TextTab } from './TextTab';
 import { LayersTab } from './LayersTab';
 import { MediaLibrary } from './MediaLibrary';
+import { HelpTab } from './HelpTab';
 import { CanvasSettings, SharedBackground, Screen } from './AppFrames';
 import type { BackgroundEffects } from './types';
 
@@ -31,7 +32,7 @@ interface SidebarTabsProps {
   onApplyEffectsToAll?: (effects: BackgroundEffects) => void;
 }
 
-type TabId = 'layout' | 'device' | 'text' | 'layers' | 'media' | 'settings';
+type TabId = 'layout' | 'device' | 'text' | 'layers' | 'media' | 'settings' | 'help';
 
 const tabs: { id: TabId; icon: typeof IconLayout; label: string }[] = [
   { id: 'layout', icon: IconLayout, label: 'Layout' },
@@ -40,6 +41,7 @@ const tabs: { id: TabId; icon: typeof IconLayout; label: string }[] = [
   { id: 'layers', icon: IconStack, label: 'Layers' },
   { id: 'media', icon: IconPhoto, label: 'Media' },
   { id: 'settings', icon: IconSettings, label: 'Settings' },
+  { id: 'help', icon: IconHelp, label: 'Help' },
 ];
 
 const TRANSITION = 'width 0.2s ease, min-width 0.2s ease, max-width 0.2s ease';
@@ -376,6 +378,8 @@ export function SidebarTabs({
             </Stack>
           </Box>
         );
+      case 'help':
+        return <HelpTab />;
     }
   };
 
@@ -403,8 +407,9 @@ export function SidebarTabs({
         {tabs.map(({ id, icon: Icon, label }) => {
           const isActive = activeTab === id;
           return (
-            <Tooltip key={id} label={label} position="right" withArrow>
+            <Tooltip key={id} id={`tab-${id}`} label={label} position="right" withArrow>
               <Box
+                id={`tab-${id}`}
                 onClick={() => handleTabClick(id)}
                 onMouseEnter={() => handleTabHover(id)}
                 onMouseLeave={handleTabLeave}

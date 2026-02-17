@@ -33,12 +33,15 @@ const TemplateCard = ({
   template,
   selected,
   onClick,
+  id,
 }: {
   template: (typeof DIY_TEMPLATES)[0];
   selected: boolean;
   onClick: () => void;
+  id?: string;
 }) => (
   <Box
+    id={id}
     onClick={onClick}
     style={{
       aspectRatio: '1',
@@ -249,6 +252,7 @@ export function DeviceTab() {
                 {templates.map((template) => (
                   <TemplateCard
                     key={template.id}
+                    id={`device-${template.id}`}
                     template={template}
                     selected={currentTemplateId === template.id}
                     onClick={() => handleTemplateSelect(template.id)}

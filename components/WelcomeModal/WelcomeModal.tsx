@@ -64,7 +64,7 @@ const features: FeatureItem[] = [
 ];
 
 export function WelcomeModal() {
-  const { welcomeModalDismissed, dismissWelcomeModal } = useAppStore();
+  const { welcomeModalDismissed, dismissWelcomeModal, startTutorial } = useAppStore();
   const [opened, setOpened] = useState(false);
   const [dontShowAgain, setDontShowAgain] = useState(false);
   const [ready, setReady] = useState(false);
@@ -97,6 +97,11 @@ export function WelcomeModal() {
       dismissWelcomeModal();
     }
     setOpened(false);
+  };
+
+  const handleStartTour = () => {
+    handleClose();
+    startTutorial();
   };
 
   // Don't render until store is hydrated
@@ -196,9 +201,14 @@ export function WelcomeModal() {
                 label: { color: 'var(--mantine-color-gray-4)' },
               }}
             />
-            <Button onClick={handleClose} variant="white" color="gray">
-              Get Started
-            </Button>
+            <Group>
+              <Button onClick={handleStartTour} variant="light" color="violet">
+                Take a Quick Tour
+              </Button>
+              <Button onClick={handleClose} variant="white" color="gray">
+                Get Started
+              </Button>
+            </Group>
           </Group>
         </Box>
       </Stack>

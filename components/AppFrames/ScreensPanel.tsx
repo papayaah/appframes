@@ -605,6 +605,7 @@ export function ScreensPanel({
 
         <Box style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0 }}>
           <Box
+            id="btn-add-screen"
             onClick={(e) => {
               e.preventDefault();
               e.stopPropagation();

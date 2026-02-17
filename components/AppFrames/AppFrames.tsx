@@ -12,6 +12,7 @@ import { MobileBottomNav, MOBILE_NAV_HEIGHT } from './MobileBottomNav';
 import { Canvas } from './Canvas';
 import { ScreensPanel } from './ScreensPanel';
 import { HistorySidebar } from './HistorySidebar';
+import { OnboardingTour } from './OnboardingTour';
 import { useFrames, getCanvasDimensions, getCanvasSizeLabel, getCompositionFrameCount } from './FramesContext';
 import { Screen, CanvasSettings, ScreenImage, AppFramesActions, clampFrameTransform, SharedBackground, TextElement } from './types';
 import { CrossCanvasDragProvider } from './CrossCanvasDragContext';
@@ -1199,6 +1200,7 @@ export function AppFrames() {
           )}
 
         </AppShell>
+        <OnboardingTour />
       </InteractionLockProvider>
     </CrossCanvasDragProvider>
   );
