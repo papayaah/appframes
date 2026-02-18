@@ -9,6 +9,7 @@ export function useFrameOperations(
     commitDoc: (label: string, updator: (draft: UndoableDoc) => void) => void,
     mutateDoc: (updator: (draft: UndoableDoc) => void) => void,
     currentCanvasSize: string,
+    primarySelectedIndex: number,
 ) {
 
     const commitCurrentScreens = useCallback((label: string, updater: (screensDraft: Screen[]) => void) => {
@@ -43,10 +44,9 @@ export function useFrameOperations(
         });
     }, [commitCurrentScreens]);
 
-    const addFrameSlot = useCallback((screenIndex: number) => {
+    const addFrameSlot = useCallback(() => {
         commitCurrentScreens('Add frame', (list) => {
-            const s = list[screenIndex];
-            // Note: primarySelectedIndex is handled by caller to pass correct screenIndex
+            const s = list[primarySelectedIndex];
             if (!s) return;
 
             const currentComposition = s.settings?.composition ?? 'single';
@@ -71,7 +71,7 @@ export function useFrameOperations(
             while (imgs.length < nextCount) imgs.push({ diyOptions: getDefaultDIYOptions('phone'), frameX: 0, frameY: 0 });
             s.images = imgs.slice(0, nextCount);
         });
-    }, [commitCurrentScreens]);
+    }, [commitCurrentScreens, primarySelectedIndex]);
 
     const clearFrameSlot = useCallback((screenIndex: number, frameIndex: number) => {
         commitCurrentScreens('Clear frame', (list) => {

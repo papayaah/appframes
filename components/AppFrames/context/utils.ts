@@ -1,6 +1,6 @@
-
 import { CanvasSettings, Screen, ScreenImage, TextElement, DEFAULT_TEXT_STYLE, DEFAULT_BACKGROUND_EFFECTS } from '../types';
-import { DIYOptions, DIYDeviceType, getDefaultDIYOptions } from '../diy-frames/types';
+import { DIYOptions, DIYDeviceType } from '../diy-frames/types';
+export { getDefaultDIYOptions } from '../diy-frames/types';
 
 // Canvas dimensions helper (App Store requirements)
 export const getCanvasDimensions = (canvasSize: string, orientation: string) => {
@@ -116,6 +116,7 @@ export const getCanvasSizeLabel = (canvasSize: string): string => {
         'google-tablet-10': '10" Tablet',
         'google-chromebook': 'Chromebook',
         'google-xr': 'Android XR',
+        'google-feature-graphic': 'Feature Graphic (1024×500)',
     };
 
     return labels[canvasSize] || canvasSize;
@@ -147,6 +148,23 @@ const createId = (prefix: string) =>
     `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 
 export const clamp01 = (v: number) => Math.max(0, Math.min(100, v));
+
+export type FrameTransformProperty = 'tiltX' | 'tiltY' | 'rotateZ' | 'frameScale';
+
+export function clampFrameTransform(value: number, property: FrameTransformProperty): number {
+    if (!Number.isFinite(value)) return property === 'frameScale' ? 100 : 0;
+
+    switch (property) {
+        case 'rotateZ':
+            return Math.max(-180, Math.min(180, value));
+        case 'frameScale':
+            return Math.max(20, Math.min(500, value));
+        case 'tiltX':
+        case 'tiltY':
+        default:
+            return Math.max(-60, Math.min(60, value));
+    }
+}
 
 export const normalizeRotation = (deg: number) => {
     const n = ((deg % 360) + 360) % 360;
@@ -248,3 +266,6 @@ export const generateNextScreenName = (sourceName: string, canvasSize: string, s
     // Default fallback for custom names
     return `${sourceName} (copy)`;
 };
+
+// Exporting getMaxZIndex that was local
+export { getMaxZIndex };

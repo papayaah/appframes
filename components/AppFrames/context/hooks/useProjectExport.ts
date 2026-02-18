@@ -17,7 +17,7 @@ export function useProjectExport() {
             const zip = new JSZip();
 
             // 1. Collect media
-            const mediaIds = collectClientMediaIds(project);
+            const mediaIds = collectClientMediaIds(project as unknown as Record<string, unknown>);
 
             // 2. Prepare manifest
             const manifest = {
@@ -38,22 +38,23 @@ export function useProjectExport() {
 
                 for (const id of Array.from(mediaIds)) {
                     const asset = await db.get('assets', id);
-                    if (asset && asset.file) {
+                    if (asset && (asset as any).file) {
+                        const file = (asset as any).file as File;
                         // Create a safe filename usually derived from original filename or id
                         // asset.file is a File/Blob stored in IDB
-                        const originalName = asset.file.name || `media-${id}`;
+                        const originalName = file.name || `media-${id}`;
                         const ext = originalName.split('.').pop() || 'bin';
                         const safeName = `${id}-${sanitizeFilename(originalName)}`;
 
-                        mediaFolder.file(safeName, asset.file);
+                        mediaFolder.file(safeName, file);
                         mediaIdToRef.set(id, safeName);
-                        manifest.mediaFiles.push({ mediaRef: safeName, originalPath: asset.path || '' });
+                        manifest.mediaFiles.push({ mediaRef: safeName, originalPath: (asset as any).path || '' });
                     }
                 }
             }
 
             // 4. Transform project data
-            const cleanProject = stripProjectForClientExport(project, mediaIdToRef);
+            const cleanProject = stripProjectForClientExport(project as unknown as Record<string, unknown>, mediaIdToRef);
 
             // 5. Add JSON files
             zip.file('manifest.json', JSON.stringify(manifest, null, 2));
@@ -113,37 +114,28 @@ export function useProjectExport() {
             if (mediaFolder) {
                 const { initDB } = await import('@reactkits.dev/react-media-library');
                 const db = await initDB();
-                const tx = db.transaction('assets', 'readwrite'); // We might need separate transactions or check lib API
-                // actually initDB return idb instance.
 
-                // We will process sequentially or parallel?
-                // Let's do parallel
                 const mediaPromises = manifest.mediaFiles.map(async (entry: any) => {
                     const fileData = await mediaFolder.file(entry.mediaRef)?.async('blob');
                     if (fileData) {
-                        // Determine mime type if possible or generic
-                        // We create a File object
                         const restoredFile = new File([fileData], entry.mediaRef, { type: fileData.type });
 
-                        // Add to media library
-                        // We need to use Media Library API to add.
-                        // Assuming we can just add to IDB directly or use a helper.
-                        // Since I don't know Media Library API fully, I'll simulate "add".
-                        // Looking at library usage: usually `addAsset(file)`.
-                        // I will try to use `db.add('assets', ...)` directly if possible?
-                        // Or I can just check how `react-media-library` does it.
-                        // But generally writing to IDB is standard.
-
-                        // Let's assume standard structure:
-                        const newAsset = {
+                        // We use put to get an ID.
+                        // We need to match MediaAsset interface
+                        const newAsset: any = {
                             file: restoredFile,
                             createdAt: new Date(),
-                            // other fields?
-                            path: entry.originalPath, // Restore path if useful
+                            path: entry.originalPath,
                             tags: ['imported'],
+                            handleName: entry.mediaRef,
+                            fileName: entry.mediaRef,
+                            fileType: fileData.type,
+                            mimeType: fileData.type,
+                            size: fileData.size,
+                            width: 0, // Unknown without reading
+                            height: 0, // Unknown without reading
                         };
 
-                        // We use put to get an ID.
                         const id = await db.put('assets', newAsset);
                         mediaRefToId.set(entry.mediaRef, Number(id));
                     }

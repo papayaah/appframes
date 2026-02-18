@@ -64,7 +64,7 @@ export function FramesProvider({ children }: { children: React.ReactNode }) {
   const screenStateRef = useRef(screenState);
   useEffect(() => { screenStateRef.current = screenState; });
 
-  const frameOps = useFrameOperations(commitDoc, projectState.mutateDoc, currentCanvasSize);
+  const frameOps = useFrameOperations(commitDoc, projectState.mutateDoc, currentCanvasSize, screenState.primarySelectedIndex);
   const textOps = useTextOperations(doc, commitDoc, projectState.mutateDoc, currentCanvasSize, screenState.primarySelectedIndex);
   const sidebarState = useSidebarState();
   const exportOps = useProjectExport();
