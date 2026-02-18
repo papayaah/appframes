@@ -23,9 +23,12 @@ interface AppState {
   // Tutorial state
   tutorialStep: number;
   tutorialActive: boolean;
+  tutorialCompleted: boolean;
   setTutorialStep: (step: number) => void;
   startTutorial: () => void;
+  stopTutorial: () => void;
   completeTutorial: () => void;
+  resetTutorial: () => void;
 }
 
 export const useAppStore = create<AppState>()(
@@ -65,9 +68,12 @@ export const useAppStore = create<AppState>()(
       // Tutorial state
       tutorialStep: 0,
       tutorialActive: false,
+      tutorialCompleted: false,
       setTutorialStep: (step) => set({ tutorialStep: step }),
-      startTutorial: () => set({ tutorialActive: true, tutorialStep: 1, welcomeModalDismissed: true }),
-      completeTutorial: () => set({ tutorialActive: false, tutorialStep: 0 }),
+      startTutorial: () => set({ tutorialActive: true, tutorialStep: 1, welcomeModalDismissed: true, tutorialCompleted: false }),
+      stopTutorial: () => set({ tutorialActive: false }),
+      completeTutorial: () => set({ tutorialActive: false, tutorialStep: 0, tutorialCompleted: true }),
+      resetTutorial: () => set({ tutorialActive: false, tutorialStep: 0, tutorialCompleted: false, welcomeModalDismissed: false }),
     }),
     {
       name: 'appframes-storage',

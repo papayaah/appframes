@@ -58,7 +58,7 @@ const TOUR_STEPS: TourStep[] = [
 ];
 
 export function OnboardingTour() {
-    const { tutorialActive, tutorialStep, setTutorialStep, completeTutorial } = useAppStore();
+    const { tutorialActive, tutorialStep, setTutorialStep, completeTutorial, stopTutorial } = useAppStore();
     const [coords, setCoords] = useState<{ top: number; left: number; width: number; height: number; } | null>(null);
 
     const currentStep = TOUR_STEPS[tutorialStep - 1];
@@ -95,7 +95,7 @@ export function OnboardingTour() {
         };
     }, [tutorialActive, currentStep]);
 
-    if (!tutorialActive || !currentStep || !coords) return null;
+    if (!tutorialActive || !currentStep) return null;
 
     const isLastStep = tutorialStep === TOUR_STEPS.length;
 
@@ -108,11 +108,19 @@ export function OnboardingTour() {
     };
 
     const handleSkip = () => {
-        completeTutorial();
+        stopTutorial();
     };
 
     // Tooltip position math
     const getTooltipStyle = () => {
+        if (!coords) {
+            return {
+                top: '50%',
+                left: '50%',
+                transform: 'translate(-50%, -50%)',
+            };
+        }
+
         const margin = 16;
         if (currentStep.position === 'right') {
             return {
@@ -133,27 +141,41 @@ export function OnboardingTour() {
 
     return (
         <Portal>
-            <Box
-                style={{
-                    position: 'fixed',
-                    inset: 0,
-                    zIndex: 10000,
-                    pointerEvents: 'none',
-                    backgroundColor: 'rgba(0, 0, 0, 0.4)',
-                    // Spotlight effect using clip-path
-                    clipPath: `polygon(
-            0% 0%, 0% 100%, 
-            ${coords.left}px 100%, 
-            ${coords.left}px ${coords.top}px, 
-            ${coords.left + coords.width}px ${coords.top}px, 
-            ${coords.left + coords.width}px ${coords.top + coords.height}px, 
-            ${coords.left}px ${coords.top + coords.height}px, 
-            ${coords.left}px 100%, 
-            100% 100%, 100% 0%
-          )`,
-                    transition: 'all 0.3s ease',
-                }}
-            />
+            {coords && (
+                <Box
+                    style={{
+                        position: 'fixed',
+                        inset: 0,
+                        zIndex: 10000,
+                        pointerEvents: 'none',
+                        backgroundColor: 'rgba(0, 0, 0, 0.4)',
+                        // Spotlight effect using clip-path
+                        clipPath: `polygon(
+                0% 0%, 0% 100%, 
+                ${coords.left}px 100%, 
+                ${coords.left}px ${coords.top}px, 
+                ${coords.left + coords.width}px ${coords.top}px, 
+                ${coords.left + coords.width}px ${coords.top + coords.height}px, 
+                ${coords.left}px ${coords.top + coords.height}px, 
+                ${coords.left}px 100%, 
+                100% 100%, 100% 0%
+              )`,
+                        transition: 'all 0.3s ease',
+                    }}
+                />
+            )}
+
+            {!coords && (
+                <Box
+                    style={{
+                        position: 'fixed',
+                        inset: 0,
+                        zIndex: 10000,
+                        backgroundColor: 'rgba(0, 0, 0, 0.6)',
+                        backdropFilter: 'blur(2px)',
+                    }}
+                />
+            )}
 
             <Box
                 style={{
@@ -200,27 +222,29 @@ export function OnboardingTour() {
                 </Paper>
 
                 {/* Small arrow pointing to the element */}
-                <Box
-                    style={{
-                        position: 'absolute',
-                        width: 0,
-                        height: 0,
-                        borderStyle: 'solid',
-                        ...(currentStep.position === 'right' ? {
-                            left: -8,
-                            top: '50%',
-                            marginTop: -8,
-                            borderWidth: '8px 8px 8px 0',
-                            borderColor: 'transparent white transparent transparent',
-                        } : {
-                            bottom: -8,
-                            left: '50%',
-                            marginLeft: -8,
-                            borderWidth: '8px 8px 0 8px',
-                            borderColor: 'white transparent transparent transparent',
-                        })
-                    }}
-                />
+                {coords && (
+                    <Box
+                        style={{
+                            position: 'absolute',
+                            width: 0,
+                            height: 0,
+                            borderStyle: 'solid',
+                            ...(currentStep.position === 'right' ? {
+                                left: -8,
+                                top: '50%',
+                                marginTop: -8,
+                                borderWidth: '8px 8px 8px 0',
+                                borderColor: 'transparent white transparent transparent',
+                            } : {
+                                bottom: -8,
+                                left: '50%',
+                                marginLeft: -8,
+                                borderWidth: '8px 8px 0 8px',
+                                borderColor: 'white transparent transparent transparent',
+                            })
+                        }}
+                    />
+                )}
             </Box>
         </Portal>
     );

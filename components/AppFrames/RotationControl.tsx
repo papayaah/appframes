@@ -67,6 +67,7 @@ export function RotationControl({
                 {label}
             </Text>
             <Box
+                id="control-rotation"
                 ref={dialRef}
                 onPointerDown={handlePointerDown}
                 onPointerMove={handlePointerMove}

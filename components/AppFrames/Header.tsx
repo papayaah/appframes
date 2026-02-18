@@ -2,10 +2,11 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
-import { Group, Text, ActionIcon, Box, Tooltip, Menu, Button, Modal, TextInput, Stack, Badge } from '@mantine/core';
-import { IconDownload, IconChevronDown, IconPlus, IconEdit, IconTrash, IconFolder, IconAlertCircle, IconUser, IconHistory, IconCloud, IconRefresh, IconFileExport, IconFileImport, IconCopy } from '@tabler/icons-react';
+import { Group, Text, ActionIcon, Box, Tooltip, Menu, Button, Modal, TextInput, Stack, Badge, ThemeIcon } from '@mantine/core';
+import { IconDownload, IconChevronDown, IconPlus, IconEdit, IconTrash, IconFolder, IconAlertCircle, IconUser, IconHistory, IconCloud, IconRefresh, IconFileExport, IconFileImport, IconCopy, IconMoodSmile, IconCheck, IconRotate } from '@tabler/icons-react';
 import { notifications } from '@mantine/notifications';
 import { useState, useEffect, useRef, Fragment } from 'react';
+import { useAppStore } from '@/stores/useAppStore';
 import type { SyncStatus } from '@/lib/ProjectSyncService';
 import type { Project } from '@/lib/PersistenceDB';
 import { CANVAS_SIZE_OPTIONS } from './Sidebar';
@@ -142,7 +143,13 @@ export function Header({
   onToggleHistory,
   onDeleteAllScreens,
 }: HeaderProps) {
+  const { tutorialCompleted, startTutorial, resetTutorial, tutorialActive, stopTutorial, completeTutorial } = useAppStore();
+  const [hydrated, setHydrated] = useState(false);
   const [projects, setProjects] = useState<Project[]>([]);
+
+  useEffect(() => {
+    setHydrated(true);
+  }, []);
   const [showNewProjectModal, setShowNewProjectModal] = useState(false);
   const [showRenameModal, setShowRenameModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -410,6 +417,73 @@ export function Header({
         </Group>
 
         <Group gap="xs">
+          {/* Tour Indicator - Only show if not completed and after hydration */}
+          {hydrated && !tutorialCompleted && (
+            <Group gap={8} mr="md">
+              {!tutorialActive ? (
+                <Tooltip label="Take a Quick Tour" position="bottom" withArrow>
+                  <Button
+                    variant="filled"
+                    size="sm"
+                    radius="xl"
+                    leftSection={<IconMoodSmile size={18} />}
+                    onClick={startTutorial}
+                    styles={{
+                      root: {
+                        background: 'linear-gradient(90deg, #2563EB 0%, #9333EA 100%)',
+                        border: 0,
+                        padding: '0 20px',
+                        height: 38,
+                        '&:hover': {
+                          opacity: 0.9,
+                        },
+                      },
+                      label: {
+                        fontWeight: 600,
+                      }
+                    }}
+                  >
+                    <Box component="span" visibleFrom="md">Take a Quick Tour</Box>
+                    <Box component="span" visibleFrom="sm" hiddenFrom="md">Tour</Box>
+                  </Button>
+                </Tooltip>
+              ) : (
+                <Button
+                  variant="filled"
+                  color="red"
+                  size="sm"
+                  radius="xl"
+                  onClick={stopTutorial}
+                  styles={{
+                    root: { height: 38 }
+                  }}
+                >
+                  Stop Tour
+                </Button>
+              )}
+
+              <Tooltip label="Reset Tour Progress" position="bottom" withArrow>
+                <ActionIcon
+                  variant="filled"
+                  size={38}
+                  radius="xl"
+                  onClick={resetTutorial}
+                  styles={{
+                    root: {
+                      backgroundColor: '#374151',
+                      border: 0,
+                      '&:hover': {
+                        backgroundColor: '#1F2937',
+                      },
+                    }
+                  }}
+                >
+                  <IconRotate size={18} />
+                </ActionIcon>
+              </Tooltip>
+            </Group>
+          )}
+
           {/* Save & Sync Status Icon */}
           <SyncStatusIcon saveStatus={saveStatus} syncStatus={syncStatus} />
 
