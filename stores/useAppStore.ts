@@ -25,10 +25,12 @@ interface AppState {
   tutorialActive: boolean;
   tutorialCompleted: boolean;
   setTutorialStep: (step: number) => void;
+  nextTutorialStep: () => void;
   startTutorial: () => void;
   stopTutorial: () => void;
   completeTutorial: () => void;
   resetTutorial: () => void;
+  resumeTutorial: () => void;
 }
 
 export const useAppStore = create<AppState>()(
@@ -65,15 +67,23 @@ export const useAppStore = create<AppState>()(
       isTipDismissed: (tipKey) => get().dismissedTips.includes(tipKey),
       resetTips: () => set({ dismissedTips: [] }),
 
-      // Tutorial state
       tutorialStep: 0,
       tutorialActive: false,
       tutorialCompleted: false,
       setTutorialStep: (step) => set({ tutorialStep: step }),
-      startTutorial: () => set({ tutorialActive: true, tutorialStep: 1, welcomeModalDismissed: true, tutorialCompleted: false }),
+      nextTutorialStep: () => {
+        const nextStep = get().tutorialStep + 1;
+        console.log('Advancing to tutorial step:', nextStep);
+        set({ tutorialStep: nextStep });
+      },
+      startTutorial: () => {
+        console.log('Starting tutorial from step 1');
+        set({ tutorialActive: true, tutorialStep: 1, tutorialCompleted: false });
+      },
       stopTutorial: () => set({ tutorialActive: false }),
       completeTutorial: () => set({ tutorialActive: false, tutorialStep: 0, tutorialCompleted: true }),
       resetTutorial: () => set({ tutorialActive: false, tutorialStep: 0, tutorialCompleted: false, welcomeModalDismissed: false }),
+      resumeTutorial: () => set({ tutorialActive: true }),
     }),
     {
       name: 'appframes-storage',

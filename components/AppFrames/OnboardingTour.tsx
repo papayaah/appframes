@@ -58,7 +58,7 @@ const TOUR_STEPS: TourStep[] = [
 ];
 
 export function OnboardingTour() {
-    const { tutorialActive, tutorialStep, setTutorialStep, completeTutorial, stopTutorial } = useAppStore();
+    const { tutorialActive, tutorialStep, nextTutorialStep, completeTutorial, stopTutorial } = useAppStore();
     const [coords, setCoords] = useState<{ top: number; left: number; width: number; height: number; } | null>(null);
 
     const currentStep = TOUR_STEPS[tutorialStep - 1];
@@ -103,7 +103,7 @@ export function OnboardingTour() {
         if (isLastStep) {
             completeTutorial();
         } else {
-            setTutorialStep(tutorialStep + 1);
+            nextTutorialStep();
         }
     };
 

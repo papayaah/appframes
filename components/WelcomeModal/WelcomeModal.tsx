@@ -64,10 +64,13 @@ const features: FeatureItem[] = [
 ];
 
 export function WelcomeModal() {
-  const { welcomeModalDismissed, dismissWelcomeModal, startTutorial } = useAppStore();
+  const { welcomeModalDismissed, dismissWelcomeModal, startTutorial, resumeTutorial, tutorialStep, tutorialCompleted } = useAppStore();
   const [opened, setOpened] = useState(false);
   const [dontShowAgain, setDontShowAgain] = useState(false);
   const [ready, setReady] = useState(false);
+
+  const canResume = tutorialStep >= 1 && !tutorialCompleted;
+  console.log('WelcomeModal canResume check:', { tutorialStep, tutorialCompleted, canResume });
 
   // Wait for Zustand to hydrate from localStorage before deciding to show modal
   useEffect(() => {
@@ -101,7 +104,11 @@ export function WelcomeModal() {
 
   const handleStartTour = () => {
     handleClose();
-    startTutorial();
+    if (canResume) {
+      resumeTutorial();
+    } else {
+      startTutorial();
+    }
   };
 
   // Don't render until store is hydrated
@@ -203,7 +210,7 @@ export function WelcomeModal() {
             />
             <Group>
               <Button onClick={handleStartTour} variant="light" color="violet">
-                Take a Quick Tour
+                {canResume ? 'Resume Quick Tour' : 'Take a Quick Tour'}
               </Button>
               <Button onClick={handleClose} variant="white" color="gray">
                 Get Started

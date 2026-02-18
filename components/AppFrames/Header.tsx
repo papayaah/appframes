@@ -143,7 +143,19 @@ export function Header({
   onToggleHistory,
   onDeleteAllScreens,
 }: HeaderProps) {
-  const { tutorialCompleted, startTutorial, resetTutorial, tutorialActive, stopTutorial, completeTutorial } = useAppStore();
+  const {
+    tutorialCompleted,
+    startTutorial,
+    resumeTutorial,
+    resetTutorial,
+    tutorialActive,
+    stopTutorial,
+    completeTutorial,
+    tutorialStep
+  } = useAppStore();
+
+  const canResume = tutorialStep >= 1 && !tutorialCompleted;
+
   const [hydrated, setHydrated] = useState(false);
   const [projects, setProjects] = useState<Project[]>([]);
 
@@ -421,13 +433,13 @@ export function Header({
           {hydrated && !tutorialCompleted && (
             <Group gap={8} mr="md">
               {!tutorialActive ? (
-                <Tooltip label="Take a Quick Tour" position="bottom" withArrow>
+                <Tooltip label={canResume ? `Resume Quick Tour (Step ${tutorialStep})` : "Take a Quick Tour"} position="bottom" withArrow>
                   <Button
                     variant="filled"
                     size="sm"
                     radius="xl"
                     leftSection={<IconMoodSmile size={18} />}
-                    onClick={startTutorial}
+                    onClick={canResume ? resumeTutorial : startTutorial}
                     styles={{
                       root: {
                         background: 'linear-gradient(90deg, #2563EB 0%, #9333EA 100%)',
@@ -443,8 +455,8 @@ export function Header({
                       }
                     }}
                   >
-                    <Box component="span" visibleFrom="md">Take a Quick Tour</Box>
-                    <Box component="span" visibleFrom="sm" hiddenFrom="md">Tour</Box>
+                    <Box component="span" visibleFrom="md">{canResume ? 'Resume Quick Tour' : 'Take a Quick Tour'}</Box>
+                    <Box component="span" visibleFrom="sm" hiddenFrom="md">{canResume ? 'Resume' : 'Tour'}</Box>
                   </Button>
                 </Tooltip>
               ) : (

@@ -1,19 +1,53 @@
 'use client';
 
-import { Box, Text, Stack, Title, Accordion, ThemeIcon, Group, List, Mark, Code } from '@mantine/core';
+import { Box, Text, Stack, Title, Accordion, ThemeIcon, Group, List, Mark, Code, Button, Divider, Paper } from '@mantine/core';
 import {
     IconRocket,
     IconDragDrop,
     IconMaximize,
     IconTypography,
     IconDeviceFloppy,
-    IconClick
+    IconClick,
+    IconSchool,
+    IconRefresh
 } from '@tabler/icons-react';
+import { useAppStore } from '@/stores/useAppStore';
 
 export function HelpTab() {
+    const { startTutorial, resumeTutorial, resetTutorial, tutorialStep, tutorialCompleted } = useAppStore();
+    const canResume = tutorialStep >= 1 && !tutorialCompleted;
+    console.log('HelpTab canResume check:', { tutorialStep, tutorialCompleted, canResume });
+
     return (
         <Box style={{ height: '100%', overflow: 'auto' }} className="scroll-on-hover" p="md">
             <Title order={4} mb="lg">Documentation & Tips</Title>
+
+            {/* Quick Tour Section */}
+            <Paper withBorder p="md" radius="md" mb="xl" style={{ backgroundColor: '#f8f9ff', borderColor: '#e0e7ff' }}>
+                <Stack gap="xs">
+                    <Group gap="xs">
+                        <ThemeIcon color="violet" variant="light"><IconSchool size={16} /></ThemeIcon>
+                        <Text fw={700}>Interactive Tour</Text>
+                    </Group>
+                    <Text size="sm" c="dimmed">
+                        New to AppFrames? Let us show you the core features with a step-by-step guided tour.
+                    </Text>
+                    <Group mt="xs">
+                        {canResume ? (
+                            <Button size="xs" color="violet" onClick={resumeTutorial} leftSection={<IconRocket size={14} />}>
+                                Resume Tour (Step {tutorialStep})
+                            </Button>
+                        ) : (
+                            <Button size="xs" color="violet" onClick={startTutorial} leftSection={<IconRocket size={14} />}>
+                                Start Quick Tour
+                            </Button>
+                        )}
+                        <Button size="xs" variant="subtle" color="gray" onClick={resetTutorial} leftSection={<IconRefresh size={14} />}>
+                            Reset
+                        </Button>
+                    </Group>
+                </Stack>
+            </Paper>
 
             <Accordion variant="separated" defaultValue="basics">
                 <Accordion.Item value="basics">
