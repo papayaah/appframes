@@ -23,7 +23,7 @@ import { TextElement as CanvasTextElement } from './TextElement';
 import { useMediaImage } from '@/hooks/useMediaImage';
 import { exportService } from '@/lib/ExportService';
 import { ExportModal } from './ExportModal';
-import { getBackgroundStyle } from './Sidebar';
+import { getBackgroundStyle } from './sharedBackgroundUtils';
 
 const getPlatform = (canvasSize: string): 'apple' | 'google' => {
   if (canvasSize.startsWith('google')) return 'google';

@@ -4,7 +4,7 @@ import { useCallback, useRef, useState } from 'react';
 import { Box, Text, Stack, Select, Slider, Group, Tooltip, Button, Divider } from '@mantine/core';
 import { IconLayout, IconDeviceMobile, IconPhoto, IconTypography, IconSettings, IconStack, IconHelp } from '@tabler/icons-react';
 import { useAppStore } from '../../stores/useAppStore';
-import { Sidebar } from './Sidebar';
+import { LayoutSidebar } from './panels/layout/LayoutSidebar';
 import { DeviceTab } from './DeviceTab';
 import { TextTab } from './TextTab';
 import { LayersTab } from './LayersTab';
@@ -322,9 +322,9 @@ export function SidebarTabs({
   const renderPanelContent = (tabId: TabId) => {
     switch (tabId) {
       case 'layout':
-        return <Sidebar settings={settings} setSettings={setSettings} screens={screens}
+        return <LayoutSidebar settings={settings} setSettings={setSettings} screens={screens}
           sharedBackground={sharedBackground} onSharedBackgroundChange={onSharedBackgroundChange} onToggleScreenInSharedBg={onToggleScreenInSharedBg}
-          onApplyEffectsToAll={onApplyEffectsToAll} />;
+        />;
       case 'device':
         return <DeviceTab />;
       case 'text':

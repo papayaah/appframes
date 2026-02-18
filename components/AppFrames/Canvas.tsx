@@ -9,7 +9,7 @@ import { OverflowDeviceRenderer } from './OverflowDeviceRenderer';
 import { getCanvasDimensions } from './FramesContext';
 import { useMediaImage } from '../../hooks/useMediaImage';
 import { TextElement as CanvasTextElement } from './TextElement';
-import { getBackgroundStyle } from './Sidebar';
+import { getBackgroundStyle } from './sharedBackgroundUtils';
 import { SharedCanvasBackground } from './SharedCanvasBackground';
 import { BackgroundEffectsOverlay } from './BackgroundEffectsOverlay';
 

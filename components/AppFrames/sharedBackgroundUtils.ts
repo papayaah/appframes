@@ -260,3 +260,17 @@ export function insertScreenIdInOrder(
   result.splice(insertIdx, 0, newScreenId);
   return result;
 }
+
+export const isGradient = (color: string): boolean => {
+  return color.startsWith('linear-gradient') || color.startsWith('radial-gradient');
+};
+
+export const getBackgroundStyle = (color: string): React.CSSProperties => {
+  if (color === 'transparent') {
+    return { backgroundColor: 'transparent' };
+  }
+  if (isGradient(color)) {
+    return { backgroundImage: color };
+  }
+  return { backgroundColor: color };
+};

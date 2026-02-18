@@ -9,7 +9,7 @@ import { useMediaImage } from '@/hooks/useMediaImage';
 import { MantineProvider } from '@mantine/core';
 import { theme } from '@/theme';
 import { InteractionLockProvider } from '@/components/AppFrames/InteractionLockContext';
-import { getBackgroundStyle } from '@/components/AppFrames/Sidebar';
+import { getBackgroundStyle } from '@/components/AppFrames/sharedBackgroundUtils';
 
 export type ExportFormat = 'png' | 'jpg';
 

@@ -9,7 +9,7 @@ import { useState, useEffect, useRef, Fragment } from 'react';
 import { useAppStore } from '@/stores/useAppStore';
 import type { SyncStatus } from '@/lib/ProjectSyncService';
 import type { Project } from '@/lib/PersistenceDB';
-import { CANVAS_SIZE_OPTIONS } from './Sidebar';
+import { CANVAS_SIZE_OPTIONS } from './panels/layout/LayoutConstants';
 
 interface CanvasSizeOption {
   id: string;

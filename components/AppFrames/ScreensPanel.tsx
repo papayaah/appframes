@@ -6,7 +6,7 @@ import { IconPlus, IconX, IconCheck, IconCopy } from '@tabler/icons-react';
 import { Screen, CanvasSettings, SharedBackground } from './AppFrames';
 import { CompositionRenderer } from './CompositionRenderer';
 import { getCanvasSizeLabel, getCanvasDimensions } from './FramesContext';
-import { getBackgroundStyle } from './Sidebar';
+import { getBackgroundStyle } from './sharedBackgroundUtils';
 import { useMediaImage } from '../../hooks/useMediaImage';
 import { SharedCanvasBackground } from './SharedCanvasBackground';
 import { BackgroundEffectsOverlay } from './BackgroundEffectsOverlay';

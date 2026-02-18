@@ -17,7 +17,8 @@ import {
 import { IconPlus, IconZoomIn } from '@tabler/icons-react';
 import { CanvasSettings } from './AppFrames';
 import { GradientEditor } from './GradientEditor';
-import { isGradient, getBackgroundStyle, BACKGROUND_PRESETS } from './Sidebar';
+import { isGradient, getBackgroundStyle } from './sharedBackgroundUtils';
+import { BACKGROUND_PRESETS } from './panels/layout/LayoutConstants';
 import { isFixedOrientationCanvas } from './FramesContext';
 import { BackgroundEffectsPanel } from './BackgroundEffectsPanel';
 import { DEFAULT_BACKGROUND_EFFECTS } from './types';

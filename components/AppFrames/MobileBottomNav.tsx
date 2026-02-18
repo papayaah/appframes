@@ -10,7 +10,7 @@ import {
   IconSettings,
   IconStack,
 } from '@tabler/icons-react';
-import { Sidebar } from './Sidebar';
+import { LayoutSidebar } from './panels/layout/LayoutSidebar';
 import { DeviceTab } from './DeviceTab';
 import { TextTab } from './TextTab';
 import { LayersTab } from './LayersTab';
@@ -66,7 +66,7 @@ export function MobileBottomNav({
   const renderPanelContent = (tabId: TabId) => {
     switch (tabId) {
       case 'layout':
-        return <Sidebar settings={settings} setSettings={setSettings} screens={screens} />;
+        return <LayoutSidebar settings={settings} setSettings={setSettings} screens={screens} />;
       case 'device':
         return <DeviceTab />;
       case 'text':
