@@ -101,8 +101,10 @@ export const FullLayout: Story = {
                                 justifyContent: 'center',
                                 color: '#999',
                                 fontSize: 14,
+                                textAlign: 'center',
+                                padding: 24,
                             }}>
-                                Device Frame Preview
+                                Main Workspace Canvas Area (Generic)
                             </div>
                         </div>
 

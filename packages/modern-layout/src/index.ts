@@ -18,6 +18,17 @@ export { SidebarRail } from './components/SidebarRail';
 export { NotchHandle } from './components/NotchHandle';
 export { FloatingPanel } from './components/FloatingPanel';
 export { SettingsPanel } from './components/SettingsPanel';
+export { LayoutSkeleton } from './components/LayoutSkeleton';
+export { FeatureTip } from './components/FeatureTip';
+export { TourProvider, useTour } from './components/Tour/TourProvider';
+export { Tour } from './components/Tour/Tour';
+export { WelcomeModal } from './components/WelcomeModal';
+export { AppHeader } from './components/AppHeader';
+export { AppFooter } from './components/AppFooter';
+export { FloatingToolbar } from './components/FloatingToolbar';
+export { ProBadge } from './components/billing/ProBadge';
+export { UpgradeCTA } from './components/billing/UpgradeCTA';
+export { PricingCard } from './components/billing/PricingCard';
 
 // Presets
 export { defaultPreset } from './presets';

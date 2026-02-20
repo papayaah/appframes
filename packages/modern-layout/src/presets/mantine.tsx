@@ -7,6 +7,12 @@ import {
     Badge as MantineBadge,
     ScrollArea as MantineScrollArea,
     AppShell as MantineAppShell,
+    Modal as MantineModal,
+    Skeleton as MantineSkeleton,
+    Overlay as MantineOverlay,
+    TextInput as MantineInput,
+    Text as MantineText,
+    Button as MantineButton,
 } from '@mantine/core';
 import type { LayoutComponentPreset } from '../types';
 
@@ -177,6 +183,118 @@ export const mantinePreset: LayoutComponentPreset = {
             {footer && <MantineAppShell.Footer>{footer}</MantineAppShell.Footer>}
         </MantineAppShell>
     ),
+    Modal: ({ children, isOpen, onClose, title, size = 'md', centered = true, withOverlay = true, closeOnClickOutside = true, className }) => (
+        <MantineModal
+            opened={isOpen}
+            onClose={onClose}
+            title={title}
+            size={size}
+            centered={centered}
+            withOverlay={withOverlay}
+            closeOnClickOutside={closeOnClickOutside}
+            className={className}
+        >
+            {children}
+        </MantineModal>
+    ),
+    Skeleton: ({ width, height, circle, radius, animate, className, style }) => (
+        <MantineSkeleton
+            width={width}
+            height={height}
+            circle={circle}
+            radius={radius}
+            animate={animate}
+            className={className}
+            style={style}
+        />
+    ),
+    Overlay: ({ color, opacity, blur, zIndex, onClick, className, children }) => (
+        <MantineOverlay
+            color={color}
+            opacity={opacity}
+            blur={blur}
+            zIndex={zIndex}
+            onClick={onClick}
+            className={className}
+        >
+            {children}
+        </MantineOverlay>
+    ),
+    Input: ({ value, onChange, placeholder, label, description, error, disabled, type, leftSection, rightSection, className }) => (
+        <MantineInput
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            placeholder={placeholder}
+            label={label}
+            description={description}
+            error={error}
+            disabled={disabled}
+            type={type}
+            leftSection={leftSection}
+            rightSection={rightSection}
+            className={className}
+        />
+    ),
+    Header: ({ children, height, className, style }) => (
+        <MantineAppShell.Header className={className} style={{ ...style, height: height ?? 45, display: 'flex', alignItems: 'center', padding: '0 16px' }}>
+            {children}
+        </MantineAppShell.Header>
+    ),
+    Footer: ({ children, height, className, style }) => (
+        <MantineAppShell.Footer className={className} style={{ ...style, height: height ?? 40, display: 'flex', alignItems: 'center', padding: '0 16px' }}>
+            {children}
+        </MantineAppShell.Footer>
+    ),
+    Text: ({ children, size = 'md', weight, bold, color, align, className, style, transform, lineHeight }) => (
+        <MantineText
+            size={size}
+            fw={bold ? 700 : weight}
+            c={color}
+            ta={align}
+            tt={transform}
+            lh={lineHeight}
+            className={className}
+            style={style}
+        >
+            {children}
+        </MantineText>
+    ),
+    Button: ({ children, onClick, variant = 'primary', size = 'md', disabled, loading, fullWidth, leftSection, rightSection, className, style, type }) => {
+        const variantMap = {
+            primary: 'filled',
+            secondary: 'outline',
+            danger: 'filled',
+            light: 'light',
+            subtle: 'subtle',
+        } as const;
+
+        const colorMap = {
+            primary: 'violet',
+            secondary: 'gray',
+            danger: 'red',
+            light: 'violet',
+            subtle: 'violet',
+        } as const;
+
+        return (
+            <MantineButton
+                onClick={onClick}
+                variant={variantMap[variant]}
+                color={colorMap[variant]}
+                size={size}
+                disabled={disabled}
+                loading={loading}
+                fullWidth={fullWidth}
+                leftSection={leftSection}
+                rightSection={rightSection}
+                className={className}
+                style={style}
+                type={type}
+            >
+                {children}
+            </MantineButton>
+        );
+    },
 };
 
 /**

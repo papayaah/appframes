@@ -230,6 +230,21 @@ export interface BoxProps {
     'data-export-hide'?: string;
 }
 
+export interface TextProps {
+    children: ReactNode;
+    size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
+    weight?: number | string;
+    bold?: boolean;
+    color?: string;
+    align?: 'left' | 'center' | 'right';
+    className?: string;
+    style?: CSSProperties;
+    /** Transform text to uppercase, lowercase, etc. */
+    transform?: 'uppercase' | 'capitalize' | 'lowercase' | 'none';
+    /** Line height */
+    lineHeight?: number | string;
+}
+
 export interface IconButtonProps {
     icon: ReactNode;
     onClick?: () => void;
@@ -239,6 +254,21 @@ export interface IconButtonProps {
     tooltip?: string;
     className?: string;
     'aria-label'?: string;
+}
+
+export interface ButtonProps {
+    children: ReactNode;
+    onClick?: (e: React.MouseEvent) => void;
+    variant?: 'primary' | 'secondary' | 'danger' | 'light' | 'subtle';
+    size?: 'xs' | 'sm' | 'md' | 'lg';
+    disabled?: boolean;
+    loading?: boolean;
+    fullWidth?: boolean;
+    leftSection?: ReactNode;
+    rightSection?: ReactNode;
+    className?: string;
+    style?: CSSProperties;
+    type?: 'button' | 'submit' | 'reset';
 }
 
 export interface TooltipProps {
@@ -296,6 +326,70 @@ export interface AppShellProps {
     className?: string;
 }
 
+export interface ModalProps {
+    children: ReactNode;
+    isOpen: boolean;
+    onClose: () => void;
+    title?: string;
+    size?: number | string;
+    centered?: boolean;
+    withOverlay?: boolean;
+    closeOnClickOutside?: boolean;
+    className?: string;
+}
+
+export interface SkeletonProps {
+    width?: number | string;
+    height?: number | string;
+    circle?: boolean;
+    radius?: number | string;
+    animate?: boolean;
+    className?: string;
+    style?: CSSProperties;
+}
+
+export interface OverlayProps {
+    color?: string;
+    opacity?: number;
+    blur?: number;
+    zIndex?: number;
+    onClick?: () => void;
+    className?: string;
+    children?: ReactNode;
+}
+
+export interface InputProps {
+    value?: string;
+    onChange: (value: string) => void;
+    placeholder?: string;
+    label?: string;
+    description?: string;
+    error?: ReactNode;
+    disabled?: boolean;
+    type?: string;
+    leftSection?: ReactNode;
+    rightSection?: ReactNode;
+    className?: string;
+}
+
+export interface HeaderProps {
+    children: ReactNode;
+    height?: number | string;
+    fixed?: boolean;
+    border?: boolean;
+    className?: string;
+    style?: CSSProperties;
+}
+
+export interface FooterProps {
+    children: ReactNode;
+    height?: number | string;
+    fixed?: boolean;
+    border?: boolean;
+    className?: string;
+    style?: CSSProperties;
+}
+
 // ============================================================================
 // Component Preset Interface
 // ============================================================================
@@ -317,6 +411,22 @@ export interface LayoutComponentPreset {
     ScrollArea: React.FC<ScrollAreaProps>;
     /** App shell layout (optional - for full layout preset) */
     AppShell?: React.FC<AppShellProps>;
+    /** Modal/Dialog component */
+    Modal: React.FC<ModalProps>;
+    /** Loading placeholder */
+    Skeleton: React.FC<SkeletonProps>;
+    /** Transparent overlay */
+    Overlay: React.FC<OverlayProps>;
+    /** Generic text input */
+    Input: React.FC<InputProps>;
+    /** App header */
+    Header: React.FC<HeaderProps>;
+    /** App footer */
+    Footer: React.FC<FooterProps>;
+    /** Typography component */
+    Text: React.FC<TextProps>;
+    /** Generic button component */
+    Button: React.FC<ButtonProps>;
 }
 
 // ============================================================================
@@ -324,7 +434,7 @@ export interface LayoutComponentPreset {
 // ============================================================================
 
 export interface IconComponent {
-    (props: { size?: number | string; [key: string]: unknown }): ReactNode;
+    (props: { size?: number | string;[key: string]: unknown }): ReactNode;
 }
 
 export interface LayoutIcons {

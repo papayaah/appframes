@@ -87,3 +87,29 @@ export const mediaAssetsRelations = relations(mediaAssets, ({ one }) => ({
     references: [user.id],
   }),
 }));
+
+/**
+ * User licenses table
+ * Tracks one-time fee purchases (LTD) for Pro features.
+ */
+export const userLicenses = pgTable('user_licenses', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: text('user_id').notNull().references(() => user.id, { onDelete: 'cascade' }),
+  licenseType: text('license_type').notNull().default('LIFETIME'), // e.g., 'LIFETIME'
+  status: text('status').notNull().default('ACTIVE'), // 'ACTIVE', 'REVOKED'
+  gateway: text('gateway').notNull().default('HITPAY'),
+  hitpayPaymentId: text('hitpay_payment_id').unique(), // External reference (Payment Request ID)
+  amount: integer('amount').notNull(), // In cents/subunits
+  currency: text('currency').notNull().default('PHP'),
+  createdAt: timestamp('created_at', { mode: 'string' }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { mode: 'string' }).notNull().defaultNow(),
+}, (t) => ({
+  userIdIdx: index('user_licenses_user_id_idx').on(t.userId),
+}));
+
+export const userLicensesRelations = relations(userLicenses, ({ one }) => ({
+  user: one(user, {
+    fields: [userLicenses.userId],
+    references: [user.id],
+  }),
+}));

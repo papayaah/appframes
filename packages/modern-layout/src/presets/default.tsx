@@ -166,4 +166,206 @@ export const defaultPreset: LayoutComponentPreset = {
             {children}
         </div>
     ),
+    Modal: ({ children, isOpen, onClose, title, size = 500, centered = true }) => {
+        if (!isOpen) return null;
+        return (
+            <>
+                <div
+                    onClick={onClose}
+                    style={{
+                        position: 'fixed',
+                        inset: 0,
+                        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                        zIndex: 1999,
+                    }}
+                />
+                <div
+                    style={{
+                        position: 'fixed',
+                        top: centered ? '50%' : '10%',
+                        left: '50%',
+                        transform: 'translateX(-50%)' + (centered ? ' translateY(-50%)' : ''),
+                        width: typeof size === 'number' ? size : size,
+                        maxHeight: '80vh',
+                        backgroundColor: 'white',
+                        borderRadius: 8,
+                        boxShadow: '0 8px 32px rgba(0, 0, 0, 0.2)',
+                        zIndex: 2000,
+                        display: 'flex',
+                        flexDirection: 'column',
+                    }}
+                >
+                    {title && (
+                        <div style={{ padding: 16, borderBottom: '1px solid #e9ecef', fontWeight: 600 }}>
+                            {title}
+                        </div>
+                    )}
+                    <div style={{ padding: 16, overflow: 'auto' }}>
+                        {children}
+                    </div>
+                </div>
+            </>
+        );
+    },
+
+    Skeleton: ({ width = '100%', height = 20, circle, radius = 4, animate = true }) => (
+        <div
+            style={{
+                width: width,
+                height: height,
+                borderRadius: circle ? '50%' : radius,
+                backgroundColor: '#e9ecef',
+                animation: animate ? 'pulse 1.5s infinite ease-in-out' : 'none',
+            }}
+        />
+    ),
+
+    Overlay: ({ color = 'rgba(0,0,0,0.5)', opacity, blur, zIndex = 100, onClick, children }) => (
+        <div
+            onClick={onClick}
+            style={{
+                position: 'fixed',
+                inset: 0,
+                backgroundColor: color,
+                opacity: opacity,
+                backdropFilter: blur ? `blur(${blur}px)` : 'none',
+                zIndex: zIndex,
+            }}
+        >
+            {children}
+        </div>
+    ),
+
+    Input: ({ value, onChange, placeholder, label, type = 'text', disabled }) => (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            {label && <label style={{ fontSize: 13, fontWeight: 500 }}>{label}</label>}
+            <input
+                type={type}
+                value={value}
+                onChange={(e) => onChange(e.target.value)}
+                placeholder={placeholder}
+                disabled={disabled}
+                style={{
+                    padding: '8px 12px',
+                    borderRadius: 6,
+                    border: '1px solid #dee2e6',
+                    fontSize: 14,
+                }}
+            />
+        </div>
+    ),
+
+    Header: ({ children, height = 45, fixed = true, border = true }) => (
+        <header
+            style={{
+                height,
+                display: 'flex',
+                alignItems: 'center',
+                padding: '0 16px',
+                backgroundColor: 'white',
+                borderBottom: border ? '1px solid #e9ecef' : 'none',
+                position: fixed ? 'sticky' : 'relative',
+                top: 0,
+                zIndex: 10,
+            }}
+        >
+            {children}
+        </header>
+    ),
+
+    Footer: ({ children, height = 40, fixed = true, border = true }) => (
+        <footer
+            style={{
+                height,
+                display: 'flex',
+                alignItems: 'center',
+                padding: '0 16px',
+                backgroundColor: 'white',
+                borderTop: border ? '1px solid #e9ecef' : 'none',
+                position: fixed ? 'fixed' : 'relative',
+                bottom: 0,
+                left: 0,
+                right: 0,
+                zIndex: 10,
+            }}
+        >
+            {children}
+        </footer>
+    ),
+
+    Text: ({ children, size = 'md', weight, bold, color, align, className, style, transform, lineHeight }) => {
+        const sizeMap = {
+            xs: 12,
+            sm: 14,
+            md: 16,
+            lg: 18,
+            xl: 20,
+        };
+
+        return (
+            <div
+                className={className}
+                style={{
+                    fontSize: sizeMap[size],
+                    fontWeight: bold ? 700 : weight,
+                    color: color || 'inherit',
+                    textAlign: align,
+                    textTransform: transform,
+                    lineHeight: lineHeight,
+                    ...style,
+                }}
+            >
+                {children}
+            </div>
+        );
+    },
+
+    Button: ({ children, onClick, variant = 'primary', size = 'md', disabled, loading, fullWidth, leftSection, rightSection, className, style, type = 'button' }) => {
+        const variantStyles: Record<string, React.CSSProperties> = {
+            primary: { backgroundColor: '#667eea', color: 'white' },
+            secondary: { backgroundColor: '#e9ecef', color: '#495057' },
+            danger: { backgroundColor: '#f03e3e', color: 'white' },
+            light: { backgroundColor: 'rgba(102, 126, 234, 0.1)', color: '#667eea' },
+            subtle: { backgroundColor: 'transparent', color: '#667eea' },
+        };
+
+        const sizeStyles: Record<string, React.CSSProperties> = {
+            xs: { padding: '4px 8px', fontSize: 12 },
+            sm: { padding: '6px 12px', fontSize: 13 },
+            md: { padding: '8px 16px', fontSize: 14 },
+            lg: { padding: '10px 20px', fontSize: 16 },
+        };
+
+        return (
+            <button
+                type={type}
+                onClick={onClick}
+                disabled={disabled || loading}
+                className={className}
+                style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 8,
+                    borderRadius: 6,
+                    border: 'none',
+                    cursor: (disabled || loading) ? 'not-allowed' : 'pointer',
+                    width: fullWidth ? '100%' : 'auto',
+                    opacity: (disabled || loading) ? 0.6 : 1,
+                    transition: 'all 0.15s',
+                    ...variantStyles[variant],
+                    ...sizeStyles[size],
+                    ...style,
+                }}
+            >
+                {loading ? '...' : (
+                    <>
+                        {leftSection}
+                        {children}
+                        {rightSection}
+                    </>
+                )}
+            </button>
+        );
+    },
 };
