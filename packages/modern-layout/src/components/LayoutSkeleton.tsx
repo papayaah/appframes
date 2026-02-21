@@ -10,6 +10,8 @@ interface LayoutSkeletonProps {
     showFooter?: boolean;
     /** Custom class name */
     className?: string;
+    /** Custom content for the main area (replaces default grid) */
+    children?: React.ReactNode;
 }
 
 /**
@@ -22,6 +24,7 @@ export const LayoutSkeleton: React.FC<LayoutSkeletonProps> = ({
     showHeader = true,
     showFooter = false,
     className,
+    children,
 }) => {
     const { preset, config } = useLayout();
 
@@ -45,13 +48,13 @@ export const LayoutSkeleton: React.FC<LayoutSkeletonProps> = ({
             footer={showFooter ? <Footer><Skeleton width={150} height={16} /></Footer> : undefined}
             padding="md"
         >
-            <Box style={{ display: 'flex', flexDirection: 'column', gap: 24, padding: 20 }}>
-                <Skeleton width="40%" height={32} />
-                <Box style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: 20 }}>
-                    {[1, 2, 3, 4, 5, 6].map((i) => (
-                        <Skeleton key={i} width="100%" height={200} radius={12} />
-                    ))}
-                </Box>
+            <Box style={{ display: 'flex', flexDirection: 'column', gap: 24, padding: 20, height: '100%', boxSizing: 'border-box' }}>
+                {children ?? (
+                    <>
+                        <Skeleton width="40%" height={32} />
+                        <Box style={{ flex: 1, backgroundColor: '#f1f3f5', borderRadius: 20, opacity: 0.5, border: '2px dashed #dee2e6' }} />
+                    </>
+                )}
             </Box>
         </AppShell>
     ) : (
@@ -73,12 +76,12 @@ export const LayoutSkeleton: React.FC<LayoutSkeletonProps> = ({
                     </Box>
                 )}
                 <Box style={{ flex: 1, padding: 32, display: 'flex', flexDirection: 'column', gap: 24 }}>
-                    <Skeleton width="30%" height={32} />
-                    <Box style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 16 }}>
-                        {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
-                            <Skeleton key={i} width="100%" height={160} radius={8} />
-                        ))}
-                    </Box>
+                    {children ?? (
+                        <>
+                            <Skeleton width="30%" height={32} />
+                            <Box style={{ flex: 1, backgroundColor: '#f1f3f5', borderRadius: 20, opacity: 0.5, border: '2px dashed #dee2e6' }} />
+                        </>
+                    )}
                 </Box>
             </Box>
         </Box>

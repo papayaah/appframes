@@ -48,6 +48,19 @@
                 "import": "./dist/presets/mantine.mjs",
                 "require": "./dist/presets/mantine.js"
             }
+        },
+        "./presets/tailwind": {
+            "types": "./src/presets/tailwind.tsx",
+            "development": {
+                "types": "./src/presets/tailwind.tsx",
+                "import": "./src/presets/tailwind.tsx",
+                "require": "./src/presets/tailwind.tsx"
+            },
+            "default": {
+                "types": "./dist/presets/tailwind.d.ts",
+                "import": "./dist/presets/tailwind.mjs",
+                "require": "./dist/presets/tailwind.js"
+            }
         }
     },
     "files": [

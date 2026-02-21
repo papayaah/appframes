@@ -103,6 +103,8 @@ export const mantinePreset: LayoutComponentPreset = {
             withOverlay={withOverlay}
             closeOnClickOutside={closeOnClickOutside}
             transitionProps={{ duration: 200 }}
+            withinPortal={true}
+            zIndex={40000}
             styles={{
                 content: {
                     display: 'flex',
@@ -193,6 +195,8 @@ export const mantinePreset: LayoutComponentPreset = {
             withOverlay={withOverlay}
             closeOnClickOutside={closeOnClickOutside}
             className={className}
+            withinPortal={true}
+            zIndex={41000}
         >
             {children}
         </MantineModal>

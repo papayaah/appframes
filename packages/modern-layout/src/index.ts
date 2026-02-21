@@ -1,5 +1,5 @@
 // ============================================================================
-// @anthropic.dev/modern-layout
+// @reactkits.dev/modern-layout
 // Headless Modern Layout Shell for React 19
 // ============================================================================
 
@@ -29,6 +29,8 @@ export { FloatingToolbar } from './components/FloatingToolbar';
 export { ProBadge } from './components/billing/ProBadge';
 export { UpgradeCTA } from './components/billing/UpgradeCTA';
 export { PricingCard } from './components/billing/PricingCard';
+export { MobileBottomNav } from './components/MobileBottomNav';
+export { MobileDrawer } from './components/MobileDrawer';
 
 // Presets
 export { defaultPreset } from './presets';

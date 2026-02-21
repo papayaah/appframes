@@ -12,6 +12,8 @@ export interface WelcomeModalProps {
     message: string;
     /** Image or illustration URL (optional) */
     image?: string;
+    /** Video URL (optional) */
+    video?: string;
     /** Primary button label */
     primaryActionLabel?: string;
     /** Called when primary button is clicked */
@@ -30,6 +32,7 @@ export const WelcomeModal: React.FC<WelcomeModalProps> = ({
     title,
     message,
     image,
+    video,
     primaryActionLabel = 'Get Started',
     onPrimaryAction,
     secondaryActionLabel,
@@ -42,7 +45,16 @@ export const WelcomeModal: React.FC<WelcomeModalProps> = ({
     return (
         <Modal isOpen={isOpen} onClose={onClose} title={title} size="md" centered>
             <Box style={{ display: 'flex', flexDirection: 'column', gap: 20, alignItems: 'center', textAlign: 'center' }}>
-                {image && (
+                {video ? (
+                    <video
+                        src={video}
+                        autoPlay
+                        loop
+                        muted
+                        playsInline
+                        style={{ width: '100%', maxHeight: 300, objectFit: 'cover', borderRadius: 8 }}
+                    />
+                ) : image && (
                     <img
                         src={image}
                         alt={title}

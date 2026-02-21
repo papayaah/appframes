@@ -132,6 +132,25 @@ export const OnboardingPopup: StoryObj = {
     }
 };
 
+export const VideoOnboarding: StoryObj = {
+    render: () => {
+        const [isOpen, setIsOpen] = useState(true);
+        return (
+            <Box style={{ padding: 40, height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Button onClick={() => setIsOpen(true)}>Open Video Welcome</Button>
+                <WelcomeModal
+                    isOpen={isOpen}
+                    onClose={() => setIsOpen(false)}
+                    title="See the Magic in Action"
+                    message="Watch this quick walkthrough to see how you can transform your workflow with our new tools."
+                    primaryActionLabel="Got it!"
+                    video="https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4"
+                />
+            </Box>
+        );
+    }
+};
+
 export const GuidedTour: StoryObj = {
     render: () => {
         const { startTour } = useTour();

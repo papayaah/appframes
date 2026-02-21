@@ -228,6 +228,7 @@ export interface BoxProps {
     onMouseDown?: (e: React.MouseEvent) => void;
     ref?: RefObject<HTMLDivElement>;
     'data-export-hide'?: string;
+    id?: string;
 }
 
 export interface TextProps {
@@ -379,6 +380,7 @@ export interface HeaderProps {
     border?: boolean;
     className?: string;
     style?: CSSProperties;
+    id?: string;
 }
 
 export interface FooterProps {
@@ -388,6 +390,7 @@ export interface FooterProps {
     border?: boolean;
     className?: string;
     style?: CSSProperties;
+    id?: string;
 }
 
 // ============================================================================

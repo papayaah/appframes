@@ -11,22 +11,24 @@ import {
     Indicator,
     Stack,
     TextInput,
+    Skeleton,
 } from '@mantine/core';
 import {
-    IconLayout2,
-    IconSettings,
-    IconLayersSubtract,
-    IconTypography,
-    IconPhoto,
-    IconHelp,
-    IconBell,
-    IconSearch,
     IconPlus,
     IconArrowRight,
     IconDeviceFloppy,
     IconShare,
     IconChevronRight,
-    IconDots
+    IconDots,
+    IconLayoutDashboard,
+    IconFileCode,
+    IconBox,
+    IconDatabase,
+    IconSettings,
+    IconSearch,
+    IconBell,
+    IconHelp,
+    IconLayout2
 } from '@tabler/icons-react';
 
 // Use relative imports to bypass any workspace/alias resolution issues during development
@@ -44,6 +46,11 @@ import {
     FloatingPanel,
     FloatingToolbar,
     useLayout,
+    ProBadge,
+    UpgradeCTA,
+    PricingCard,
+    MobileBottomNav,
+    MobileDrawer,
 } from '../../src/index';
 
 import { mantinePreset } from '../../src/presets/mantine';
@@ -54,17 +61,18 @@ const theme = createTheme({
 });
 
 function DesignerWorkspace() {
-    const [activeId, setActiveId] = useState<string | null>('layers');
+    const [activeId, setActiveId] = useState<string | null>('dashboard');
     const [isPinned, setIsPinned] = useState(false);
     const [isWelcomeOpen, setIsWelcomeOpen] = useState(false);
     const [isTipOpen, setIsTipOpen] = useState(false);
     const [showSkeleton, setShowSkeleton] = useState(true);
     const [inspectingId, setInspectingId] = useState<string | null>(null);
+    const [showPricing, setShowPricing] = useState(false);
 
     const tipAnchorRef = useRef<HTMLDivElement>(null);
     const { startTour } = useTour();
-    const { preset } = useLayout();
-    const { AppShell } = preset as any;
+    const { preset, isMobile } = useLayout();
+    const { AppShell, IconButton } = preset as any;
 
     // Simulate initial load
     useEffect(() => {
@@ -81,13 +89,24 @@ function DesignerWorkspace() {
     ];
 
     if (showSkeleton) {
-        return <LayoutSkeleton />;
+        return (
+            <LayoutSkeleton
+                showFooter={!isMobile}
+                showSidebar={!isMobile}
+            >
+                <Box style={{ display: 'flex', flexDirection: 'column', gap: 24, padding: 20, height: '100%', boxSizing: 'border-box' }}>
+                    <Skeleton width="40%" height={32} />
+                    <Box style={{ flex: 1, backgroundColor: '#f8f9fa', borderRadius: 20, opacity: 0.5, border: '2px dashed #dee2e6' }} />
+                </Box>
+            </LayoutSkeleton>
+        );
     }
 
     const sideTabs = [
-        { id: 'layers', icon: <IconLayersSubtract size={22} />, label: 'Layers' },
-        { id: 'typography', icon: <IconTypography size={22} />, label: 'Text' },
-        { id: 'images', icon: <IconPhoto size={22} />, label: 'Photos' },
+        { id: 'dashboard', icon: <IconLayoutDashboard size={22} />, label: 'Dashboard' },
+        { id: 'explorer', icon: <IconFileCode size={22} />, label: 'Explorer' },
+        { id: 'assets', icon: <IconBox size={22} />, label: 'Assets' },
+        { id: 'database', icon: <IconDatabase size={22} />, label: 'Resources' },
         { id: 'settings', icon: <IconSettings size={22} />, label: 'Settings' },
     ];
 
@@ -108,19 +127,22 @@ function DesignerWorkspace() {
                     primary={
                         <Group gap="xs">
                             <Box style={{ padding: 6, backgroundColor: '#667eea', borderRadius: 8 }}>
-                                <IconLayout2 size={24} color="white" />
+                                <IconBox size={24} color="white" />
                             </Box>
                             <Box>
-                                <Text fw={800} size="sm" style={{ letterSpacing: -0.5, lineHeight: 1, color: '#333' }}>APPFRAMES</Text>
-                                <Text size="xs" color="dimmed" style={{ lineHeight: 1 }}>v2.0 Beta</Text>
+                                <Group gap={4} align="center">
+                                    <Text fw={800} size="sm" style={{ letterSpacing: -0.5, lineHeight: 1, color: '#333' }}>LAYOUT SHELL</Text>
+                                    <ProBadge variant="purple" size="xs" />
+                                </Group>
+                                <Text size="xs" color="dimmed" style={{ lineHeight: 1 }}>Framework v1.0.0</Text>
                             </Box>
                         </Group>
                     }
                     secondary={
                         <Group gap="xs">
-                            <Text size="sm">Projects</Text>
+                            <Text size="sm">Workspace</Text>
                             <IconChevronRight size={14} color="#ccc" />
-                            <Text size="sm" fw={600}>Untitled Artwork</Text>
+                            <Text size="sm" fw={600}>Default Project</Text>
                         </Group>
                     }
                     center={
@@ -135,29 +157,42 @@ function DesignerWorkspace() {
                         </Box>
                     }
                     actions={
-                        <Group gap="md">
-                            <ActionIcon variant="subtle" color="gray" radius="xl">
-                                <Indicator color="red" size={6} offset={3}>
-                                    <IconBell size={20} />
-                                </Indicator>
-                            </ActionIcon>
-                            <Button.Group>
-                                <Button size="xs" variant="outline" leftSection={<IconDeviceFloppy size={14} />}>Save</Button>
-                                <Button size="xs" variant="filled" leftSection={<IconShare size={14} />}>Share</Button>
-                            </Button.Group>
+                        <Group gap={isMobile ? "xs" : "md"}>
+                            {!isMobile && (
+                                <>
+                                    <ActionIcon variant="subtle" color="gray" radius="xl">
+                                        <Indicator color="red" size={6} offset={3}>
+                                            <IconBell size={20} />
+                                        </Indicator>
+                                    </ActionIcon>
+                                    <Button.Group>
+                                        <Button size="xs" variant="outline" leftSection={<IconDeviceFloppy size={14} />}>Save</Button>
+                                        <Button size="xs" variant="filled" leftSection={<IconShare size={14} />}>Share</Button>
+                                    </Button.Group>
+                                </>
+                            )}
                             <Avatar src="https://i.pravatar.cc/300" size="sm" radius="xl" />
                         </Group>
                     }
                 />
             }
-            navbar={
+            navbar={!isMobile && (
                 <SidebarRail
                     tabs={sideTabs}
                     activeTabId={activeId}
                     onTabClick={handleTabClick}
                     isPinned={isPinned}
                 >
-                    <Box style={{ paddingBottom: 8 }}>
+                    <Stack gap={8} style={{ paddingBottom: 8, alignItems: 'center' }}>
+                        <IconButton
+                            icon={<IconPlus size={20} style={{ color: '#f6d365' }} />}
+                            tooltip="Upgrade to Pro"
+                            onClick={() => setShowPricing(true)}
+                            style={{
+                                background: 'linear-gradient(135deg, #2c3e50 0%, #000 100%)',
+                                border: '1px solid #f6d365'
+                            }}
+                        />
                         <ActionIcon
                             variant="subtle"
                             color="gray"
@@ -167,25 +202,33 @@ function DesignerWorkspace() {
                         >
                             <IconHelp size={22} />
                         </ActionIcon>
-                    </Box>
+                    </Stack>
                 </SidebarRail>
-            }
+            )}
             footer={
-                <AppFooter
-                    left={
-                        <Group gap="xs">
-                            <Box w={8} h={8} style={{ backgroundColor: '#2dd4bf', borderRadius: '50%' }} />
-                            <Text size="xs">Syncing to cloud...</Text>
-                        </Group>
-                    }
-                    center={<Text size="xs">375 x 667 | iPhone 14</Text>}
-                    right={
-                        <Group gap="md">
-                            <Text size="xs" style={{ cursor: 'pointer' }}>Release Notes</Text>
-                            <Text size="xs" fw={700}>BETA</Text>
-                        </Group>
-                    }
-                />
+                isMobile ? (
+                    <MobileBottomNav
+                        tabs={sideTabs}
+                        activeTabId={isPinned ? activeId : null}
+                        onTabClick={handleTabClick}
+                    />
+                ) : (
+                    <AppFooter
+                        left={
+                            <Group gap="xs">
+                                <Box w={8} h={8} style={{ backgroundColor: '#2dd4bf', borderRadius: '50%' }} />
+                                <Text size="xs">Syncing to cloud...</Text>
+                            </Group>
+                        }
+                        center={<Text size="xs">375 x 667 | iPhone 14</Text>}
+                        right={
+                            <Group gap="md">
+                                <Text size="xs" style={{ cursor: 'pointer' }}>Release Notes</Text>
+                                <Text size="xs" fw={700}>BETA</Text>
+                            </Group>
+                        }
+                    />
+                )
             }
         >
             <Box style={{ flex: 1, position: 'relative', overflow: 'hidden', height: '100%' }}>
@@ -203,23 +246,23 @@ function DesignerWorkspace() {
                 >
                     <Stack align="center" gap="xl">
                         <Box
-                            onClick={() => setInspectingId(inspectingId === 'frame-1' ? null : 'frame-1')}
+                            onClick={() => setInspectingId(inspectingId === 'item-1' ? null : 'item-1')}
                             style={{
-                                width: 375,
-                                height: 667,
+                                width: '80%',
+                                height: '70%',
                                 backgroundColor: 'white',
-                                borderRadius: 24,
-                                boxShadow: '0 20px 50px rgba(0,0,0,0.1)',
-                                border: inspectingId === 'frame-1' ? '2px solid #667eea' : '1px solid #eee',
+                                borderRadius: 20,
+                                boxShadow: '0 10px 30px rgba(0,0,0,0.05)',
+                                border: inspectingId === 'item-1' ? '2px solid #667eea' : '1px solid #eee',
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
                                 cursor: 'pointer',
                                 transition: 'all 0.2s ease',
-                                transform: inspectingId === 'frame-1' ? 'scale(1.02)' : 'scale(1)'
+                                transform: inspectingId === 'item-1' ? 'scale(1.01)' : 'scale(1)'
                             }}
                         >
-                            <Text color="dimmed" size="xs">Empty Frame</Text>
+                            <Text color="dimmed" size="sm">Generic Content Area</Text>
                         </Box>
 
                         <FloatingToolbar
@@ -234,32 +277,111 @@ function DesignerWorkspace() {
                     </Stack>
                 </Box>
 
-                {/* Side Panel for Config */}
-                <FloatingPanel
-                    id="properties-panel"
-                    title="Properties"
-                    isOpen={!!inspectingId}
-                    onClose={() => setInspectingId(null)}
-                    initialSize={{ width: 320, height: 480 }}
-                    initialPosition={{ x: window.innerWidth - 340, y: 80 }}
+                {/* Pricing Overlay */}
+                {showPricing && (
+                    <Box
+                        style={{
+                            position: 'fixed',
+                            top: 0,
+                            left: 0,
+                            width: '100vw',
+                            height: '100vh',
+                            backgroundColor: 'rgba(0, 0, 0, 0.4)',
+                            backdropFilter: 'blur(10px)',
+                            zIndex: 30000,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            animation: 'fadeIn 0.2s ease-out'
+                        }}
+                        onClick={() => setShowPricing(false)}
+                    >
+                        <Box
+                            style={{ maxWidth: 450, width: '100%', padding: 20 }}
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            <PricingCard
+                                onSelect={() => {
+                                    alert('Redirecting to HitPay...');
+                                    setShowPricing(false);
+                                }}
+                            />
+                            <Button
+                                variant="subtle"
+                                color="gray"
+                                fullWidth
+                                mt="md"
+                                style={{ color: 'white' }}
+                                onClick={() => setShowPricing(false)}
+                            >
+                                Maybe Later
+                            </Button>
+                        </Box>
+                    </Box>
+                )}
+
+                {/* Properties Panel (Desktop) */}
+                {!isMobile && (
+                    <FloatingPanel
+                        id="properties-panel"
+                        title="Properties"
+                        isOpen={!!inspectingId}
+                        onClose={() => setInspectingId(null)}
+                        initialSize={{ width: 320, height: 480 }}
+                        initialPosition={{ x: window.innerWidth - 340, y: 80 }}
+                    >
+                        <Stack p="md">
+                            <Box>
+                                <Text size="xs" fw={700} color="dimmed" mb={4}>GEOMETRY</Text>
+                                <Group grow>
+                                    <TextInput label="X" value="120" size="xs" readOnly />
+                                    <TextInput label="Y" value="450" size="xs" readOnly />
+                                </Group>
+                            </Box>
+                            <Box>
+                                <Text size="xs" fw={700} color="dimmed" mb={4}>STYLING</Text>
+                                <Stack gap="xs">
+                                    <Box h={40} style={{ backgroundColor: '#667eea', borderRadius: 8, cursor: 'pointer' }} />
+                                    <Text size="xs">Primary Brand Violet</Text>
+                                </Stack>
+                            </Box>
+                        </Stack>
+                    </FloatingPanel>
+                )}
+
+                {/* Mobile Tab Content (Bottom Sheet) */}
+                <MobileDrawer
+                    isOpen={isMobile && isPinned && !!activeId}
+                    onClose={() => setIsPinned(false)}
+                    title={sideTabs.find(t => t.id === activeId)?.label}
                 >
-                    <Stack p="md">
+                    <Stack>
+                        <TextInput placeholder="Search..." size="md" radius="md" />
+                        <Box h={200} style={{ backgroundColor: '#f8f9fa', borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <Text color="dimmed">Content for {activeId}</Text>
+                        </Box>
+                        <Button fullWidth size="md">Add to Canvas</Button>
+                    </Stack>
+                </MobileDrawer>
+
+                {/* Mobile Properties (Bottom Sheet) */}
+                <MobileDrawer
+                    isOpen={isMobile && !!inspectingId}
+                    onClose={() => setInspectingId(null)}
+                    title="Edit Item"
+                >
+                    <Stack gap="xl">
                         <Box>
-                            <Text size="xs" fw={700} color="dimmed" mb={4}>GEOMETRY</Text>
-                            <Group grow>
-                                <TextInput label="X" value="120" size="xs" readOnly />
-                                <TextInput label="Y" value="450" size="xs" readOnly />
+                            <Text fw={600} mb="sm">Appearance</Text>
+                            <Group gap="xs">
+                                {['#667eea', '#764ba2', '#2dd4bf', '#f59e0b'].map(c => (
+                                    <Box key={c} w={48} h={48} style={{ backgroundColor: c, borderRadius: 12, cursor: 'pointer' }} />
+                                ))}
                             </Group>
                         </Box>
-                        <Box>
-                            <Text size="xs" fw={700} color="dimmed" mb={4}>STYLING</Text>
-                            <Stack gap="xs">
-                                <Box h={40} style={{ backgroundColor: '#667eea', borderRadius: 8, cursor: 'pointer' }} />
-                                <Text size="xs">Primary Brand Violet</Text>
-                            </Stack>
-                        </Box>
+                        <Button fullWidth size="lg">Save Changes</Button>
                     </Stack>
-                </FloatingPanel>
+                </MobileDrawer>
 
                 {/* Help Overlay Trigger */}
                 <Box

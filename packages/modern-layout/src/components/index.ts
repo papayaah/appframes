@@ -13,4 +13,9 @@ export { FloatingToolbar } from './FloatingToolbar';
 export { ProBadge } from './billing/ProBadge';
 export { UpgradeCTA } from './billing/UpgradeCTA';
 export { PricingCard } from './billing/PricingCard';
-export * from './Tour';
+
+// Mobile components
+export { MobileBottomNav } from './MobileBottomNav';
+export { MobileDrawer } from './MobileDrawer';
+
+export * from './Tour/index';

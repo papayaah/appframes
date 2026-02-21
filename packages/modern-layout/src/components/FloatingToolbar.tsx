@@ -2,26 +2,43 @@ import React from 'react';
 import { useLayout } from '../context/LayoutContext';
 
 export interface FloatingToolbarProps {
-    children: React.ReactNode;
+    children?: React.ReactNode;
     position?: 'top' | 'bottom';
     offset?: number;
     className?: string;
     style?: React.CSSProperties;
+    /** Optional ID for testing or targeting */
+    id?: string;
+    /** Whether the toolbar is visible */
+    visible?: boolean;
+    /** Item shortcuts (legacy/alternative to children) */
+    items?: Array<{
+        id: string;
+        icon: React.ReactNode;
+        label: string;
+        onClick?: () => void;
+    }>;
 }
 
 export const FloatingToolbar: React.FC<FloatingToolbarProps> = ({
     children,
     position = 'bottom',
-    offset = 24,
+    offset = 64,
     className,
     style,
+    id,
+    visible = true,
+    items,
 }) => {
     const { preset } = useLayout();
-    const { Box } = preset!;
+    const { Box, IconButton } = preset!;
+
+    if (!visible) return null;
 
     return (
         <Box
             className={className}
+            id={id}
             style={{
                 position: 'fixed',
                 [position]: offset,
@@ -40,7 +57,16 @@ export const FloatingToolbar: React.FC<FloatingToolbarProps> = ({
                 ...style,
             }}
         >
-            {children}
+            {items ? items.map(item => (
+                <IconButton
+                    key={item.id}
+                    icon={item.icon}
+                    onClick={item.onClick}
+                    tooltip={item.label}
+                    aria-label={item.label}
+                    size="md"
+                />
+            )) : children}
         </Box>
     );
 };
